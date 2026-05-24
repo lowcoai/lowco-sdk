@@ -1,15 +1,15 @@
-# @backend-platform/lowco-sdk-lowcodb
+# @lowcoai/lowcodb
 
 TypeScript / Node client for the lowcodb manager service. Works in any environment that ships a global `fetch` (Node 18+, modern browsers, Bun, Deno).
 
 ```bash
-npm install @backend-platform/lowco-sdk-lowcodb
+npm install @lowcoai/lowcodb
 ```
 
 ## Quick start
 
 ```ts
-import { LowcodbClient } from "@backend-platform/lowco-sdk-lowcodb";
+import { LowcodbClient } from "@lowcoai/lowcodb";
 
 const client = new LowcodbClient({
   baseURL: "http://localhost:8080",
@@ -46,15 +46,15 @@ const rows = await client.listRecords(base.schema!, table.name!, {
 
 ## Options
 
-| Option | Description |
-| ------ | ----------- |
-| `baseURL` | Manager URL (required). |
-| `orgId` | Sets `X-Org-Id`. |
-| `userId` | Sets `X-User-Id`. |
-| `defaultHeaders` | Extra headers added to every request. |
-| `apiBasePath` | Overrides `/v1/lowcodb` (useful behind reverse proxies). |
-| `fetch` | Custom fetch implementation (defaults to global `fetch`). |
-| `timeoutMs` | Per-request timeout (default 30 000; `0` disables). |
+| Option           | Description                                               |
+| ---------------- | --------------------------------------------------------- |
+| `baseURL`        | Manager URL (required).                                   |
+| `orgId`          | Sets `X-Org-Id`.                                          |
+| `userId`         | Sets `X-User-Id`.                                         |
+| `defaultHeaders` | Extra headers added to every request.                     |
+| `apiBasePath`    | Overrides `/v1/lowcodb` (useful behind reverse proxies).  |
+| `fetch`          | Custom fetch implementation (defaults to global `fetch`). |
+| `timeoutMs`      | Per-request timeout (default 30 000; `0` disables).       |
 
 You can also mutate identity at runtime: `client.setOrgId(...)`, `client.setUserId(...)`, `client.setHeader(k, v)`.
 
@@ -63,7 +63,7 @@ You can also mutate identity at runtime: `client.setOrgId(...)`, `client.setUser
 Every non-2xx response throws `LowcodbError`:
 
 ```ts
-import { LowcodbError } from "@backend-platform/lowco-sdk-lowcodb";
+import { LowcodbError } from "@lowcoai/lowcodb";
 
 try {
   await client.getBase("missing");
