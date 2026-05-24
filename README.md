@@ -8,12 +8,15 @@ The repository is a **multi-module monorepo**: one folder per ecosystem (Go / np
 lowco-sdk/
 ├── go/
 │   ├── lowcodb/      ← github.com/backend-platform/lowco-sdk/go/lowcodb
-│   └── agentx/       ← github.com/backend-platform/lowco-sdk/go/agentx
+│   ├── agentx/       ← github.com/backend-platform/lowco-sdk/go/agentx
+│   └── workflow/     ← github.com/backend-platform/lowco-sdk/go/workflow
 ├── npm/
 │   ├── lowcodb/      ← @lowcoai/lowcodb
-│   └── agentx/       ← @lowcoai/agentx
+│   ├── agentx/       ← @lowcoai/agentx
+│   └── workflow/     ← @lowcoai/workflow
 └── docs/
-    └── lowcodb.md    ← REST surface reference (language-agnostic)
+    ├── lowcodb.md    ← REST surface reference (language-agnostic)
+    └── workflow.md   ← REST surface reference (language-agnostic)
 ```
 
 `agentx` is a single SDK covering three services – **agent-manager**, **agent-kb** and **agent-executor** – exposed as `client.Manager`, `client.KB` and `client.Executor` sub-clients sharing one HTTP transport.
@@ -24,10 +27,11 @@ Each module is independent — you can `go get` or `npm install` a single produc
 
 ## Products
 
-| Product   | Services covered                              | Go module                                          | npm package        | Docs                                       |
-| --------- | --------------------------------------------- | -------------------------------------------------- | ------------------ | ------------------------------------------ |
-| `lowcodb` | lowcodb manager                               | `github.com/backend-platform/lowco-sdk/go/lowcodb` | `@lowcoai/lowcodb` | [docs/lowcodb.md](docs/lowcodb.md)         |
-| `agentx`  | agent-manager · agent-kb · agent-executor     | `github.com/backend-platform/lowco-sdk/go/agentx`  | `@lowcoai/agentx`  | [go/agentx/README.md](go/agentx/README.md) |
+| Product    | Services covered                              | Go module                                           | npm package         | Docs                                       |
+| ---------- | --------------------------------------------- | --------------------------------------------------- | ------------------- | ------------------------------------------ |
+| `lowcodb`  | lowcodb manager                               | `github.com/backend-platform/lowco-sdk/go/lowcodb`  | `@lowcoai/lowcodb`  | [docs/lowcodb.md](docs/lowcodb.md)         |
+| `agentx`   | agent-manager · agent-kb · agent-executor     | `github.com/backend-platform/lowco-sdk/go/agentx`   | `@lowcoai/agentx`   | [go/agentx/README.md](go/agentx/README.md) |
+| `workflow` | workflow-orchestrator                         | `github.com/backend-platform/lowco-sdk/go/workflow` | `@lowcoai/workflow` | [docs/workflow.md](docs/workflow.md)       |
 
 > Future products will follow the same `go/<product>` + `npm/<product>` pattern.
 
@@ -71,6 +75,23 @@ resp,   _ := client.Executor.SendMessage(ctx, "agent_abc", params)
 
 See [go/agentx/README.md](go/agentx/README.md).
 
+```bash
+go get github.com/backend-platform/lowco-sdk/go/workflow
+```
+
+```go
+import "github.com/backend-platform/lowco-sdk/go/workflow"
+
+client, _ := workflow.NewClient(workflow.Config{
+    BaseURL: "http://localhost:8080",
+    OrgID:   "org_123",
+    UserID:  "user_123",
+})
+workflows, _ := client.Workflows.List(ctx, nil)
+```
+
+See [go/workflow/README.md](go/workflow/README.md).
+
 ### npm
 
 ```bash
@@ -111,6 +132,24 @@ const resp = await client.Executor.sendMessage("agent_abc", params);
 
 See [npm/agentx/README.md](npm/agentx/README.md).
 
+```bash
+npm install @lowcoai/workflow
+```
+
+```ts
+import { WorkflowClient } from "@lowcoai/workflow";
+
+const client = new WorkflowClient({
+  baseUrl: "http://localhost:8080",
+  orgId: "org_123",
+  userId: "user_123",
+});
+
+const workflows = await client.workflows.list();
+```
+
+See [npm/workflow/README.md](npm/workflow/README.md).
+
 ---
 
 ## Adding a new product to this SDK
@@ -131,4 +170,4 @@ Per-product modules keep dependency surface area small and let consumers upgrade
 - Errors surface as a typed exception (`*RequestError` / `*Error` class) with `statusCode`, `message`, `code`, and the raw body for debugging.
 - Method names mirror the controller verbs in the corresponding service so the SDKs and server stay in lockstep.
 
-NPM packages — `@lowcoai/lowcodb`, `@lowcoai/agentx`.
+NPM packages — `@lowcoai/lowcodb`, `@lowcoai/agentx`, `@lowcoai/workflow`.

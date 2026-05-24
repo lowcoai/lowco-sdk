@@ -1,0 +1,7 @@
+# @lowcoai/workflow docs index
+
+- README.md: high-level summary, install, core examples
+- docs/overview.md: architecture and transport behavior
+- docs/quickstart.md: end-to-end usage flow
+- docs/api-reference.md: complete SDK method to API endpoint mapping
+- llms-full.txt: full machine-readable SDK and endpoint specification

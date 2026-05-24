@@ -1,0 +1,114 @@
+# workflow — REST surface reference
+
+Service: **workflow-orchestrator**. All routes are mounted under `/v1/wf/*`.
+
+## Conventions
+
+- **Tenancy**: pass `X-Org-Id` (and optionally `X-User-Id`) on every request.
+- **Auth**: `Authorization: Bearer <token>`.
+- **Response envelope**: `{ success, data, error, message }`. Clients should read the inner `data`. Both SDKs (`@lowcoai/workflow`, `github.com/backend-platform/lowco-sdk/go/workflow`) unwrap automatically.
+
+## Endpoints
+
+### Workflows
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET`    | `/workflows` | List workflows (pagination) |
+| `GET`    | `/workflows/count` | Count workflows |
+| `GET`    | `/workflows/:id` | Get one workflow |
+| `POST`   | `/workflows` | Create workflow |
+| `PUT`    | `/workflows/:id` | Update workflow (creates a new version) |
+| `DELETE` | `/workflows/:id` | Delete workflow |
+| `POST`   | `/workflows/run` | Start or resume an execution |
+| `GET`    | `/workflows/:id/versions` | List versions for a workflow |
+| `POST`   | `/workflows/:id/publish` | Publish workflow as a template |
+| `GET`    | `/workflows/published` | List published templates |
+| `GET`    | `/workflows/published/count` | Count published templates |
+| `GET`    | `/workflows/published/:id` | Get a published template |
+| `PUT`    | `/workflows/published/:id` | Update a published template |
+| `DELETE` | `/workflows/published/:id` | Delete a published template |
+| `GET`    | `/workflows/published/web` | List web-facing published templates |
+| `GET`    | `/workflows/published/web/:id` | Get a web-facing published template |
+| `GET`    | `/workflows/published/web/search` | Search published templates |
+
+#### Run payload
+
+- **Start**: `{ workflowId, inputData?, environmentId? }`
+- **Resume**: `{ workflowId, executionId, activityId, environmentId? }`
+
+### Environments
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET`    | `/environments` | List environments |
+| `GET`    | `/environments/:id` | Get one environment |
+| `POST`   | `/environments` | Create environment |
+| `PUT`    | `/environments/:id` | Update environment |
+| `DELETE` | `/environments/:id` | Delete environment |
+| `PATCH`  | `/environments/:id/default` | Mark environment as default |
+
+### Functions
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET`    | `/functions` | List functions |
+| `GET`    | `/functions/:id` | Get one function |
+| `POST`   | `/functions` | Create function |
+| `PUT`    | `/functions/:id` | Update function (creates a new version) |
+| `DELETE` | `/functions/:id` | Delete function |
+| `GET`    | `/functions/:id/versions` | List versions for a function |
+| `POST`   | `/functions/:id/execute` | Execute a function with params |
+
+### Executions
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET` | `/executions` | List executions (supports `?full=true`) |
+| `GET` | `/executions/count` | Count executions |
+| `GET` | `/executions/:id` | Get one execution |
+| `GET` | `/executions/:id/logs` | Stream/list logs for an execution |
+
+### Activities
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET` | `/activities` | List activity-history entries |
+| `GET` | `/activities/count` | Count activity-history entries |
+| `GET` | `/activities/:id` | Get one activity-history entry |
+| `GET` | `/activities/:id/logs` | Logs for a single activity |
+
+### Human tasks
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET`   | `/human-tasks` | List human tasks |
+| `GET`   | `/human-tasks/:id` | Get a single human task |
+| `PATCH` | `/human-tasks/:id/complete` | Complete a human task with an action |
+
+### Analytics
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET` | `/analytics` | Default analytics snapshot |
+| `GET` | `/analytics/:id` | Analytics for a specific entity (e.g. workflow) |
+
+### Dry run
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `POST` | `/dryrun` | Evaluate an expression against an execution context |
+
+### Webhooks
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `POST`   | `/webhook/:workflowId` | Trigger a workflow via webhook (also used as create) |
+| `GET`    | `/webhook/:workflowId` | List webhooks bound to a workflow |
+| `PUT`    | `/webhook/:webhookId` | Update a webhook |
+| `DELETE` | `/webhook/:workflowId` | Delete a webhook |
+
+## See also
+
+- Go client: [`../go/workflow/README.md`](../go/workflow/README.md)
+- npm client: [`../npm/workflow/README.md`](../npm/workflow/README.md)
