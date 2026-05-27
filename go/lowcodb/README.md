@@ -106,7 +106,7 @@ The SDK mirrors `lowcodb/manager/server/server.go` 1-to-1:
 - **Bases** — `GetBase`, `CreateBase`, `UpdateBase`, `DeleteBase`, `ListBases`, `ExportBaseCollection`, `SyncBaseTables`
 - **Tables** — `GetTable`, `CreateTable`, `UpdateTable`, `DeleteTable`, `ListTables`
 - **Columns** — `GetColumn`, `CreateColumn`, `BulkCreateColumns`, `UpdateColumn`, `BulkUpdateColumns`, `DeleteColumn`, `ListColumns`, `ValidateField`
-- **Indexes** — `CreateTableIndex`, `UpdateTableIndex`, `ListTableIndexes`, `DeleteTableIndex`
+- **Indexes** — `GetTableIndex`, `CreateTableIndex`, `UpdateTableIndex`, `ListTableIndexes`, `DeleteTableIndex`
 - **Records** — `CreateRecord`, `GetRecord`, `UpdateRecord`, `DeleteRecord`, `ListRecords`, `CountRecords`, `CreateBulkRecords`, `UpdateBulkRecords`, `DeleteBulkRecords`
 - **Views (data)** — `GetViewRecord`, `ListViewRecords`, `CountViewRecords`
 - **Views (metadata)** — `ListViews`, `CreateView`, `GetView`, `UpdateView`, `DeleteView`, `RefreshView`

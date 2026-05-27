@@ -104,6 +104,11 @@ type TableIndex struct {
 	IsUnique  bool     `json:"isUnique,omitempty"`
 }
 
+// TableIndexUpdateInput is the rename-only payload accepted by PUT /tables/{tableId}/index/{id}.
+type TableIndexUpdateInput struct {
+	IndexName string `json:"indexName,omitempty"`
+}
+
 type TableTrigger struct {
 	BaseEntity
 	BaseID       string `json:"baseId,omitempty"`

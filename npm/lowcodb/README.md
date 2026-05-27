@@ -81,7 +81,7 @@ The client mirrors `lowcodb/manager/server/server.go` 1-to-1:
 - **Bases** — `getBase`, `createBase`, `updateBase`, `deleteBase`, `listBases`, `exportBaseCollection`, `syncBaseTables`
 - **Tables** — `getTable`, `createTable`, `updateTable`, `deleteTable`, `listTables`
 - **Columns** — `getColumn`, `createColumn`, `bulkCreateColumns`, `updateColumn`, `bulkUpdateColumns`, `deleteColumn`, `listColumns`, `validateField`
-- **Indexes** — `createTableIndex`, `updateTableIndex`, `listTableIndexes`, `deleteTableIndex`
+- **Indexes** — `getTableIndex`, `createTableIndex`, `updateTableIndex`, `listTableIndexes`, `deleteTableIndex`
 - **Records** — `createRecord`, `getRecord`, `updateRecord`, `deleteRecord`, `listRecords`, `countRecords`, `createBulkRecords`, `updateBulkRecords`, `deleteBulkRecords`
 - **Views (data)** — `getViewRecord`, `listViewRecords`, `countViewRecords`
 - **Views (metadata)** — `listViews`, `createView`, `getView`, `updateView`, `deleteView`, `refreshView`

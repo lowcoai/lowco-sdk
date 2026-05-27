@@ -90,6 +90,11 @@ export interface TableIndex extends BaseEntity {
   isUnique?: boolean;
 }
 
+/** Rename-only payload accepted by PUT /tables/{tableId}/index/{id}. */
+export interface TableIndexUpdateInput {
+  indexName?: string;
+}
+
 export interface TableTrigger extends BaseEntity {
   baseId?: string;
   tableId?: string;

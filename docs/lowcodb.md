@@ -132,8 +132,9 @@ A *base* is a logical database (its own schema, optionally backed by an external
 | Method | Path                                           | Purpose       |
 | ------ | ---------------------------------------------- | ------------- |
 | GET    | `/tables/{tableId}/indexes`                    | List.         |
+| GET    | `/tables/{tableId}/index/{id}`                 | Fetch one.    |
 | POST   | `/tables/{tableId}/index`                      | Create.       |
-| PUT    | `/tables/{tableId}/index/{id}`                 | Update.       |
+| PUT    | `/tables/{tableId}/index/{id}`                 | Rename (`indexName` only). |
 | DELETE | `/tables/{tableId}/index/{id}`                 | Drop.         |
 
 ### Records (table data)
@@ -246,6 +247,7 @@ When `baseId` is omitted, the manager targets its own metadata schema. When set,
 | `GET /tables/{tableId}/columns/{id}`                    | `GetColumn`                | `getColumn`              |
 | `POST /validate`                                        | `ValidateField`            | `validateField`          |
 | `POST /tables/{tableId}/index`                          | `CreateTableIndex`         | `createTableIndex`       |
+| `GET /tables/{tableId}/index/{id}`                      | `GetTableIndex`            | `getTableIndex`          |
 | `PUT /tables/{tableId}/index/{id}`                      | `UpdateTableIndex`         | `updateTableIndex`       |
 | `GET /tables/{tableId}/indexes`                         | `ListTableIndexes`         | `listTableIndexes`       |
 | `DELETE /tables/{tableId}/index/{id}`                   | `DeleteTableIndex`         | `deleteTableIndex`       |

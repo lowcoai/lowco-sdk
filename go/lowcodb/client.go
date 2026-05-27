@@ -273,6 +273,14 @@ func (c *Client) ValidateField(ctx context.Context, field Field) (*ValidationRes
 
 // --- Table indexes -------------------------------------------------------
 
+func (c *Client) GetTableIndex(ctx context.Context, tableID, id string) (*TableIndex, error) {
+	var out TableIndex
+	if err := c.do(ctx, http.MethodGet, c.apiPath("tables", tableID, "index", id), nil, nil, &out, true); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *Client) CreateTableIndex(ctx context.Context, tableID string, index TableIndex) (*TableIndex, error) {
 	var out TableIndex
 	if err := c.do(ctx, http.MethodPost, c.apiPath("tables", tableID, "index"), nil, index, &out, true); err != nil {
@@ -281,7 +289,7 @@ func (c *Client) CreateTableIndex(ctx context.Context, tableID string, index Tab
 	return &out, nil
 }
 
-func (c *Client) UpdateTableIndex(ctx context.Context, tableID, id string, index TableIndex) (*TableIndex, error) {
+func (c *Client) UpdateTableIndex(ctx context.Context, tableID, id string, index TableIndexUpdateInput) (*TableIndex, error) {
 	var out TableIndex
 	if err := c.do(ctx, http.MethodPut, c.apiPath("tables", tableID, "index", id), nil, index, &out, true); err != nil {
 		return nil, err

@@ -22,6 +22,7 @@ import {
   type SyncTablesResult,
   type Table,
   type TableIndex,
+  type TableIndexUpdateInput,
   type TableTrigger,
   type TableView,
   type TableWebhook,
@@ -227,6 +228,13 @@ export class LowcodbClient {
 
   // --- Table indexes -----------------------------------------------------
 
+  getTableIndex(tableId: string, id: string): Promise<TableIndex> {
+    return this.request({
+      method: "GET",
+      path: this.api("tables", tableId, "index", id),
+      enveloped: true,
+    });
+  }
   createTableIndex(tableId: string, index: TableIndex): Promise<TableIndex> {
     return this.request({
       method: "POST",
@@ -235,7 +243,7 @@ export class LowcodbClient {
       enveloped: true,
     });
   }
-  updateTableIndex(tableId: string, id: string, index: TableIndex): Promise<TableIndex> {
+  updateTableIndex(tableId: string, id: string, index: TableIndexUpdateInput): Promise<TableIndex> {
     return this.request({
       method: "PUT",
       path: this.api("tables", tableId, "index", id),
