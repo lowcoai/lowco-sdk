@@ -2,6 +2,12 @@ import { generateId } from "./utils";
 import { Config, DeviceInfo, Event, LocationInfo, Metadata } from "./types";
 import UAParser from "ua-parser-js";
 
+declare global {
+  interface Window {
+    __LOWCO_ANALYTICS_DEFAULT_URL__?: string;
+  }
+}
+
 class LowcoAnalytics {
   private static instance: LowcoAnalytics;
   private config: Config | null = null;
