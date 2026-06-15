@@ -4,8 +4,9 @@ Service: **workflow-orchestrator**. All routes are mounted under `/v1/wf/*`.
 
 ## Conventions
 
-- **Tenancy**: pass `X-Org-Id` (and optionally `X-User-Id`) on every request.
-- **Auth**: `Authorization: Bearer <token>`.
+- **Host**: always `https://api.lowco.ai`.
+- **Auth**: `Authorization: Bearer <user-token-or-api-key>` — required; identifies the acting user.
+- **Tenancy**: pass `X-Org-Id` on every request.
 - **Response envelope**: `{ success, data, error, message }`. Clients should read the inner `data`. Both SDKs (`@lowcoai/workflow`, `github.com/backend-platform/lowco-sdk/go/workflow`) unwrap automatically.
 
 ## Endpoints

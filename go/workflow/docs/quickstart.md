@@ -6,10 +6,8 @@
 ctx := context.Background()
 
 client, err := workflow.NewClient(workflow.Config{
-	BaseURL:   "http://localhost:8080",
-	Token:     os.Getenv("WORKFLOW_TOKEN"),
+	Token:     os.Getenv("WORKFLOW_TOKEN"), // required: user token or API key
 	OrgID:     "1",
-	UserID:    "user_123",
 	TimeoutMS: 30_000,
 	Headers: map[string]string{
 		"X-Request-Source": "payments-service",

@@ -1,5 +1,4 @@
 export const HEADER_ORG_ID = "X-Org-Id";
-export const HEADER_USER_ID = "X-User-Id";
 
 export type ISODateString = string;
 

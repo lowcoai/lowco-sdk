@@ -3,8 +3,7 @@ package lowcodb
 import "time"
 
 const (
-	HeaderOrgID  = "X-Org-Id"
-	HeaderUserID = "X-User-Id"
+	HeaderOrgID = "X-Org-Id"
 )
 
 type BaseEntity struct {

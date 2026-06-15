@@ -12,10 +12,8 @@ npm install @lowcoai/flux
 import { FluxClient } from "@lowcoai/flux";
 
 const flux = new FluxClient({
-  baseUrl: "wss://flux.example.com/v1/ws",
-  token: "<jwt>",
+  token: "<token-or-api-key>",
   orgId: "org_123",
-  userId: "user_123",
 });
 
 flux.onState((state) => console.log("flux:", state));
@@ -34,12 +32,12 @@ flux.sendMessage("tables:leads", "ping", { hello: "world" });
 
 ## Options
 
+The client always connects to `wss://ws.lowco.ai/`.
+
 | Option                 | Description                                                          |
 | ---------------------- | -------------------------------------------------------------------- |
-| `baseUrl`              | WebSocket URL (`ws://`, `wss://`, `http://`, `https://`). Required.  |
-| `token`                | Auth token sent as the `token` query parameter. Required.            |
+| `token`                | Auth token (user token or API key) sent as the `token` query parameter. Required. |
 | `orgId`                | Organization id sent as `orgId`. Required.                           |
-| `userId`               | User id sent as `userId` (optional).                                 |
 | `clientId`             | Stable client id; defaults to a generated value.                     |
 | `heartbeatIntervalMs`  | Ping interval (default `5000`).                                      |
 | `reconnectIntervalMs`  | Initial reconnect backoff (default `1000`, capped at 30 s).          |

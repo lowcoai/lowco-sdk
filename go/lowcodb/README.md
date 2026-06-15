@@ -2,6 +2,8 @@
 
 Go client for the lowcodb manager service.
 
+Every request is sent to the fixed host `https://api.lowco.ai` (`lowcodb.DefaultBaseURL`). `NewClient` requires a token (a user token or an API key) that is sent as `Authorization: Bearer <token>` on every request.
+
 ```
 go get github.com/backend-platform/lowco-sdk/go/lowcodb
 ```
@@ -20,9 +22,8 @@ import (
 )
 
 func main() {
-    client, err := lowcodb.NewClient("http://localhost:8080",
+    client, err := lowcodb.NewClient("<token-or-api-key>",
         lowcodb.WithOrgID("org_123"),
-        lowcodb.WithUserID("user_123"),
     )
     if err != nil {
         log.Fatal(err)
@@ -76,12 +77,11 @@ func main() {
 | Option | Description |
 | ------ | ----------- |
 | `WithOrgID(id)` | Sets `X-Org-Id`. |
-| `WithUserID(id)` | Sets `X-User-Id`. |
 | `WithDefaultHeader(k, v)` | Adds an arbitrary header. |
 | `WithHTTPClient(c)` | Replaces the default `http.Client` (30 s timeout). |
 | `WithAPIBasePath(p)` | Overrides `/v1/lowcodb` (useful behind reverse proxies). |
 
-Headers can also be changed at runtime: `client.SetOrgID(...)`, `client.SetUserID(...)`.
+Headers can also be changed at runtime: `client.SetOrgID(...)`.
 
 ## Errors
 

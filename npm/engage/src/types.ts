@@ -1,6 +1,5 @@
 export interface Config {
   apiKey: string;
-  url?: string;
   orgId: string;
   autoTrack?: boolean;
 }

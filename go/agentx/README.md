@@ -1,7 +1,10 @@
 # agentx
 
 Go client for the agentx backend, covering the **agent-manager**, **agent-kb**
-(knowledge-base) and **agent-executor** services in a single package.
+(knowledge-base) and **agent-executor** services in a single package. All
+three services live behind the fixed host `https://api.lowco.ai`
+(`agentx.DefaultBaseURL`); construction requires a token (a user token or an
+API key) sent as `Authorization: Bearer <token>` on every request.
 
 ```bash
 go get github.com/backend-platform/lowco-sdk/go/agentx
@@ -17,9 +20,8 @@ import (
 )
 
 ctx := context.Background()
-client, err := agentx.NewClient("http://localhost:8080",
+client, err := agentx.NewClient("<token-or-api-key>",
     agentx.WithOrgID("org_123"),
-    agentx.WithUserID("user_123"),
 )
 if err != nil {
     panic(err)
@@ -37,22 +39,6 @@ resp,   _ := client.Executor.SendMessage(ctx, "agent_abc", agentx.MessageSendPar
     ChatType: "chat",
 })
 ```
-
-## Split deployments
-
-When the three services are on different hosts, omit `baseURL` and pass
-per-service URLs instead:
-
-```go
-client, _ := agentx.NewClient("",
-    agentx.WithManagerURL("http://manager.internal:8080"),
-    agentx.WithKBURL("http://kb.internal:8080"),
-    agentx.WithExecutorURL("http://executor.internal:8080"),
-    agentx.WithOrgID("org_123"),
-)
-```
-
-Any combination works – a global `baseURL` plus selective overrides is fine.
 
 ## Streaming the executor
 
@@ -77,14 +63,12 @@ default 30s `Timeout` doesn't truncate the connection.
 | Option                              | Description                                              |
 | ----------------------------------- | -------------------------------------------------------- |
 | `WithOrgID(id)`                     | Sets `X-Org-Id`.                                         |
-| `WithUserID(id)`                    | Sets `X-User-Id`.                                        |
 | `WithDefaultHeader(k, v)`           | Adds an arbitrary header to every request.               |
-| `WithManagerURL(u)` / `WithKBURL(u)` / `WithExecutorURL(u)` | Per-service base URL override.       |
 | `WithManagerAPIBasePath(p)` / `WithKBAPIBasePath(p)` / `WithExecutorAPIBasePath(p)` | Override the route prefix per service. |
 | `WithHTTPClient(c)`                 | Provides a custom `*http.Client` (default: 30s timeout). |
 
-Identity can also be mutated at runtime via `client.SetOrgID(...)`,
-`client.SetUserID(...)`, `client.SetHeader(k, v)`.
+Identity can also be mutated at runtime via `client.SetOrgID(...)` and
+`client.SetHeader(k, v)`.
 
 ## Errors
 

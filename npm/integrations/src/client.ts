@@ -1,7 +1,8 @@
 import type { ApiEnvelope, HttpMethod, RequestOptions, SDKConfig } from "./types.js";
 
+const BASE_URL = "https://api.lowco.ai";
+
 export const HEADER_ORG_ID = "X-Org-Id";
-export const HEADER_USER_ID = "X-User-Id";
 
 export class IntegrationsError extends Error {
   readonly status: number;
@@ -16,19 +17,18 @@ export class IntegrationsError extends Error {
 }
 
 export class HttpClient {
-  private readonly baseUrl: string;
-  private readonly token?: string;
+  private readonly token: string;
   private readonly orgId?: string;
-  private readonly userId?: string;
   private readonly timeoutMs: number;
   private readonly extraHeaders: Record<string, string>;
   private readonly fetchImpl: typeof globalThis.fetch;
 
   constructor(config: SDKConfig) {
-    this.baseUrl = config.baseUrl.replace(/\/$/, "");
+    if (!config.token) {
+      throw new Error("`token` is required. Pass a user token or API key in SDK config.");
+    }
     this.token = config.token;
     this.orgId = config.orgId;
-    this.userId = config.userId;
     this.timeoutMs = config.timeoutMs ?? 30_000;
     this.extraHeaders = config.headers ?? {};
     this.fetchImpl = config.fetch ?? globalThis.fetch;
@@ -54,14 +54,11 @@ export class HttpClient {
     if (body !== undefined) {
       headers["Content-Type"] = "application/json";
     }
-    if (this.token && !headers.Authorization) {
+    if (!headers.Authorization) {
       headers.Authorization = `Bearer ${this.token}`;
     }
     if (this.orgId && !headers[HEADER_ORG_ID]) {
       headers[HEADER_ORG_ID] = this.orgId;
-    }
-    if (this.userId && !headers[HEADER_USER_ID]) {
-      headers[HEADER_USER_ID] = this.userId;
     }
 
     const controller = new AbortController();
@@ -100,7 +97,7 @@ export class HttpClient {
 
   private buildUrl(path: string, query?: Record<string, unknown>): string {
     const normalized = path.startsWith("/") ? path : `/${path}`;
-    const url = new URL(`${this.baseUrl}${normalized}`);
+    const url = new URL(`${BASE_URL}${normalized}`);
     if (query) {
       for (const [key, value] of Object.entries(query)) {
         if (value === undefined || value === null) continue;

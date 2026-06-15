@@ -4,6 +4,9 @@
 // unwraps the standard response envelope ({ success, data, error, message })
 // and surfaces non-2xx responses as *RequestError.
 //
-// Tenancy is identified through the X-Org-Id / X-User-Id headers; set them
-// with WithOrgID / WithUserID at construction or SetOrgID / SetUserID later.
+// Every request is sent to the fixed host DefaultBaseURL
+// ("https://api.lowco.ai"). NewClient requires a token (a user token or an
+// API key) that is sent as "Authorization: Bearer <token>" on every request.
+// Tenancy is identified through the X-Org-Id header; set it with WithOrgID at
+// construction or SetOrgID later.
 package lowcodb

@@ -7,25 +7,14 @@ import {
   DEFAULT_KB_API_BASE_PATH,
   DEFAULT_MANAGER_API_BASE_PATH,
   HEADER_ORG_ID,
-  HEADER_USER_ID,
 } from "./types.js";
 
 export { ExecutorClient, KBClient, ManagerClient };
 export { tryParseMessage, type StreamEvent } from "./executor.js";
 
 export interface AgentxClientOptions {
-  /**
-   * Base URL applied to all three services (e.g. "http://localhost:8080").
-   * When the services live on different hosts, omit this and use the
-   * `managerURL` / `kbURL` / `executorURL` per-service overrides.
-   */
-  baseURL?: string;
-  /** Override the agent-manager base URL. */
-  managerURL?: string;
-  /** Override the agent-kb base URL. */
-  kbURL?: string;
-  /** Override the agent-executor base URL. */
-  executorURL?: string;
+  /** User token or API key sent as `Authorization: Bearer <token>` on every request. Required. */
+  token: string;
   /** Override the agent-manager route prefix (default "/v1/agentx/manager"). */
   managerApiBasePath?: string;
   /** Override the agent-kb route prefix (default "/v1/agentx/kb"). */
@@ -34,8 +23,6 @@ export interface AgentxClientOptions {
   executorApiBasePath?: string;
   /** X-Org-Id header value. */
   orgId?: string;
-  /** X-User-Id header value. */
-  userId?: string;
   /** Extra headers added to every request. */
   defaultHeaders?: Record<string, string>;
   /** Custom fetch implementation (defaults to global fetch). */
@@ -52,9 +39,8 @@ export interface AgentxClientOptions {
  * Unified agentx client.
  *
  * Wraps three sub-clients – [Manager], [KB], [Executor] – that share HTTP
- * transport, tenancy headers and request options. Pass a single `baseURL`
- * for a unified deployment, or per-service URLs when the services live on
- * different hosts.
+ * transport, tenancy headers and request options. All requests go to
+ * `https://api.lowco.ai`.
  */
 export class AgentxClient {
   private readonly headers: Record<string, string>;
@@ -67,19 +53,13 @@ export class AgentxClient {
   readonly Executor: ExecutorClient;
 
   constructor(opts: AgentxClientOptions) {
-    const managerURL = opts.managerURL ?? opts.baseURL;
-    const kbURL = opts.kbURL ?? opts.baseURL;
-    const executorURL = opts.executorURL ?? opts.baseURL;
-
-    if (!managerURL || !kbURL || !executorURL) {
-      throw new Error(
-        "AgentxClient: every service needs a base URL – set baseURL or managerURL/kbURL/executorURL",
-      );
+    if (!opts.token || !opts.token.trim()) {
+      throw new Error("AgentxClient: token is required");
     }
 
     this.headers = { ...(opts.defaultHeaders ?? {}) };
+    this.headers.Authorization = `Bearer ${opts.token}`;
     if (opts.orgId) this.headers[HEADER_ORG_ID] = opts.orgId;
-    if (opts.userId) this.headers[HEADER_USER_ID] = opts.userId;
 
     const transport = new Transport({
       fetch: opts.fetch ?? fetch,
@@ -88,15 +68,12 @@ export class AgentxClient {
     });
 
     const managerTarget: ServiceTarget = {
-      baseURL: managerURL,
       apiBasePath: normalizePrefix(opts.managerApiBasePath ?? DEFAULT_MANAGER_API_BASE_PATH),
     };
     const kbTarget: ServiceTarget = {
-      baseURL: kbURL,
       apiBasePath: normalizePrefix(opts.kbApiBasePath ?? DEFAULT_KB_API_BASE_PATH),
     };
     const executorTarget: ServiceTarget = {
-      baseURL: executorURL,
       apiBasePath: normalizePrefix(opts.executorApiBasePath ?? DEFAULT_EXECUTOR_API_BASE_PATH),
     };
 
@@ -108,11 +85,6 @@ export class AgentxClient {
   setOrgId(orgId: string | null): void {
     if (orgId) this.headers[HEADER_ORG_ID] = orgId;
     else delete this.headers[HEADER_ORG_ID];
-  }
-
-  setUserId(userId: string | null): void {
-    if (userId) this.headers[HEADER_USER_ID] = userId;
-    else delete this.headers[HEADER_USER_ID];
   }
 
   /** Sets / overwrites an arbitrary default header. Pass null to delete. */

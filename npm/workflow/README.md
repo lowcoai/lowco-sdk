@@ -12,10 +12,8 @@ npm install @lowcoai/workflow
 import { WorkflowClient } from "@lowcoai/workflow";
 
 const client = new WorkflowClient({
-  baseUrl: "http://localhost:8080",
-  token: process.env.WORKFLOW_TOKEN,
+  token: process.env.WORKFLOW_TOKEN!, // required: user token or API key
   orgId: "1",
-  userId: "user_123",
 });
 
 const workflows = await client.workflows.list({ page: 1, limit: 20 });
@@ -75,8 +73,9 @@ try {
 
 ## Conventions
 
-- Tenancy: `X-Org-Id` and `X-User-Id` headers (set via `orgId` / `userId`).
-- Auth: `Authorization: Bearer <token>`.
+- Host: all requests go to `https://api.lowco.ai`.
+- Tenancy: `X-Org-Id` header (set via `orgId`).
+- Auth: `Authorization: Bearer <token>` — `token` (user token or API key) is required.
 - Response envelope: `{ success, data, error, message }` — the SDK unwraps `data` for you.
 
 ## Docs

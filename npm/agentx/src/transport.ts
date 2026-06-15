@@ -1,9 +1,10 @@
 import { AgentxError } from "./errors.js";
 import type { APIErrorPayload, ListParams } from "./types.js";
 
-/** Per-service URL + route prefix, shared by all three sub-clients. */
+const BASE_URL = "https://api.lowco.ai";
+
+/** Per-service route prefix, shared by all three sub-clients. */
 export interface ServiceTarget {
-  baseURL: string;
   apiBasePath: string;
 }
 
@@ -82,13 +83,12 @@ export class Transport {
   }
 
   private async send(
-    target: ServiceTarget,
+    _target: ServiceTarget,
     opts: RequestOptions,
     accept: string,
     signal?: AbortSignal,
   ): Promise<Response> {
-    const baseURL = target.baseURL.replace(/\/+$/, "");
-    const url = new URL(baseURL + opts.path);
+    const url = new URL(BASE_URL + opts.path);
     if (opts.query) {
       opts.query.forEach((v, k) => url.searchParams.append(k, v));
     }

@@ -12,8 +12,7 @@ npm install @lowcoai/integrations
 import { IntegrationsClient } from "@lowcoai/integrations";
 
 const client = new IntegrationsClient({
-  baseUrl: "http://localhost:8080",
-  token: "your-token",
+  token: "your-token-or-api-key", // required
   orgId: "1"
 });
 
@@ -68,6 +67,7 @@ try {
 
 ## Conventions
 
-- Tenancy: `X-Org-Id` and `X-User-Id` headers (set via `orgId` / `userId`).
-- Auth: `Authorization: Bearer <token>`.
+- Host: all requests go to `https://api.lowco.ai`.
+- Tenancy: `X-Org-Id` header (set via `orgId`).
+- Auth: `Authorization: Bearer <token>` — `token` (user token or API key) is required.
 - Response envelope: `{ success, data, error, message }` — the SDK unwraps `data` for you.

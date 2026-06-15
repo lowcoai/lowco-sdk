@@ -52,9 +52,8 @@ go get github.com/backend-platform/lowco-sdk/go/lowcodb
 ```go
 import lowcodb "github.com/backend-platform/lowco-sdk/go/lowcodb"
 
-client, _ := lowcodb.NewClient("http://localhost:8080",
+client, _ := lowcodb.NewClient("<token-or-api-key>",
     lowcodb.WithOrgID("org_123"),
-    lowcodb.WithUserID("user_123"),
 )
 bases, _ := client.ListBases(ctx, nil)
 ```
@@ -68,9 +67,8 @@ go get github.com/backend-platform/lowco-sdk/go/agentx
 ```go
 import "github.com/backend-platform/lowco-sdk/go/agentx"
 
-client, _ := agentx.NewClient("http://localhost:8080",
+client, _ := agentx.NewClient("<token-or-api-key>",
     agentx.WithOrgID("org_123"),
-    agentx.WithUserID("user_123"),
 )
 agents, _ := client.Manager.ListAgents(ctx, nil)
 kbs,    _ := client.KB.ListKnowledgeBases(ctx, nil)
@@ -87,9 +85,8 @@ go get github.com/backend-platform/lowco-sdk/go/workflow
 import "github.com/backend-platform/lowco-sdk/go/workflow"
 
 client, _ := workflow.NewClient(workflow.Config{
-    BaseURL: "http://localhost:8080",
-    OrgID:   "org_123",
-    UserID:  "user_123",
+    Token: "<token-or-api-key>",
+    OrgID: "org_123",
 })
 workflows, _ := client.Workflows.List(ctx, nil)
 ```
@@ -104,9 +101,8 @@ go get github.com/backend-platform/lowco-sdk/go/integrations
 import "github.com/backend-platform/lowco-sdk/go/integrations"
 
 client, _ := integrations.NewClient(integrations.Config{
-    BaseURL: "http://localhost:8080",
-    OrgID:   "org_123",
-    UserID:  "user_123",
+    Token: "<token-or-api-key>",
+    OrgID: "org_123",
 })
 apps, _ := client.Applications.List(ctx, nil)
 result, _ := client.Actions.Run(ctx, "action_123", integrations.RunActionRequest{
@@ -127,9 +123,8 @@ npm install @lowcoai/lowcodb
 import { LowcodbClient } from "@lowcoai/lowcodb";
 
 const client = new LowcodbClient({
-  baseURL: "http://localhost:8080",
+  token: "<token-or-api-key>",
   orgId: "org_123",
-  userId: "user_123",
 });
 
 const bases = await client.listBases();
@@ -145,9 +140,8 @@ npm install @lowcoai/agentx
 import { AgentxClient } from "@lowcoai/agentx";
 
 const client = new AgentxClient({
-  baseURL: "http://localhost:8080",
+  token: "<token-or-api-key>",
   orgId: "org_123",
-  userId: "user_123",
 });
 
 const agents = await client.Manager.listAgents();
@@ -165,9 +159,8 @@ npm install @lowcoai/workflow
 import { WorkflowClient } from "@lowcoai/workflow";
 
 const client = new WorkflowClient({
-  baseUrl: "http://localhost:8080",
+  token: "<token-or-api-key>",
   orgId: "org_123",
-  userId: "user_123",
 });
 
 const workflows = await client.workflows.list();
@@ -183,9 +176,8 @@ npm install @lowcoai/integrations
 import { IntegrationsClient } from "@lowcoai/integrations";
 
 const client = new IntegrationsClient({
-  baseUrl: "http://localhost:8080",
+  token: "<token-or-api-key>",
   orgId: "org_123",
-  userId: "user_123",
 });
 
 const apps = await client.applications.list();
@@ -212,7 +204,9 @@ Per-product modules keep dependency surface area small and let consumers upgrade
 
 ## Repository conventions
 
-- Every SDK uses **headers** for tenancy (`X-Org-Id`, `X-User-Id`) — never query params.
+- Every SDK targets the fixed API host `https://api.lowco.ai` (`wss://ws.lowco.ai/` for flux) — base URLs are not configurable.
+- Every SDK authenticates with a required user token or API key sent as `Authorization: Bearer <value>`; user identity is derived from the token, so there is no `X-User-Id` header.
+- Org scoping uses the `X-Org-Id` header — never query params.
 - Every SDK speaks the service's enveloped JSON response shape (`{ success, data, error, message }`) and unwraps `data` for the caller.
 - Errors surface as a typed exception (`*RequestError` / `*Error` class) with `statusCode`, `message`, `code`, and the raw body for debugging.
 - Method names mirror the controller verbs in the corresponding service so the SDKs and server stay in lockstep.

@@ -4,15 +4,14 @@ import "net/http"
 
 // Header keys used for tenancy.
 const (
-	HeaderOrgID  = "X-Org-Id"
-	HeaderUserID = "X-User-Id"
+	HeaderOrgID = "X-Org-Id"
 )
 
 type Config struct {
-	BaseURL    string
+	// Token is required. It may hold a user token or an API key and is sent
+	// as "Authorization: Bearer <token>" on every request.
 	Token      string
 	OrgID      string
-	UserID     string
 	TimeoutMS  int
 	Headers    map[string]string
 	HTTPClient *http.Client

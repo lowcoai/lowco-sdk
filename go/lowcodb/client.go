@@ -13,6 +13,9 @@ import (
 	"time"
 )
 
+// DefaultBaseURL is the fixed API host every request is sent to.
+const DefaultBaseURL = "https://api.lowco.ai"
+
 const defaultAPIBasePath = "/v1/lowcodb"
 
 // Option configures a Client at construction time.
@@ -26,16 +29,18 @@ type Client struct {
 	headers     http.Header
 }
 
-// NewClient returns a Client targeting the given manager base URL
-// (e.g. "http://localhost:8080"). Use the With* options to configure
-// tenancy headers, a custom HTTP client, or a non-default API base path.
-func NewClient(baseURL string, opts ...Option) (*Client, error) {
-	if strings.TrimSpace(baseURL) == "" {
-		return nil, fmt.Errorf("baseURL is required")
+// NewClient returns a Client targeting DefaultBaseURL. token is required –
+// it may hold a user token or an API key and is sent as
+// "Authorization: Bearer <token>" on every request. Use the With* options to
+// configure tenancy headers, a custom HTTP client, or a non-default API base
+// path.
+func NewClient(token string, opts ...Option) (*Client, error) {
+	if strings.TrimSpace(token) == "" {
+		return nil, fmt.Errorf("token is required")
 	}
-	u, err := url.Parse(baseURL)
+	u, err := url.Parse(DefaultBaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("parse baseURL: %w", err)
+		return nil, fmt.Errorf("parse base URL: %w", err)
 	}
 	c := &Client{
 		baseURL:     u,
@@ -43,6 +48,7 @@ func NewClient(baseURL string, opts ...Option) (*Client, error) {
 		httpClient:  &http.Client{Timeout: 30 * time.Second},
 		headers:     make(http.Header),
 	}
+	c.headers.Set("Authorization", "Bearer "+token)
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -63,15 +69,6 @@ func WithOrgID(orgID string) Option {
 	return func(c *Client) {
 		if strings.TrimSpace(orgID) != "" {
 			c.headers.Set(HeaderOrgID, orgID)
-		}
-	}
-}
-
-// WithUserID sets the X-User-Id header for every request.
-func WithUserID(userID string) Option {
-	return func(c *Client) {
-		if strings.TrimSpace(userID) != "" {
-			c.headers.Set(HeaderUserID, userID)
 		}
 	}
 }
@@ -101,15 +98,6 @@ func (c *Client) SetOrgID(orgID string) {
 		return
 	}
 	c.headers.Set(HeaderOrgID, orgID)
-}
-
-// SetUserID updates the X-User-Id header at runtime. Pass "" to clear it.
-func (c *Client) SetUserID(userID string) {
-	if strings.TrimSpace(userID) == "" {
-		c.headers.Del(HeaderUserID)
-		return
-	}
-	c.headers.Set(HeaderUserID, userID)
 }
 
 // Health pings the manager's /health endpoint.

@@ -8,21 +8,19 @@ All routes live under the base path **`/v1/lowcodb`** (overridable per-SDK).
 
 ## Authentication & tenancy
 
-Every request carries two headers:
+The API host is always `https://api.lowco.ai`. Every request carries:
 
-| Header        | Purpose                              |
-| ------------- | ------------------------------------ |
-| `X-Org-Id`    | Tenant ID — scopes reads and writes. |
-| `X-User-Id`   | Acting user — used for audit fields. |
-
-The SDKs accept both in their constructors:
+| Header           | Purpose                                                        |
+| ---------------- | -------------------------------------------------------------- |
+| `Authorization`  | `Bearer <user-token-or-api-key>` — required; identifies the acting user. |
+| `X-Org-Id`       | Tenant ID — scopes reads and writes.                            |
 
 ```go
-lowcodb.NewClient(url, lowcodb.WithOrgID("..."), lowcodb.WithUserID("..."))
+lowcodb.NewClient("<token-or-api-key>", lowcodb.WithOrgID("..."))
 ```
 
 ```ts
-new LowcodbClient({ baseURL: url, orgId: "...", userId: "..." })
+new LowcodbClient({ token: "<token-or-api-key>", orgId: "..." })
 ```
 
 ---

@@ -2,11 +2,7 @@ import { generateId } from "./utils";
 import { Config, DeviceInfo, Event, LocationInfo, Metadata } from "./types";
 import UAParser from "ua-parser-js";
 
-declare global {
-  interface Window {
-    __LOWCO_ANALYTICS_DEFAULT_URL__?: string;
-  }
-}
+const BASE_URL = "https://api.lowco.ai";
 
 class LowcoAnalytics {
   private static instance: LowcoAnalytics;
@@ -45,19 +41,7 @@ class LowcoAnalytics {
   }
 
   public init(config: Config) {
-    const resolvedUrl = this.resolveBaseUrl(config);
-
-    if (!resolvedUrl) {
-      console.error(
-        "Analytics initialization failed. Provide config.url or load the browser script from your analytics host.",
-      );
-      return;
-    }
-
-    this.config = {
-      ...config,
-      url: resolvedUrl,
-    };
+    this.config = { ...config };
     console.log("Analytics initialized with config:", config);
     this.initializeSession();
     if (config.autoTrack && this.canUseBrowserApis()) {
@@ -69,25 +53,6 @@ class LowcoAnalytics {
     if (this.canUseBrowserApis()) {
       this.setDeviceInfo();
     }
-  }
-
-  private resolveBaseUrl(config: Config): string | null {
-    if (config.url) {
-      return config.url.replace(/\/$/, "");
-    }
-
-    if (
-      typeof window !== "undefined" &&
-      typeof window.__LOWCO_ANALYTICS_DEFAULT_URL__ === "string"
-    ) {
-      return window.__LOWCO_ANALYTICS_DEFAULT_URL__;
-    }
-
-    if (typeof window !== "undefined" && window.location?.origin) {
-      return window.location.origin;
-    }
-
-    return null;
   }
 
   private canUseBrowserApis(): boolean {
@@ -409,7 +374,7 @@ class LowcoAnalytics {
       return;
     }
     // extract device info and location info
-    fetch(`${this.config.url}/v1/engage/track`, {
+    fetch(`${BASE_URL}/v1/engage/track`, {
       method: "POST",
       body: JSON.stringify(event),
       headers: {

@@ -4,8 +4,9 @@ Service: **integrations-manager**. All routes are mounted under `/v1/integration
 
 ## Conventions
 
-- **Tenancy**: pass `X-Org-Id` (and optionally `X-User-Id`) on every request.
-- **Auth**: `Authorization: Bearer <token>`.
+- **Host**: always `https://api.lowco.ai`.
+- **Auth**: `Authorization: Bearer <user-token-or-api-key>` — required; identifies the acting user.
+- **Tenancy**: pass `X-Org-Id` on every request.
 - **Response envelope**: `{ success, data, error, message }`. Clients should read the inner `data`. Both SDKs (`@lowcoai/integrations`, `github.com/backend-platform/lowco-sdk/go/integrations`) unwrap automatically.
 - **Global org**: org `1` holds globally-shared applications/actions. List/Get endpoints merge org-scoped rows with global rows; mutations on a global entity transparently fork it into the caller's org.
 

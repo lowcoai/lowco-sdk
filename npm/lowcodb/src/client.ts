@@ -1,7 +1,6 @@
 import { LowcodbError } from "./errors.js";
 import {
   HEADER_ORG_ID,
-  HEADER_USER_ID,
   type APIErrorPayload,
   type Base,
   type Column,
@@ -32,15 +31,15 @@ import {
   type ViewRefreshResponse,
 } from "./types.js";
 
+const BASE_URL = "https://api.lowco.ai";
+
 const DEFAULT_API_BASE_PATH = "/v1/lowcodb";
 
 export interface LowcodbClientOptions {
-  /** Manager URL (e.g. "http://localhost:8080"). Required. */
-  baseURL: string;
+  /** User token or API key sent as `Authorization: Bearer <token>` on every request. Required. */
+  token: string;
   /** X-Org-Id header value. */
   orgId?: string;
-  /** X-User-Id header value. */
-  userId?: string;
   /** Extra headers added to every request. */
   defaultHeaders?: Record<string, string>;
   /** Route prefix; defaults to "/v1/lowcodb". */
@@ -61,34 +60,27 @@ interface RequestInternalOptions {
 }
 
 export class LowcodbClient {
-  private readonly baseURL: string;
   private readonly apiBasePath: string;
   private readonly fetchFn: typeof fetch;
   private readonly timeoutMs: number;
   private readonly headers: Record<string, string>;
 
   constructor(opts: LowcodbClientOptions) {
-    if (!opts.baseURL || !opts.baseURL.trim()) {
-      throw new Error("LowcodbClient: baseURL is required");
+    if (!opts.token || !opts.token.trim()) {
+      throw new Error("LowcodbClient: token is required");
     }
-    this.baseURL = opts.baseURL.replace(/\/+$/, "");
     this.apiBasePath = "/" + (opts.apiBasePath ?? DEFAULT_API_BASE_PATH).replace(/^\/+|\/+$/g, "");
     this.fetchFn = opts.fetch ?? fetch;
     this.timeoutMs = opts.timeoutMs ?? 30_000;
 
     this.headers = { ...(opts.defaultHeaders ?? {}) };
+    this.headers.Authorization = `Bearer ${opts.token}`;
     if (opts.orgId) this.headers[HEADER_ORG_ID] = opts.orgId;
-    if (opts.userId) this.headers[HEADER_USER_ID] = opts.userId;
   }
 
   setOrgId(orgId: string | null): void {
     if (orgId) this.headers[HEADER_ORG_ID] = orgId;
     else delete this.headers[HEADER_ORG_ID];
-  }
-
-  setUserId(userId: string | null): void {
-    if (userId) this.headers[HEADER_USER_ID] = userId;
-    else delete this.headers[HEADER_USER_ID];
   }
 
   /** Sets / overwrites an arbitrary default header. Pass null to delete. */
@@ -604,7 +596,7 @@ export class LowcodbClient {
   }
 
   private async request<T>(opts: RequestInternalOptions): Promise<T> {
-    const url = new URL(this.baseURL + opts.path);
+    const url = new URL(BASE_URL + opts.path);
     if (opts.query) {
       opts.query.forEach((v, k) => url.searchParams.append(k, v));
     }

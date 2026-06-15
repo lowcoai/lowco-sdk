@@ -2,6 +2,8 @@
 
 Go client for the **lowco flux** realtime WebSocket service. Built on `github.com/gorilla/websocket`.
 
+Every client connects to the fixed endpoint `wss://ws.lowco.ai/` (`flux.DefaultWSURL`). Authentication uses a required token (a user token or an API key); user identity is derived from the token server-side.
+
 ```
 go get github.com/backend-platform/lowco-sdk/go/flux
 ```
@@ -19,9 +21,7 @@ import (
 )
 
 func main() {
-    client, err := flux.NewClient("wss://flux.example.com/v1/ws", "<token>", "org_123",
-        flux.WithUserID("user_123"),
-    )
+    client, err := flux.NewClient("<token-or-api-key>", "org_123")
     if err != nil {
         log.Fatal(err)
     }
@@ -60,7 +60,6 @@ func main() {
 
 | Option                    | Description                                                  |
 | ------------------------- | ------------------------------------------------------------ |
-| `WithUserID(id)`          | Sends `userId` as a query parameter.                         |
 | `WithClientID(id)`        | Overrides the generated client id.                           |
 | `WithHeartbeatInterval`   | Ping cadence (default `5s`).                                 |
 | `WithReconnectInterval`   | Initial reconnect backoff (default `1s`, capped at `30s`).   |

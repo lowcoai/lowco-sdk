@@ -5,10 +5,9 @@ export type JsonObject = { [key: string]: JsonValue };
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export interface SDKConfig {
-  baseUrl: string;
-  token?: string;
+  /** User token or API key sent as `Authorization: Bearer <token>` on every request. Required. */
+  token: string;
   orgId?: string;
-  userId?: string;
   timeoutMs?: number;
   headers?: Record<string, string>;
   fetch?: typeof globalThis.fetch;

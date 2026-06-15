@@ -3,17 +3,15 @@
 //
 // A single Client exposes three sub-clients – Manager, KB, Executor – that
 // mirror the routes registered in each service's server.go. They share HTTP
-// transport, tenancy headers (X-Org-Id / X-User-Id) and request options.
+// transport, the X-Org-Id tenancy header and request options. All three
+// services live behind the fixed host DefaultBaseURL ("https://api.lowco.ai").
 //
-// Construction:
+// Construction requires a token (a user token or an API key) that is sent as
+// "Authorization: Bearer <token>" on every request:
 //
-//	client, err := agentx.NewClient("http://localhost:8080",
+//	client, err := agentx.NewClient("<token-or-api-key>",
 //	    agentx.WithOrgID("org_123"),
-//	    agentx.WithUserID("user_123"),
 //	)
-//
-// When the three services live behind different hosts, override individual
-// base URLs with WithManagerURL / WithKBURL / WithExecutorURL.
 //
 // Enveloped responses ({success, data, error, message}) are unwrapped
 // automatically; non-2xx responses surface as *RequestError. JSON-RPC level

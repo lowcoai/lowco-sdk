@@ -1,3 +1,5 @@
+export const WS_URL = "wss://ws.lowco.ai/";
+
 export const generateClientId = (): string => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -8,25 +10,16 @@ export const generateClientId = (): string => {
 };
 
 export const buildWebSocketUrl = (
-  baseUrl: string,
   token: string,
   orgId: string,
   clientId: string,
-  userId: string,
   queryParams?: Record<string, string>,
 ): string => {
-  const url = new URL(baseUrl);
-
-  if (url.protocol === "http:") url.protocol = "ws:";
-  else if (url.protocol === "https:") url.protocol = "wss:";
-  else if (url.protocol !== "ws:" && url.protocol !== "wss:") {
-    throw new Error(`Unsupported WebSocket baseUrl protocol: ${url.protocol}`);
-  }
+  const url = new URL(WS_URL);
 
   url.searchParams.set("token", token);
   url.searchParams.set("orgId", orgId);
   url.searchParams.set("cli", clientId);
-  if (userId) url.searchParams.set("userId", userId);
   if (queryParams) {
     for (const [key, value] of Object.entries(queryParams)) {
       url.searchParams.set(key, value);

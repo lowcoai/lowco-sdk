@@ -4,7 +4,6 @@ export interface InlineSnippetOptions {
   apiKey?: string;
   orgId?: string;
   autoTrack?: boolean;
-  url?: string;
   eventName?: string;
   eventData?: Metadata;
 }
@@ -29,7 +28,6 @@ export function createInlineSnippet({
   apiKey = "YOUR_API_KEY",
   orgId = "YOUR_ORG_ID",
   autoTrack = true,
-  url,
   eventName = "signup_completed",
   eventData,
 }: InlineSnippetOptions = {}): string {
@@ -37,7 +35,6 @@ export function createInlineSnippet({
     apiKey,
     orgId,
     autoTrack,
-    ...(url ? { url } : {}),
   });
 
   const eventCall = eventData

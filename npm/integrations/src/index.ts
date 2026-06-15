@@ -29,5 +29,5 @@ export class IntegrationsClient {
   }
 }
 
-export { HttpClient, IntegrationsError, HEADER_ORG_ID, HEADER_USER_ID } from "./client.js";
+export { HttpClient, IntegrationsError, HEADER_ORG_ID } from "./client.js";
 export * from "./types.js";

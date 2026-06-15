@@ -18,14 +18,15 @@
 
 ## Transport behavior
 
+- All requests go to `https://api.lowco.ai`
 - JSON request/response by default
-- Supports `Authorization: Bearer <token>`
-- Supports `X-Org-Id` and `X-User-Id` headers
+- Requires `token` (user token or API key), sent as `Authorization: Bearer <token>` on every request
+- Supports the `X-Org-Id` header (via `orgId`)
 - Optional per-request query params and abort signal
 - Envelope-aware response parser (`{ data: ... }` unwrapped automatically)
 - Throws `WorkflowError` with HTTP status and raw payload on failures
 
 ## Compatibility assumptions
 
-- Base API URL serves endpoints under `/v1/wf`
+- Endpoints are served under `https://api.lowco.ai/v1/wf`
 - Runtime supports `fetch` (Node 18+ or browser), or a custom fetch is injected

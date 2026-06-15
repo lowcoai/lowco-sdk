@@ -37,16 +37,12 @@ export enum SocketEvent {
 }
 
 export interface FluxClientOptions {
-  /** WebSocket base URL, e.g. "wss://flux.example.com" or "https://flux.example.com". */
-  baseUrl: string;
-  /** Authentication token. */
+  /** Authentication token (user token or API key) sent as the `token` query parameter. Required. */
   token: string;
   /** Organization id. */
   orgId: string;
   /** Optional stable client id (defaults to a generated value). */
   clientId?: string;
-  /** Optional user id sent as `userId` query parameter. */
-  userId?: string;
   /** Heartbeat interval in milliseconds (default 5000). */
   heartbeatIntervalMs?: number;
   /** Initial reconnect backoff in milliseconds (default 1000). */

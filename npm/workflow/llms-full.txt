@@ -32,14 +32,13 @@ Access pattern:
 
 ```ts
 interface SDKConfig {
-  baseUrl: string;
-  token?: string;  // becomes Authorization: Bearer <token>
+  token: string;   // required; user token or API key, becomes Authorization: Bearer <token>
   orgId?: string;  // becomes X-Org-Id
-  userId?: string; // becomes X-User-Id
   timeoutMs?: number; // default 30000
   headers?: Record<string, string>;
   fetch?: typeof globalThis.fetch;
 }
+// All requests go to https://api.lowco.ai
 ```
 
 ## Error model

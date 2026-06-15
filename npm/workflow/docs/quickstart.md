@@ -6,10 +6,8 @@
 import { WorkflowClient } from "@lowcoai/workflow";
 
 const client = new WorkflowClient({
-  baseUrl: "http://localhost:8080",
-  token: process.env.WORKFLOW_TOKEN,
-  orgId: "1",
-  userId: "user_123"
+  token: process.env.WORKFLOW_TOKEN!, // required: user token or API key
+  orgId: "1"
 });
 ```
 

@@ -35,5 +35,5 @@ export class WorkflowClient {
   }
 }
 
-export { HttpClient, WorkflowError, HEADER_ORG_ID, HEADER_USER_ID } from "./client.js";
+export { HttpClient, WorkflowError, HEADER_ORG_ID } from "./client.js";
 export * from "./types.js";

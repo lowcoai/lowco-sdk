@@ -7,8 +7,7 @@ import (
 )
 
 const (
-	HeaderOrgID  = "X-Org-Id"
-	HeaderUserID = "X-User-Id"
+	HeaderOrgID = "X-Org-Id"
 )
 
 // BaseEntity mirrors core.model.BaseEntity – the embedded audit fields used by

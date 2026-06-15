@@ -12,9 +12,8 @@ npm install @lowcoai/agentx
 import { AgentxClient } from "@lowcoai/agentx";
 
 const client = new AgentxClient({
-  baseURL: "http://localhost:8080",
+  token: "<token-or-api-key>", // required
   orgId: "org_123",
-  userId: "user_123",
 });
 
 const agents = await client.Manager.listAgents({ pageNo: 1, size: 25 });
@@ -34,21 +33,6 @@ if (resp.error) console.error("rpc error", resp.error);
 else console.log("result", resp.result);
 ```
 
-## Split deployments
-
-When the three services live on different hosts, omit `baseURL` and pass per-service URLs:
-
-```ts
-const client = new AgentxClient({
-  managerURL: "http://manager.internal:8080",
-  kbURL: "http://kb.internal:8080",
-  executorURL: "http://executor.internal:8080",
-  orgId: "org_123",
-});
-```
-
-Any combination works – a global `baseURL` plus selective overrides is fine.
-
 ## Streaming the executor
 
 ```ts
@@ -66,18 +50,18 @@ Call `ac.abort()` to stop the stream early.
 
 ## Options
 
+All requests go to `https://api.lowco.ai`.
+
 | Option                   | Description                                                            |
 | ------------------------ | ---------------------------------------------------------------------- |
-| `baseURL`                | Base URL shared by all three services.                                 |
-| `managerURL` / `kbURL` / `executorURL` | Per-service base URL overrides.                          |
-| `managerApiBasePath` / `kbApiBasePath` / `executorApiBasePath` | Route prefix per service. |
+| `token`                  | User token or API key sent as `Authorization: Bearer <token>`. Required. |
+| `managerApiBasePath` / `kbApiBasePath` / `executorApiBasePath` | Route prefix per service (defaults `/v1/agentx/manager`, `/v1/agentx/kb`, `/v1/agentx/executors`). |
 | `orgId`                  | Sets `X-Org-Id`.                                                       |
-| `userId`                 | Sets `X-User-Id`.                                                      |
 | `defaultHeaders`         | Extra headers added to every request.                                  |
 | `fetch`                  | Custom fetch implementation (defaults to global `fetch`).              |
 | `timeoutMs`              | Per-request timeout for non-streaming calls (default 30 000; `0` disables). |
 
-Identity can also be mutated at runtime via `client.setOrgId(...)`, `client.setUserId(...)`, `client.setHeader(k, v)`.
+Identity can also be mutated at runtime via `client.setOrgId(...)`, `client.setHeader(k, v)`.
 
 ## Errors
 

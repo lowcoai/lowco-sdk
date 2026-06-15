@@ -22,9 +22,8 @@ func main() {
 	ctx := context.Background()
 
 	client, err := integrations.NewClient(integrations.Config{
-		BaseURL: "http://localhost:8080",
-		Token:   "your-token",
-		OrgID:   "1",
+		Token: "your-token-or-api-key", // required
+		OrgID: "1",
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -93,6 +92,7 @@ if err != nil {
 
 ## Conventions
 
-- Tenancy: `X-Org-Id` and `X-User-Id` headers (set via `Config.OrgID` / `Config.UserID`).
-- Auth: `Authorization: Bearer <Token>`.
+- Host: all requests go to `https://api.lowco.ai` (`integrations.DefaultBaseURL`).
+- Auth: `Config.Token` is required (a user token or an API key) and is sent as `Authorization: Bearer <Token>` on every request.
+- Tenancy: `X-Org-Id` header (set via `Config.OrgID`).
 - Response envelope: `{ success, data, error, message }` — the SDK unwraps `data` for you.

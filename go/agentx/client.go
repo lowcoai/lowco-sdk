@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+// DefaultBaseURL is the fixed API host every request is sent to. All three
+// agentx services (manager, kb, executor) live behind this host.
+const DefaultBaseURL = "https://api.lowco.ai"
+
 // Default API base paths registered by each agentx service.
 const (
 	DefaultManagerAPIBasePath  = "/v1/agentx/manager"
@@ -46,35 +50,33 @@ type Client struct {
 	Executor *ExecutorClient
 }
 
-// NewClient returns a Client targeting the given base URL (e.g.
-// "http://localhost:8080"). When the three services live on different hosts
-// pass the empty string here and use WithManagerURL / WithKBURL / WithExecutorURL
-// to set per-service URLs.
-func NewClient(baseURL string, opts ...Option) (*Client, error) {
+// NewClient returns a Client targeting DefaultBaseURL. token is required –
+// it may hold a user token or an API key and is sent as
+// "Authorization: Bearer <token>" on every request.
+func NewClient(token string, opts ...Option) (*Client, error) {
+	if strings.TrimSpace(token) == "" {
+		return nil, fmt.Errorf("agentx: token is required")
+	}
+
+	u, err := url.Parse(DefaultBaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("agentx: parse base URL: %w", err)
+	}
+
 	c := &Client{
 		httpClient:       &http.Client{Timeout: 30 * time.Second},
 		headers:          make(http.Header),
+		managerURL:       u,
+		kbURL:            u,
+		executorURL:      u,
 		managerBasePath:  DefaultManagerAPIBasePath,
 		kbBasePath:       DefaultKBAPIBasePath,
 		executorBasePath: DefaultExecutorAPIBasePath,
 	}
-
-	if strings.TrimSpace(baseURL) != "" {
-		u, err := url.Parse(baseURL)
-		if err != nil {
-			return nil, fmt.Errorf("parse baseURL: %w", err)
-		}
-		c.managerURL = u
-		c.kbURL = u
-		c.executorURL = u
-	}
+	c.headers.Set("Authorization", "Bearer "+token)
 
 	for _, opt := range opts {
 		opt(c)
-	}
-
-	if c.managerURL == nil || c.kbURL == nil || c.executorURL == nil {
-		return nil, fmt.Errorf("agentx: every service needs a base URL – set baseURL or use WithManagerURL/WithKBURL/WithExecutorURL")
 	}
 
 	c.Manager = &ManagerClient{c: c}
@@ -103,47 +105,11 @@ func WithOrgID(orgID string) Option {
 	}
 }
 
-// WithUserID sets the X-User-Id header for every request.
-func WithUserID(userID string) Option {
-	return func(c *Client) {
-		if strings.TrimSpace(userID) != "" {
-			c.headers.Set(HeaderUserID, userID)
-		}
-	}
-}
-
 // WithDefaultHeader adds an arbitrary header to every request.
 func WithDefaultHeader(key, value string) Option {
 	return func(c *Client) {
 		if strings.TrimSpace(key) != "" {
 			c.headers.Set(key, value)
-		}
-	}
-}
-
-// WithManagerURL overrides the agent-manager base URL.
-func WithManagerURL(baseURL string) Option {
-	return func(c *Client) {
-		if u := parseOptionalURL(baseURL); u != nil {
-			c.managerURL = u
-		}
-	}
-}
-
-// WithKBURL overrides the agent-kb base URL.
-func WithKBURL(baseURL string) Option {
-	return func(c *Client) {
-		if u := parseOptionalURL(baseURL); u != nil {
-			c.kbURL = u
-		}
-	}
-}
-
-// WithExecutorURL overrides the agent-executor base URL.
-func WithExecutorURL(baseURL string) Option {
-	return func(c *Client) {
-		if u := parseOptionalURL(baseURL); u != nil {
-			c.executorURL = u
 		}
 	}
 }
@@ -184,15 +150,6 @@ func (c *Client) SetOrgID(orgID string) {
 	c.headers.Set(HeaderOrgID, orgID)
 }
 
-// SetUserID updates the X-User-Id header at runtime. Pass "" to clear it.
-func (c *Client) SetUserID(userID string) {
-	if strings.TrimSpace(userID) == "" {
-		c.headers.Del(HeaderUserID)
-		return
-	}
-	c.headers.Set(HeaderUserID, userID)
-}
-
 // SetHeader sets or removes (when value=="") an arbitrary default header.
 func (c *Client) SetHeader(key, value string) {
 	if strings.TrimSpace(value) == "" {
@@ -203,17 +160,6 @@ func (c *Client) SetHeader(key, value string) {
 }
 
 // --- shared transport ----------------------------------------------------
-
-func parseOptionalURL(raw string) *url.URL {
-	if strings.TrimSpace(raw) == "" {
-		return nil
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return nil
-	}
-	return u
-}
 
 func normalizePrefix(p string) string {
 	p = strings.TrimSpace(p)

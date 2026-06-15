@@ -1,6 +1,6 @@
 # @lowcoai/engage
 
-Browser analytics SDK for the **lowco engage** service. Captures page views, custom events, attribution, device, and (with permission) location info, and forwards them to the engage `/v1/engage/track` endpoint.
+Browser analytics SDK for the **lowco engage** service. Captures page views, custom events, attribution, device, and (with permission) location info, and forwards them to `https://api.lowco.ai/v1/engage/track`.
 
 ```bash
 npm install @lowcoai/engage
@@ -14,8 +14,7 @@ import LowcoAnalytics from "@lowcoai/engage";
 LowcoAnalytics.init({
   apiKey: "<api-key>",
   orgId: "org_123",
-  url: "https://engage.example.com", // optional; defaults to current origin / script origin
-  autoTrack: true,                    // auto page-view + history events
+  autoTrack: true, // auto page-view + history events
 });
 
 LowcoAnalytics.track("signup_completed", { plan: "pro" });
@@ -27,23 +26,21 @@ LowcoAnalytics.identifyUser("user_123", { email: "alice@example.com" });
 Drop the IIFE bundle into your page:
 
 ```html
-<script src="https://unpkg.com/@lowcoai/engage/script"
-        data-api-url="https://engage.example.com"></script>
+<script src="https://unpkg.com/@lowcoai/engage/script"></script>
 <script>
   LowcoAnalytics.init({ apiKey: "<api-key>", orgId: "org_123", autoTrack: true });
   LowcoAnalytics.track("signup_completed");
 </script>
 ```
 
-If `data-api-url` is omitted, the SDK uses the script's origin or `window.location.origin`.
+Events are always sent to `https://api.lowco.ai`.
 
 ## Config
 
 | Field        | Description                                                          |
 | ------------ | -------------------------------------------------------------------- |
-| `apiKey`     | API key used as `Authorization: Bearer …` header.                    |
+| `apiKey`     | API key used as `Authorization: Bearer …` header. Required.          |
 | `orgId`      | Sent as `X-Org-Id` header.                                           |
-| `url`        | Optional. Engage base URL. Falls back to the script / page origin.   |
 | `autoTrack`  | Auto-track page views and `history.pushState` / `replaceState`.      |
 
 ## API

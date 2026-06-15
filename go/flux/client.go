@@ -14,6 +14,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// DefaultWSURL is the fixed flux WebSocket endpoint every client connects to.
+const DefaultWSURL = "wss://ws.lowco.ai/"
+
 const (
 	defaultHeartbeatInterval = 5 * time.Second
 	defaultReconnectInterval = 1 * time.Second
@@ -22,11 +25,6 @@ const (
 
 // Option configures a Client at construction time.
 type Option func(*Client)
-
-// WithUserID sets the userId query parameter sent with every connection.
-func WithUserID(userID string) Option {
-	return func(c *Client) { c.userID = userID }
-}
 
 // WithClientID overrides the generated client id.
 func WithClientID(clientID string) Option {
@@ -77,10 +75,8 @@ func WithDialer(d *websocket.Dialer) Option {
 
 // Client is a thread-safe flux WebSocket client.
 type Client struct {
-	baseURL  string
 	token    string
 	orgID    string
-	userID   string
 	clientID string
 
 	heartbeatInterval time.Duration
@@ -110,12 +106,10 @@ type Client struct {
 	closeCh chan struct{}
 }
 
-// NewClient creates a Client targeting baseURL (e.g. "wss://flux.example.com/v1/ws").
-// http:// and https:// schemes are auto-upgraded to ws:// / wss://.
-func NewClient(baseURL, token, orgID string, opts ...Option) (*Client, error) {
-	if baseURL == "" {
-		return nil, fmt.Errorf("flux: baseURL is required")
-	}
+// NewClient creates a Client that connects to the flux service at
+// DefaultWSURL. token is required and may hold a user token or an API key;
+// it is sent as the `token` query parameter on every connection.
+func NewClient(token, orgID string, opts ...Option) (*Client, error) {
 	if token == "" {
 		return nil, fmt.Errorf("flux: token is required")
 	}
@@ -124,7 +118,6 @@ func NewClient(baseURL, token, orgID string, opts ...Option) (*Client, error) {
 	}
 
 	c := &Client{
-		baseURL:           baseURL,
 		token:             token,
 		orgID:             orgID,
 		clientID:          randomClientID(),
@@ -518,26 +511,14 @@ func (c *Client) sendOn(conn *websocket.Conn, channel, event string, data any, m
 }
 
 func (c *Client) buildURL() (string, error) {
-	u, err := url.Parse(c.baseURL)
+	u, err := url.Parse(DefaultWSURL)
 	if err != nil {
-		return "", fmt.Errorf("flux: parse baseURL: %w", err)
-	}
-	switch u.Scheme {
-	case "http":
-		u.Scheme = "ws"
-	case "https":
-		u.Scheme = "wss"
-	case "ws", "wss":
-	default:
-		return "", fmt.Errorf("flux: unsupported scheme %q", u.Scheme)
+		return "", fmt.Errorf("flux: parse endpoint URL: %w", err)
 	}
 	q := u.Query()
 	q.Set("token", c.token)
 	q.Set("orgId", c.orgID)
 	q.Set("cli", c.clientID)
-	if c.userID != "" {
-		q.Set("userId", c.userID)
-	}
 	for k, v := range c.queryParams {
 		q.Set(k, v)
 	}

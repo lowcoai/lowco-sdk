@@ -22,11 +22,9 @@ const DEFAULT_RECONNECT_INTERVAL_MS = 1000;
 const MAX_RECONNECT_INTERVAL_MS = 30_000;
 
 type ResolvedOptions = {
-  baseUrl: string;
   token: string;
   orgId: string;
   clientId: string;
-  userId: string;
   heartbeatIntervalMs: number;
   reconnectIntervalMs: number;
   queryParams?: Record<string, string>;
@@ -86,9 +84,6 @@ export class FluxClient {
   private readonly channels = new Map<string, FluxChannel>();
 
   constructor(options: FluxClientOptions) {
-    if (!options.baseUrl) {
-      throw new FluxError("baseUrl is required");
-    }
     if (!options.token) {
       throw new FluxError("token is required");
     }
@@ -104,11 +99,9 @@ export class FluxClient {
       );
     }
     this.options = {
-      baseUrl: options.baseUrl,
       token: options.token,
       orgId: options.orgId,
       clientId: options.clientId ?? generateClientId(),
-      userId: options.userId ?? "",
       heartbeatIntervalMs:
         options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS,
       reconnectIntervalMs:
@@ -369,11 +362,9 @@ export class FluxClient {
 
   private buildUrl(): string {
     return buildWebSocketUrl(
-      this.options.baseUrl,
       this.options.token,
       this.options.orgId,
       this.options.clientId,
-      this.options.userId,
       this.options.queryParams,
     );
   }

@@ -16,16 +16,14 @@ type httpClient struct {
 	baseURL      string
 	token        string
 	orgID        string
-	userID       string
 	timeout      time.Duration
 	extraHeaders map[string]string
 	httpClient   *http.Client
 }
 
 func newHTTPClient(config Config) (*httpClient, error) {
-	baseURL := strings.TrimSuffix(config.BaseURL, "/")
-	if baseURL == "" {
-		return nil, fmt.Errorf("base URL is required")
+	if strings.TrimSpace(config.Token) == "" {
+		return nil, fmt.Errorf("token is required")
 	}
 
 	timeout := 30 * time.Second
@@ -39,10 +37,9 @@ func newHTTPClient(config Config) (*httpClient, error) {
 	}
 
 	return &httpClient{
-		baseURL:      baseURL,
+		baseURL:      DefaultBaseURL,
 		token:        config.Token,
 		orgID:        config.OrgID,
-		userID:       config.UserID,
 		timeout:      timeout,
 		extraHeaders: cloneHeaders(config.Headers),
 		httpClient:   client,
@@ -76,14 +73,11 @@ func (c *httpClient) Request(ctx context.Context, method, path string, body any,
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if c.token != "" && req.Header.Get("Authorization") == "" {
+	if req.Header.Get("Authorization") == "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
 	if c.orgID != "" && req.Header.Get(HeaderOrgID) == "" {
 		req.Header.Set(HeaderOrgID, c.orgID)
-	}
-	if c.userID != "" && req.Header.Get(HeaderUserID) == "" {
-		req.Header.Set(HeaderUserID, c.userID)
 	}
 	if options != nil {
 		for key, value := range options.Headers {

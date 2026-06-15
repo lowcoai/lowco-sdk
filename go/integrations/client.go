@@ -4,6 +4,9 @@
 // per-resource sub-clients that share one HTTP transport and tenancy headers.
 package integrations
 
+// DefaultBaseURL is the fixed API host every request is sent to.
+const DefaultBaseURL = "https://api.lowco.ai"
+
 // Client is the unified integrations client. Each sub-client groups the
 // endpoints for one resource and shares the same underlying HTTP transport.
 type Client struct {
@@ -16,8 +19,9 @@ type Client struct {
 	MCP            *McpResource
 }
 
-// NewClient constructs a Client. BaseURL is required; OrgID / UserID set the
-// X-Org-Id and X-User-Id headers on every request.
+// NewClient constructs a Client targeting DefaultBaseURL. Config.Token is
+// required (a user token or an API key) and is sent as a Bearer token on
+// every request; OrgID sets the X-Org-Id header.
 func NewClient(config Config) (*Client, error) {
 	http, err := newHTTPClient(config)
 	if err != nil {

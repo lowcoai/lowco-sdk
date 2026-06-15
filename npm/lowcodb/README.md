@@ -12,9 +12,8 @@ npm install @lowcoai/lowcodb
 import { LowcodbClient } from "@lowcoai/lowcodb";
 
 const client = new LowcodbClient({
-  baseURL: "http://localhost:8080",
+  token: "<token-or-api-key>", // required
   orgId: "org_123",
-  userId: "user_123",
 });
 
 // 1. Create a base
@@ -46,17 +45,18 @@ const rows = await client.listRecords(base.schema!, table.name!, {
 
 ## Options
 
-| Option           | Description                                               |
-| ---------------- | --------------------------------------------------------- |
-| `baseURL`        | Manager URL (required).                                   |
-| `orgId`          | Sets `X-Org-Id`.                                          |
-| `userId`         | Sets `X-User-Id`.                                         |
-| `defaultHeaders` | Extra headers added to every request.                     |
-| `apiBasePath`    | Overrides `/v1/lowcodb` (useful behind reverse proxies).  |
-| `fetch`          | Custom fetch implementation (defaults to global `fetch`). |
-| `timeoutMs`      | Per-request timeout (default 30 000; `0` disables).       |
+All requests go to `https://api.lowco.ai`.
 
-You can also mutate identity at runtime: `client.setOrgId(...)`, `client.setUserId(...)`, `client.setHeader(k, v)`.
+| Option           | Description                                                            |
+| ---------------- | ---------------------------------------------------------------------- |
+| `token`          | User token or API key sent as `Authorization: Bearer <token>`. Required. |
+| `orgId`          | Sets `X-Org-Id`.                                                       |
+| `defaultHeaders` | Extra headers added to every request.                                  |
+| `apiBasePath`    | Overrides `/v1/lowcodb` (useful behind reverse proxies).               |
+| `fetch`          | Custom fetch implementation (defaults to global `fetch`).              |
+| `timeoutMs`      | Per-request timeout (default 30 000; `0` disables).                    |
+
+You can also mutate identity at runtime: `client.setOrgId(...)`, `client.setHeader(k, v)`.
 
 ## Errors
 

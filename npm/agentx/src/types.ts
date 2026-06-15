@@ -1,5 +1,4 @@
 export const HEADER_ORG_ID = "X-Org-Id";
-export const HEADER_USER_ID = "X-User-Id";
 
 export const DEFAULT_MANAGER_API_BASE_PATH = "/v1/agentx/manager";
 export const DEFAULT_KB_API_BASE_PATH = "/v1/agentx/kb";
