@@ -64,6 +64,19 @@ const out = await client.invokeFunction(base.schema!, fn.functionKey!, { email: 
 
 Also: `listFunctions`, `getFunction`, `updateFunction` (body changes snapshot a version), `deleteFunction`, `listFunctionVersions`.
 
+## Transactions & events
+
+```ts
+// Ordered ops in ONE database transaction — all succeed or none apply (internal bases only):
+const { results } = await client.executeTransaction(base.schema!, [
+  { type: "create", table: "orders", record: { total: 120 } },
+  { type: "update", table: "inventory", id: "9", record: { qty: 3 } },
+]);
+
+// Publish a data event on the platform bus:
+await client.publishEvent(base.schema!, { eventType: "order.placed", record: { id: "o1" } });
+```
+
 ## Options
 
 All requests go to `https://api.lowco.ai` unless `baseUrl` overrides it.
@@ -110,6 +123,8 @@ The client mirrors `lowcodb/manager/server/server.go` 1-to-1:
 - **Triggers** — `getTrigger`, `createTrigger`, `updateTrigger`, `deleteTrigger`, `listTriggers`
 - **Webhooks** — `getWebhook`, `createWebhook`, `updateWebhook`, `deleteWebhook`, `listWebhooks`
 - **DB functions** — `listFunctions`, `getFunction`, `createFunction`, `updateFunction`, `deleteFunction`, `listFunctionVersions`, `executeFunction`, `invokeFunction`
+- **Transactions** — `executeTransaction`
+- **Events** — `publishEvent`
 - **Query** — `executeQuery`, `getQuerySuggestions`
 - **Dashboards** — `getOverviewCounts`, `getMetricsDashboard`, `getDashboardOverview`
 - **Health** — `health`

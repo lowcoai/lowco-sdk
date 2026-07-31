@@ -19,6 +19,8 @@ import {
   type LowcodbRecord,
   type MetricsDashboardParams,
   type OverviewCounts,
+  type PublishEventInput,
+  type PublishEventResult,
   type RecordsBulkResult,
   type RowsResponse,
   type RunQueryRequest,
@@ -31,6 +33,8 @@ import {
   type TableView,
   type TableWebhook,
   type TableWithColumns,
+  type TransactionOperation,
+  type TransactionResult,
   type ValidationResponse,
   type ViewRefreshRequest,
   type ViewRefreshResponse,
@@ -511,6 +515,33 @@ export class LowcodbClient {
       method: "GET",
       path: this.api("webhooks"),
       query: this.listQuery(params),
+      enveloped: true,
+    });
+  }
+
+  // --- Transactions -------------------------------------------------------
+
+  /**
+   * Runs ordered create/update/delete record operations inside one database
+   * transaction — all succeed or none apply. Internal bases only.
+   */
+  executeTransaction(schema: string, operations: TransactionOperation[]): Promise<TransactionResult> {
+    return this.request({
+      method: "POST",
+      path: this.api("data", schema, "transactions"),
+      body: { operations },
+      enveloped: true,
+    });
+  }
+
+  // --- Events -------------------------------------------------------------
+
+  /** Publishes a data event for a base on the platform event bus. */
+  publishEvent(schema: string, input: PublishEventInput): Promise<PublishEventResult> {
+    return this.request({
+      method: "POST",
+      path: this.api("events", "publish"),
+      body: { schema, ...input },
       enveloped: true,
     });
   }

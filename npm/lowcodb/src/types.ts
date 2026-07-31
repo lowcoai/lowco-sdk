@@ -180,6 +180,38 @@ export interface FunctionInvokeOptions {
   method?: FunctionHTTPMethod;
 }
 
+export type TransactionOperationType = "create" | "update" | "delete";
+
+/** One step of an atomic record transaction. */
+export interface TransactionOperation {
+  type: TransactionOperationType;
+  table: string;
+  /** Required for update and delete. */
+  id?: string;
+  /** Fields for create and update. */
+  record?: LowcodbRecord;
+}
+
+/** Per-operation results, in order: the written row, or {deletedCount} for deletes. */
+export interface TransactionResult {
+  results?: LowcodbRecord[];
+}
+
+/** Payload of publishEvent (ctx.events.publish in DB functions). */
+export interface PublishEventInput {
+  /** Event name, e.g. "lead.qualified" (alphanumeric tokens separated by dots). */
+  eventType: string;
+  /** Scopes the NATS subject's table segment; "_" when omitted. */
+  tableName?: string;
+  record?: LowcodbRecord;
+  correlationId?: string;
+}
+
+export interface PublishEventResult {
+  published?: boolean;
+  subject?: string;
+}
+
 export type TableViewKind = "view" | "materialized_view";
 
 export interface TableView extends BaseEntity {
