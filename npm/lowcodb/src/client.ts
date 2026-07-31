@@ -8,8 +8,13 @@ import {
   type CountResponse,
   type DashboardOverviewParams,
   type DashboardResponse,
+  type DBFunction,
+  type DBFunctionUpsertInput,
+  type DBFunctionVersion,
   type DeleteCountResponse,
   type Field,
+  type FunctionExecuteResult,
+  type FunctionInvokeOptions,
   type ListParams,
   type LowcodbRecord,
   type MetricsDashboardParams,
@@ -40,6 +45,11 @@ export interface LowcodbClientOptions {
   token: string;
   /** X-Org-Id header value. */
   orgId?: string;
+  /**
+   * Origin of the lowcodb manager, e.g. "http://lowcodb-service:8080" for in-cluster
+   * callers. Defaults to "https://api.lowco.ai".
+   */
+  baseUrl?: string;
   /** Extra headers added to every request. */
   defaultHeaders?: Record<string, string>;
   /** Route prefix; defaults to "/v1/lowcodb". */
@@ -60,6 +70,7 @@ interface RequestInternalOptions {
 }
 
 export class LowcodbClient {
+  private readonly baseUrl: string;
   private readonly apiBasePath: string;
   private readonly fetchFn: typeof fetch;
   private readonly timeoutMs: number;
@@ -69,6 +80,7 @@ export class LowcodbClient {
     if (!opts.token || !opts.token.trim()) {
       throw new Error("LowcodbClient: token is required");
     }
+    this.baseUrl = (opts.baseUrl ?? BASE_URL).replace(/\/+$/g, "");
     this.apiBasePath = "/" + (opts.apiBasePath ?? DEFAULT_API_BASE_PATH).replace(/^\/+|\/+$/g, "");
     this.fetchFn = opts.fetch ?? fetch;
     this.timeoutMs = opts.timeoutMs ?? 30_000;
@@ -503,6 +515,79 @@ export class LowcodbClient {
     });
   }
 
+  // --- DB Functions -------------------------------------------------------
+
+  listFunctions(params?: ListParams): Promise<DBFunction[]> {
+    return this.request({
+      method: "GET",
+      path: this.api("functions"),
+      query: this.listQuery(params),
+      enveloped: true,
+    });
+  }
+  getFunction(id: string): Promise<DBFunction> {
+    return this.request({ method: "GET", path: this.api("functions", id), enveloped: true });
+  }
+  createFunction(fn: DBFunctionUpsertInput): Promise<DBFunction> {
+    return this.request({
+      method: "POST",
+      path: this.api("functions"),
+      body: fn,
+      enveloped: true,
+    });
+  }
+  updateFunction(id: string, fn: DBFunctionUpsertInput): Promise<DBFunction> {
+    return this.request({
+      method: "PUT",
+      path: this.api("functions", id),
+      body: fn,
+      enveloped: true,
+    });
+  }
+  async deleteFunction(id: string): Promise<void> {
+    await this.request({
+      method: "DELETE",
+      path: this.api("functions", id),
+      enveloped: false,
+    });
+  }
+  listFunctionVersions(id: string): Promise<DBFunctionVersion[]> {
+    return this.request({
+      method: "GET",
+      path: this.api("functions", id, "versions"),
+      enveloped: true,
+    });
+  }
+  /**
+   * Console/test execution: runs the function (active or not) with `body` surfaced as
+   * ctx.request.body and returns the full result including logs and any function error.
+   */
+  executeFunction(id: string, body?: unknown): Promise<FunctionExecuteResult> {
+    return this.request({
+      method: "POST",
+      path: this.api("functions", id, "execute"),
+      body: body ?? {},
+      enveloped: true,
+    });
+  }
+  /**
+   * Data-plane invocation of an active function by schema + key (the same route the
+   * base's gateway proxies /v1/fn/{key} to). Resolves to the function's return value.
+   */
+  invokeFunction(
+    schema: string,
+    functionKey: string,
+    body?: unknown,
+    opts?: FunctionInvokeOptions,
+  ): Promise<unknown> {
+    return this.request({
+      method: opts?.method ?? "POST",
+      path: this.api("fn", schema, functionKey),
+      body,
+      enveloped: true,
+    });
+  }
+
   // --- Query -------------------------------------------------------------
 
   executeQuery(req: RunQueryRequest): Promise<RowsResponse> {
@@ -596,7 +681,7 @@ export class LowcodbClient {
   }
 
   private async request<T>(opts: RequestInternalOptions): Promise<T> {
-    const url = new URL(BASE_URL + opts.path);
+    const url = new URL(this.baseUrl + opts.path);
     if (opts.query) {
       opts.query.forEach((v, k) => url.searchParams.append(k, v));
     }

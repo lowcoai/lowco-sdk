@@ -114,6 +114,72 @@ export interface TableWebhook extends BaseEntity {
   active?: boolean;
 }
 
+export type FunctionHTTPMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+export interface DBFunctionMetadata {
+  /** Execution timeout in ms; server default 10 000, capped at 55 000. */
+  timeoutMs?: number;
+  /** HTTP methods the invoke route accepts; defaults to ["POST"]. */
+  methods?: FunctionHTTPMethod[];
+  /** Reserved: invokable without gateway auth. Defaults to false. */
+  public?: boolean;
+}
+
+/** A user-authored JavaScript function scoped to a base. */
+export interface DBFunction extends BaseEntity {
+  baseId?: string;
+  name?: string;
+  /** URL slug the function is invoked under (/v1/fn/{functionKey}). */
+  functionKey?: string;
+  description?: string;
+  /** JavaScript source. Top-level `return` and `await` are allowed. */
+  body?: string;
+  version?: number;
+  isActive?: boolean;
+  metadata?: DBFunctionMetadata;
+}
+
+/** Create/update payload; a body change auto-creates a version snapshot. */
+export interface DBFunctionUpsertInput {
+  baseId?: string;
+  name?: string;
+  functionKey?: string;
+  description?: string;
+  body?: string;
+  isActive?: boolean;
+  metadata?: DBFunctionMetadata;
+  /** Label for the version snapshot created when the body changes. */
+  comment?: string;
+}
+
+export interface DBFunctionVersion extends BaseEntity {
+  functionId?: string;
+  version?: number;
+  body?: string;
+  comment?: string;
+}
+
+export interface FunctionExecuteError {
+  /** "TIMEOUT" | "COMPILE_ERROR" | "FUNCTION_ERROR" */
+  code?: string;
+  message?: string;
+  stack?: string;
+}
+
+/** Full console-execution result (returned even when the function itself failed). */
+export interface FunctionExecuteResult {
+  success?: boolean;
+  result?: unknown;
+  logs?: string[];
+  error?: FunctionExecuteError;
+  durationMs?: number;
+}
+
+export interface FunctionInvokeOptions {
+  /** HTTP method for the invocation; must be allowed by the function. Default POST. */
+  method?: FunctionHTTPMethod;
+}
+
 export type TableViewKind = "view" | "materialized_view";
 
 export interface TableView extends BaseEntity {

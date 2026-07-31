@@ -43,14 +43,36 @@ const rows = await client.listRecords(base.schema!, table.name!, {
 });
 ```
 
+## DB functions
+
+Author, version, and invoke server-side JavaScript functions on a base:
+
+```ts
+const fn = await client.createFunction({
+  baseId: base.id,
+  name: "create lead",
+  body: `const lead = await ctx.db.table("leads").create(ctx.request.body);
+return { lead };`,
+});
+
+// Console/test run — full result with logs and errors:
+const run = await client.executeFunction(fn.id!, { email: "a@b.co", score: 10 });
+
+// Data-plane invocation (what the gateway proxies /v1/fn/{key} to):
+const out = await client.invokeFunction(base.schema!, fn.functionKey!, { email: "a@b.co" });
+```
+
+Also: `listFunctions`, `getFunction`, `updateFunction` (body changes snapshot a version), `deleteFunction`, `listFunctionVersions`.
+
 ## Options
 
-All requests go to `https://api.lowco.ai`.
+All requests go to `https://api.lowco.ai` unless `baseUrl` overrides it.
 
 | Option           | Description                                                            |
 | ---------------- | ---------------------------------------------------------------------- |
 | `token`          | User token or API key sent as `Authorization: Bearer <token>`. Required. |
 | `orgId`          | Sets `X-Org-Id`.                                                       |
+| `baseUrl`        | Manager origin (default `https://api.lowco.ai`); set for in-cluster or local use. |
 | `defaultHeaders` | Extra headers added to every request.                                  |
 | `apiBasePath`    | Overrides `/v1/lowcodb` (useful behind reverse proxies).               |
 | `fetch`          | Custom fetch implementation (defaults to global `fetch`).              |
@@ -87,6 +109,7 @@ The client mirrors `lowcodb/manager/server/server.go` 1-to-1:
 - **Views (metadata)** — `listViews`, `createView`, `getView`, `updateView`, `deleteView`, `refreshView`
 - **Triggers** — `getTrigger`, `createTrigger`, `updateTrigger`, `deleteTrigger`, `listTriggers`
 - **Webhooks** — `getWebhook`, `createWebhook`, `updateWebhook`, `deleteWebhook`, `listWebhooks`
+- **DB functions** — `listFunctions`, `getFunction`, `createFunction`, `updateFunction`, `deleteFunction`, `listFunctionVersions`, `executeFunction`, `invokeFunction`
 - **Query** — `executeQuery`, `getQuerySuggestions`
 - **Dashboards** — `getOverviewCounts`, `getMetricsDashboard`, `getDashboardOverview`
 - **Health** — `health`
