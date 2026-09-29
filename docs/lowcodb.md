@@ -198,10 +198,10 @@ Read-only data routes (mirror tables):
 
 | Method | Path                              | Purpose                                                          |
 | ------ | --------------------------------- | ---------------------------------------------------------------- |
-| POST   | `/query/execute`                  | Run a read-only SQL query. Body `{ query, baseId? }`. Returns `{ rows: [...] }`. |
+| POST   | `/query/execute`                  | Run a SELECT/INSERT/UPDATE/DELETE statement against one base. Body `{ query, baseId }` (or `{ query, schema }`). Returns `{ rows: [...] }`. |
 | GET    | `/query/suggestions?query=&baseId=` | Autocomplete suggestions for the editor. Returns `{ suggestions: [...] }`. |
 
-When `baseId` is omitted, the manager targets its own metadata schema. When set, the query is routed to the base's connection (Postgres or MySQL).
+`baseId` (or `schema`) is required and the query runs against that one base within your org — the manager never targets its metadata schema and never crosses orgs. Only single SELECT/INSERT/UPDATE/DELETE statements are allowed (no DDL, no multiple statements, no comments); SELECT needs the `lowcodb.query.core.read` permission and INSERT/UPDATE/DELETE need `lowcodb.query.core.write`.
 
 ### Dashboards
 

@@ -4,9 +4,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/url"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -91,8 +93,16 @@ type Client struct {
 	pingSeq     int
 	lastSentSeq int
 	hasLastSeq  bool
-	subscribed  map[string]struct{}
 	channels    map[string]*Channel
+
+	// subMu guards desired and is held across the frame that reports a
+	// change to it, so a reconnect's replay cannot interleave with a
+	// subscribe or unsubscribe and resurrect a released topic.
+	subMu sync.Mutex
+	// desired is what this client wants delivered: topic → event patterns
+	// (AllEvents = every event). It is the client's own record, not a mirror
+	// of the server's acks, so every reconnect replays it in full.
+	desired map[string]map[string]struct{}
 
 	writeMu sync.Mutex
 
@@ -125,7 +135,7 @@ func NewClient(token, orgID string, opts ...Option) (*Client, error) {
 		reconnectInterval: defaultReconnectInterval,
 		queryParams:       make(map[string]string),
 		dialer:            websocket.DefaultDialer,
-		subscribed:        make(map[string]struct{}),
+		desired:           make(map[string]map[string]struct{}),
 		channels:          make(map[string]*Channel),
 		messageHandlers:   make(map[uint64]MessageHandler),
 		errorHandlers:     make(map[uint64]ErrorHandler),
@@ -173,56 +183,78 @@ func (c *Client) Disconnect() {
 	c.mu.Unlock()
 	close(c.closeCh)
 	if conn != nil {
+		// The heartbeat may be mid-write on this socket; gorilla allows one
+		// writer at a time.
+		c.writeMu.Lock()
 		_ = conn.WriteMessage(websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		c.writeMu.Unlock()
 		_ = conn.Close()
 	}
 }
 
-// Subscribe registers a single channel on the server and returns a handle
-// for binding event handlers.
-func (c *Client) Subscribe(channel string) (*Channel, error) {
-	topics := normalizeTopics([]string{channel})
-	if len(topics) == 0 {
+// Subscribe asks the server for a channel's events and returns a handle for
+// binding handlers. Pass event patterns to receive only the matching ones —
+// Subscribe("channel:<schema>", "messages.*") — or none for every event.
+//
+// Subscribes add to what the client already holds on a topic, and only the
+// difference is sent. While the socket is down the subscription is kept and
+// sent on the next connect, so this returns nil rather than ErrNotConnected.
+func (c *Client) Subscribe(channel string, events ...string) (*Channel, error) {
+	subs := parseSubscriptions([]Subscription{{Topic: channel, Events: events}})
+	if len(subs) == 0 {
 		return nil, ErrEmptyTopic
 	}
-	if err := c.send(ChannelSubscription, EventSubscribe, topics, MessageTypeAction); err != nil {
+	if err := c.addSubscriptions(subs); err != nil {
 		return nil, err
 	}
-	return c.getOrCreateChannel(topics[0]), nil
+	return c.getOrCreateChannel(subs[0].topic), nil
 }
 
-// SubscribeMany subscribes to a batch of topics in a single request.
+// SubscribeMany subscribes to every event of a batch of topics in one frame.
 func (c *Client) SubscribeMany(topics []string) error {
-	normalized := normalizeTopics(topics)
-	if len(normalized) == 0 {
-		return ErrEmptyTopic
-	}
-	return c.send(ChannelSubscription, EventSubscribe, normalized, MessageTypeAction)
+	return c.SubscribeWith(bareSubscriptions(topics)...)
 }
 
-// Unsubscribe unsubscribes from a single channel and removes its handlers.
-func (c *Client) Unsubscribe(channel string) error {
-	topics := normalizeTopics([]string{channel})
-	if len(topics) == 0 {
+// SubscribeWith subscribes to a batch of topics, each with its own event
+// filter, in one frame.
+func (c *Client) SubscribeWith(subs ...Subscription) error {
+	parsed := parseSubscriptions(subs)
+	if len(parsed) == 0 {
 		return ErrEmptyTopic
 	}
-	if err := c.send(ChannelSubscription, EventUnsubscribe, topics, MessageTypeAction); err != nil {
+	return c.addSubscriptions(parsed)
+}
+
+// Unsubscribe leaves a channel entirely and removes its handlers.
+func (c *Client) Unsubscribe(channel string) error {
+	subs := parseSubscriptions([]Subscription{{Topic: channel}})
+	if len(subs) == 0 {
+		return ErrEmptyTopic
+	}
+	if err := c.removeSubscriptions(subs); err != nil {
 		return err
 	}
-	c.clearChannel(topics[0])
+	c.clearChannel(subs[0].topic)
 	return nil
 }
 
-// UnsubscribeMany unsubscribes from a batch of topics. Bound handlers for
+// UnsubscribeMany leaves a batch of topics entirely. Bound handlers for
 // those topics are NOT removed (use Unsubscribe(name) when you also want to
 // drop handlers).
 func (c *Client) UnsubscribeMany(topics []string) error {
-	normalized := normalizeTopics(topics)
-	if len(normalized) == 0 {
+	return c.UnsubscribeWith(bareSubscriptions(topics)...)
+}
+
+// UnsubscribeWith drops event patterns: an entry with Events drops only
+// those, and its topic once none is left; an entry without drops the topic
+// whole. Bound handlers are not removed.
+func (c *Client) UnsubscribeWith(subs ...Subscription) error {
+	parsed := parseSubscriptions(subs)
+	if len(parsed) == 0 {
 		return ErrEmptyTopic
 	}
-	return c.send(ChannelSubscription, EventUnsubscribe, normalized, MessageTypeAction)
+	return c.removeSubscriptions(parsed)
 }
 
 // Send writes an action message on the given channel.
@@ -230,15 +262,23 @@ func (c *Client) Send(channel, event string, data any) error {
 	return c.send(channel, event, data, MessageTypeAction)
 }
 
-// SubscribedTopics returns the topics the server has currently acknowledged.
+// SubscribedTopics returns the topics this client holds (and replays on
+// every reconnect).
 func (c *Client) SubscribedTopics() []string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	out := make([]string, 0, len(c.subscribed))
-	for t := range c.subscribed {
-		out = append(out, t)
+	subs := c.Subscriptions()
+	out := make([]string, len(subs))
+	for i, sub := range subs {
+		out[i] = sub.Topic
 	}
 	return out
+}
+
+// Subscriptions returns every held topic with the event patterns asked of
+// it, sorted by topic.
+func (c *Client) Subscriptions() []Subscription {
+	c.subMu.Lock()
+	defer c.subMu.Unlock()
+	return c.subscriptionsLocked()
 }
 
 // OnMessage registers a handler invoked for every received message.
@@ -473,9 +513,6 @@ func (c *Client) readLoop(conn *websocket.Conn) {
 			_ = conn.Close()
 			return
 		}
-		if msg.Event == EventSubscribe || msg.Event == EventUnsubscribe {
-			c.syncSubscribed(msg.Data)
-		}
 		c.emitChannelEvent(msg)
 		c.emitMessage(msg)
 	}
@@ -522,6 +559,9 @@ func (c *Client) buildURL() (string, error) {
 	for k, v := range c.queryParams {
 		q.Set(k, v)
 	}
+	// Tells the server this client re-sends every subscription on connect,
+	// so it starts the socket clean.
+	q.Set("replay", "1")
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
@@ -546,33 +586,147 @@ func (c *Client) isExpectedPong(content any) bool {
 	return false
 }
 
-func (c *Client) syncSubscribed(content any) {
-	arr, ok := content.([]any)
-	if !ok {
-		return
-	}
-	next := make(map[string]struct{}, len(arr))
-	for _, v := range arr {
-		if s, ok := v.(string); ok && s != "" {
-			next[s] = struct{}{}
-		}
-	}
-	c.mu.Lock()
-	c.subscribed = next
-	c.mu.Unlock()
+type parsedSubscription struct {
+	topic string
+	// events is nil for a bare topic: every event on subscribe, the whole
+	// topic on unsubscribe.
+	events []string
 }
 
+func parseSubscriptions(subs []Subscription) []parsedSubscription {
+	out := make([]parsedSubscription, 0, len(subs))
+	for _, sub := range subs {
+		topic := normalizeTopic(sub.Topic)
+		if topic == "" {
+			continue
+		}
+		events := normalizeTopics(sub.Events)
+		if len(events) == 0 {
+			events = nil
+		}
+		out = append(out, parsedSubscription{topic: topic, events: events})
+	}
+	return out
+}
+
+func bareSubscriptions(topics []string) []Subscription {
+	subs := make([]Subscription, len(topics))
+	for i, topic := range topics {
+		subs[i] = Subscription{Topic: topic}
+	}
+	return subs
+}
+
+// wireSubscription is one entry of an sb/usb frame: a bare topic string when
+// it stands for every event (the frame older servers read), otherwise
+// {topic, events}.
+func wireSubscription(topic string, events []string) any {
+	if len(events) == 0 || (len(events) == 1 && events[0] == AllEvents) {
+		return topic
+	}
+	return Subscription{Topic: topic, Events: events}
+}
+
+func (c *Client) addSubscriptions(subs []parsedSubscription) error {
+	c.subMu.Lock()
+	defer c.subMu.Unlock()
+	var added []any
+	for _, sub := range subs {
+		held, ok := c.desired[sub.topic]
+		if !ok {
+			held = make(map[string]struct{})
+			c.desired[sub.topic] = held
+		}
+		events := sub.events
+		if events == nil {
+			events = []string{AllEvents}
+		}
+		var fresh []string
+		for _, e := range events {
+			if _, dup := held[e]; dup {
+				continue
+			}
+			held[e] = struct{}{}
+			fresh = append(fresh, e)
+		}
+		if len(fresh) > 0 {
+			added = append(added, wireSubscription(sub.topic, fresh))
+		}
+	}
+	return c.sendSubscriptionsLocked(EventSubscribe, added)
+}
+
+func (c *Client) removeSubscriptions(subs []parsedSubscription) error {
+	c.subMu.Lock()
+	defer c.subMu.Unlock()
+	var removed []any
+	for _, sub := range subs {
+		if sub.events == nil {
+			delete(c.desired, sub.topic)
+			removed = append(removed, sub.topic)
+			continue
+		}
+		held, ok := c.desired[sub.topic]
+		if !ok {
+			continue
+		}
+		var dropped []string
+		for _, e := range sub.events {
+			if _, has := held[e]; has {
+				delete(held, e)
+				dropped = append(dropped, e)
+			}
+		}
+		if len(held) == 0 {
+			// Released whole, so the server drops the topic whatever it holds.
+			delete(c.desired, sub.topic)
+			removed = append(removed, sub.topic)
+		} else if len(dropped) > 0 {
+			removed = append(removed, wireSubscription(sub.topic, dropped))
+		}
+	}
+	return c.sendSubscriptionsLocked(EventUnsubscribe, removed)
+}
+
+// sendSubscriptionsLocked writes an sb/usb frame. A closed socket is not an
+// error: the server keeps nothing for it, and the next connect replays
+// desired. The caller holds subMu.
+func (c *Client) sendSubscriptionsLocked(event string, entries []any) error {
+	if len(entries) == 0 {
+		return nil
+	}
+	err := c.send(ChannelSubscription, event, entries, MessageTypeAction)
+	if errors.Is(err, ErrNotConnected) {
+		return nil
+	}
+	return err
+}
+
+func (c *Client) subscriptionsLocked() []Subscription {
+	out := make([]Subscription, 0, len(c.desired))
+	for topic, held := range c.desired {
+		events := make([]string, 0, len(held))
+		for e := range held {
+			events = append(events, e)
+		}
+		sort.Strings(events)
+		out = append(out, Subscription{Topic: topic, Events: events})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Topic < out[j].Topic })
+	return out
+}
+
+// resubscribe replays every subscription on a fresh socket, which the server
+// knows nothing about.
 func (c *Client) resubscribe() {
-	c.mu.Lock()
-	topics := make([]string, 0, len(c.subscribed))
-	for t := range c.subscribed {
-		topics = append(topics, t)
+	c.subMu.Lock()
+	defer c.subMu.Unlock()
+	subs := c.subscriptionsLocked()
+	entries := make([]any, len(subs))
+	for i, sub := range subs {
+		entries[i] = wireSubscription(sub.Topic, sub.Events)
 	}
-	c.mu.Unlock()
-	if len(topics) == 0 {
-		return
-	}
-	_ = c.send(ChannelSubscription, EventSubscribe, topics, MessageTypeAction)
+	_ = c.sendSubscriptionsLocked(EventSubscribe, entries)
 }
 
 func (c *Client) getOrCreateChannel(name string) *Channel {

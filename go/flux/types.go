@@ -43,6 +43,19 @@ type SocketMessage struct {
 	Meta      *MessageMeta `json:"meta,omitempty"`
 }
 
+// AllEvents is the event pattern that matches every event on a topic.
+const AllEvents = "*"
+
+// Subscription is a topic narrowed to the events wanted from it. The server
+// delivers only events matching one of the patterns: "*" alone is every
+// event, otherwise patterns are compared token by token on "." with "*"
+// matching exactly one token ("messages.*", "*.delete", "messages.insert").
+// No Events means every event (subscribe) or the whole topic (unsubscribe).
+type Subscription struct {
+	Topic  string   `json:"topic"`
+	Events []string `json:"events,omitempty"`
+}
+
 // ConnectionState is reported via Client.OnState.
 type ConnectionState string
 

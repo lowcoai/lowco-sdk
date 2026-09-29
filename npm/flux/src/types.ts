@@ -36,6 +36,24 @@ export enum SocketEvent {
   REPLY = "reply",
 }
 
+/** The event pattern that matches every event on a topic. */
+export const ALL_EVENTS = "*";
+
+/**
+ * A topic, narrowed to the events wanted from it. The server delivers only
+ * events matching one of the patterns: `*` alone is every event, otherwise
+ * patterns are compared token by token on `.` with `*` matching exactly one
+ * token — `messages.*`, `*.delete`, `messages.insert`. Omitted or empty
+ * `events` means every event (subscribe) or the whole topic (unsubscribe).
+ */
+export interface TopicSubscription {
+  topic: string;
+  events?: readonly string[];
+}
+
+/** A bare topic string (every event) or a topic with an event filter. */
+export type SubscriptionSpec = string | TopicSubscription;
+
 export interface FluxClientOptions {
   /** Authentication token (user token or API key) sent as the `token` query parameter. Required. */
   token: string;

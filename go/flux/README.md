@@ -32,12 +32,8 @@ func main() {
     client.Connect()
     defer client.Disconnect()
 
-    // Wait for the socket to open (or use OnState).
-    for !client.IsConnected() {
-        time.Sleep(50 * time.Millisecond)
-    }
-
-    // Subscribe and bind to a channel.
+    // Subscribe and bind to a channel. A subscribe made before the socket
+    // opens is kept and sent once it does.
     ch, err := client.Subscribe("tables:leads")
     if err != nil {
         log.Fatal(err)
@@ -49,7 +45,13 @@ func main() {
     // Batch subscribe.
     _ = client.SubscribeMany([]string{"tables:leads", "tables:orders"})
 
-    // Send a message.
+    // Only some events of a topic — the server sends nothing else.
+    _, _ = client.Subscribe("channel:<schema>", "messages.*", "notifications.*")
+
+    // Send a message (needs an open socket).
+    for !client.IsConnected() {
+        time.Sleep(50 * time.Millisecond)
+    }
     _ = ch.Send("ping", map[string]string{"hello": "world"})
 
     select {}
@@ -66,11 +68,28 @@ func main() {
 | `WithQueryParam(k, v)`    | Extra query parameter appended to the connection URL.        |
 | `WithDialer(d)`           | Custom `*websocket.Dialer`.                                  |
 
-The client transparently reconnects with exponential backoff and re-subscribes to the same topics after each reconnect.
+The client transparently reconnects with exponential backoff and re-subscribes to the same topics, with their event filters, after each reconnect.
+
+## Event filters
+
+A subscription can be narrowed to the events you want, and the server then delivers only those — useful on a busy channel such as a lowcodb schema channel, where every realtime table arrives as `<table>.<insert|update|delete>`:
+
+```go
+_ = client.SubscribeWith(
+    flux.Subscription{Topic: "agent:42"},                                      // every event
+    flux.Subscription{Topic: "channel:<schema>", Events: []string{"messages.*"}}, // one table
+)
+_, _ = client.Subscribe("channel:<schema>", "notifications.insert") // adds to the filter
+
+_ = client.UnsubscribeWith(flux.Subscription{Topic: "channel:<schema>", Events: []string{"messages.*"}}) // one pattern
+_ = client.UnsubscribeMany([]string{"channel:<schema>"})                                               // the topic
+```
+
+Patterns are dot-separated: `*` alone matches every event, and elsewhere `*` matches exactly one token (`messages.*`, `*.delete`). Subscribing adds patterns to what the topic already has, and only the difference is sent. A topic is dropped when its last pattern is. Filters are not access control — channel authorization still applies per topic.
 
 ## Errors
 
-- `ErrNotConnected` — returned by `Send`, `Subscribe`, etc., when the socket is not open.
+- `ErrNotConnected` — returned by `Send` when the socket is not open. Subscribes are kept and sent on the next connect instead.
 - `ErrEmptyTopic` — returned for empty channel / topic input.
 
 Transient errors (decode failures, pong mismatch, server-side errors) are delivered via handlers registered through `OnError`.
@@ -81,5 +100,6 @@ Transient errors (decode failures, pong mismatch, server-side errors) are delive
 client.Connect()              // (re)open the socket
 client.IsConnected()          // bool
 client.Disconnect()           // close and stop reconnects
-client.SubscribedTopics()     // server-acknowledged topics
+client.SubscribedTopics()     // topics this client holds (replayed on reconnect)
+client.Subscriptions()        // the same, with each topic's event patterns
 ```

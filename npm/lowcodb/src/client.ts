@@ -771,14 +771,32 @@ async function throwHttpError(resp: Response): Promise<never> {
   throw buildHttpError(resp.status, text);
 }
 
+/**
+ * The manager's error envelope puts the *opaque platform code* in `error.message`
+ * ("AAS-00105" and friends, from core/api/builder.go) and the **real** text in
+ * `error.details`. Reading `message` alone is what made every error thrown by a DB
+ * function reach its `ctx.functions.invoke` caller as a bare "AAS-00105" with the
+ * cause discarded — guards could only be asserted as "it rejected".
+ */
+const OPAQUE_PLATFORM_CODE = /^AAS-\d+$/;
+
 function buildHttpError(status: number, text: string): LowcodbError {
   let message = text.trim();
-  let code: string | undefined;
+  let code: string | number | undefined;
   try {
     const parsed = JSON.parse(text) as { message?: string; error?: APIErrorPayload };
-    if (parsed.error?.message?.trim()) {
-      message = parsed.error.message;
-      code = parsed.error.code;
+    const envelope = parsed.error;
+    const envelopeMessage = envelope?.message?.trim();
+    if (envelopeMessage) {
+      message = envelopeMessage;
+      code = envelope?.code;
+      // Prefer the detail text whenever `message` is nothing but the platform code.
+      // `code` is left alone (the manager sends the numeric HTTP status there) and the
+      // platform code stays recoverable from `body`, so nothing is lost.
+      const details = typeof envelope?.details === "string" ? envelope.details.trim() : "";
+      if (details && OPAQUE_PLATFORM_CODE.test(envelopeMessage)) {
+        message = details;
+      }
     } else if (parsed.message) {
       message = parsed.message;
     }

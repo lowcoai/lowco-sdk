@@ -7,10 +7,11 @@
  */
 export class LowcodbError extends Error {
   readonly statusCode: number;
-  readonly code?: string;
+  /** The manager sends the numeric HTTP status in `error.code`, so this may be a number. */
+  readonly code?: string | number;
   readonly body: string;
 
-  constructor(opts: { statusCode: number; message: string; code?: string; body: string }) {
+  constructor(opts: { statusCode: number; message: string; code?: string | number; body: string }) {
     super(opts.message || `lowcodb: status=${opts.statusCode}`);
     this.name = "LowcodbError";
     this.statusCode = opts.statusCode;

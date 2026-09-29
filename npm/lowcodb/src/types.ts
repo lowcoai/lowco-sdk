@@ -284,9 +284,12 @@ export interface SyncTablesResult {
 export type DashboardResponse = Record<string, unknown>;
 
 export interface APIErrorPayload {
-  code?: string;
+  /** The manager sends the numeric HTTP status here, not a string code. */
+  code?: string | number;
+  /** The opaque platform code ("AAS-00105"), *not* the human message. */
   message?: string;
-  details?: Record<string, unknown>;
+  /** Where the real message actually lives. A string on the wire. */
+  details?: string | Record<string, unknown>;
 }
 
 export interface ListParams {

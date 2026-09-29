@@ -1,5 +1,6 @@
 import { FluxError } from "./errors.js";
 import {
+  ALL_EVENTS,
   type ChannelEventHandler,
   type ConnectionState,
   type ErrorHandler,
@@ -9,13 +10,10 @@ import {
   type MessageType,
   type SocketMessage,
   type StateHandler,
+  type SubscriptionSpec,
+  type TopicSubscription,
 } from "./types.js";
-import {
-  buildWebSocketUrl,
-  generateClientId,
-  normalizeTopic,
-  normalizeTopics,
-} from "./utils.js";
+import { buildWebSocketUrl, generateClientId, normalizeTopic } from "./utils.js";
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 5000;
 const DEFAULT_RECONNECT_INTERVAL_MS = 1000;
@@ -33,8 +31,8 @@ type ResolvedOptions = {
 
 /**
  * WebSocket client for the flux realtime service. One instance owns a single
- * connection, automatically reconnects with exponential backoff, and keeps
- * topic subscriptions in sync across reconnects.
+ * connection, automatically reconnects with exponential backoff, and replays
+ * every subscription — event filters included — on each reconnect.
  */
 export class FluxClient {
   private static instance: FluxClient | null = null;
@@ -71,7 +69,13 @@ export class FluxClient {
   private reconnectAttempt = 0;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private manuallyClosed = false;
-  private subscribed = new Set<string>();
+  /**
+   * What this client wants delivered: topic → event patterns (`*` = every
+   * event). It is the client's own record rather than a mirror of the
+   * server's acks, so a reconnect replays it in full, and a subscribe made
+   * while the socket is down is simply sent on the next open.
+   */
+  private readonly desired = new Map<string, Set<string>>();
   private _isConnected = false;
 
   private readonly onMessageHandlers = new Set<MessageHandler>();
@@ -145,9 +149,6 @@ export class FluxClient {
         ws.close();
         return;
       }
-      if (payload.event === "sb" || payload.event === "usb") {
-        this.syncSubscribed(payload.data);
-      }
       this.emitChannelEvent(payload);
       this.emitMessage(payload);
     };
@@ -185,36 +186,92 @@ export class FluxClient {
     this.ws = null;
   }
 
-  subscribe(channel: string): FluxChannel;
-  subscribe(topics: string[]): void;
-  subscribe(channelOrTopics: string | string[]): FluxChannel | void {
-    const normalized = normalizeTopics(
-      Array.isArray(channelOrTopics) ? channelOrTopics : [channelOrTopics],
+  /**
+   * Ask the server for a topic's events. Pass `events` to receive only the
+   * matching ones — `subscribe("channel:<schema>", { events: ["messages.*"] })`
+   * — or omit it for every event. Subscribes add to what the client already
+   * holds on a topic; only the difference goes over the wire. While the
+   * socket is down the subscription is kept and sent on the next open.
+   */
+  subscribe(
+    channel: string,
+    options?: { events?: readonly string[] },
+  ): FluxChannel;
+  subscribe(topics: SubscriptionSpec[]): void;
+  subscribe(
+    channelOrTopics: string | SubscriptionSpec[],
+    options?: { events?: readonly string[] },
+  ): FluxChannel | void {
+    const specs = parseSpecs(
+      Array.isArray(channelOrTopics)
+        ? channelOrTopics
+        : [{ topic: channelOrTopics, events: options?.events }],
     );
-    if (normalized.length === 0) {
+    const first = specs[0];
+    if (!first) {
       throw new FluxError("at least one topic is required to subscribe");
     }
-    this.send("flux:subscription", "sb", normalized, "action");
+    const added: TopicSubscription[] = [];
+    for (const { topic, events } of specs) {
+      let held = this.desired.get(topic);
+      if (!held) {
+        held = new Set();
+        this.desired.set(topic, held);
+      }
+      const fresh = (events ?? [ALL_EVENTS]).filter((e) => !held.has(e));
+      fresh.forEach((e) => held.add(e));
+      if (fresh.length > 0) added.push({ topic, events: fresh });
+    }
+    if (added.length > 0 && this.isOpen()) {
+      this.send("flux:subscription", "sb", added.map(toWire), "action");
+    }
     if (Array.isArray(channelOrTopics)) {
       return;
     }
-    return this.getOrCreateChannel(normalized[0]!);
+    return this.getOrCreateChannel(first.topic);
   }
 
+  /**
+   * Stop receiving events. A bare topic drops it whole; a topic with
+   * `events` drops only those patterns, and the topic once none is left.
+   * The single-topic overload also removes the channel's bound handlers.
+   */
   unsubscribe(channel: string): void;
-  unsubscribe(topics: string[]): void;
-  unsubscribe(channelOrTopics: string | string[]): void {
-    const normalized = normalizeTopics(
+  unsubscribe(topics: SubscriptionSpec[]): void;
+  unsubscribe(channelOrTopics: string | SubscriptionSpec[]): void {
+    const specs = parseSpecs(
       Array.isArray(channelOrTopics) ? channelOrTopics : [channelOrTopics],
     );
-    if (normalized.length === 0) {
+    const first = specs[0];
+    if (!first) {
       throw new FluxError("at least one topic is required to unsubscribe");
     }
-    this.send("flux:subscription", "usb", normalized, "action");
+    const removed: SubscriptionSpec[] = [];
+    for (const { topic, events } of specs) {
+      const held = this.desired.get(topic);
+      if (!events) {
+        this.desired.delete(topic);
+        removed.push(topic);
+        continue;
+      }
+      if (!held) continue;
+      const dropped = events.filter((e) => held.delete(e));
+      if (held.size === 0) {
+        // Released whole, so the server drops the topic whatever it holds.
+        this.desired.delete(topic);
+        removed.push(topic);
+      } else if (dropped.length > 0) {
+        removed.push({ topic, events: dropped });
+      }
+    }
+    // A closed socket has nothing to tell: the server drops a connection's
+    // subscriptions with it, and the next open replays only what is left.
+    if (removed.length > 0 && this.isOpen()) {
+      this.send("flux:subscription", "usb", removed, "action");
+    }
     if (!Array.isArray(channelOrTopics)) {
-      const name = normalized[0]!;
-      this.clearChannelHandlers(name);
-      this.channels.delete(name);
+      this.clearChannelHandlers(first.topic);
+      this.channels.delete(first.topic);
     }
   }
 
@@ -222,8 +279,17 @@ export class FluxClient {
     this.send(channel, event, data);
   }
 
+  /** The topics this client holds (and replays on every reconnect). */
   getSubscribedTopics(): string[] {
-    return [...this.subscribed];
+    return [...this.desired.keys()];
+  }
+
+  /** Every held topic with the event patterns asked of it. */
+  getSubscriptions(): TopicSubscription[] {
+    return [...this.desired].map(([topic, events]) => ({
+      topic,
+      events: [...events],
+    }));
   }
 
   onMessage(handler: MessageHandler): () => void {
@@ -365,7 +431,9 @@ export class FluxClient {
       this.options.token,
       this.options.orgId,
       this.options.clientId,
-      this.options.queryParams,
+      // Tells the server this client re-sends every subscription on
+      // connect, so it starts the socket clean.
+      { ...this.options.queryParams, replay: "1" },
     );
   }
 
@@ -377,12 +445,10 @@ export class FluxClient {
     return Number.isFinite(seq) && seq === this.lastSentSeq;
   }
 
-  private syncSubscribed(content: unknown): void {
-    if (!Array.isArray(content)) {
-      return;
-    }
-    this.subscribed = new Set(
-      content.filter((v): v is string => typeof v === "string" && v.length > 0),
+  private isOpen(): boolean {
+    return (
+      this.ws !== null &&
+      this.ws.readyState === this.options.webSocketImpl.OPEN
     );
   }
 
@@ -453,17 +519,46 @@ export class FluxClient {
     }
   }
 
+  /** A new socket holds nothing server-side: replay everything wanted. */
   private resubscribeTopics(): void {
-    const topics = [...this.subscribed];
-    if (topics.length === 0) {
+    const all = this.getSubscriptions().map(toWire);
+    if (all.length === 0) {
       return;
     }
     try {
-      this.send("flux:subscription", "sb", topics, "action");
+      this.send("flux:subscription", "sb", all, "action");
     } catch {
       /* socket may not be ready yet */
     }
   }
+}
+
+interface ParsedSpec {
+  topic: string;
+  /** null for a bare topic: every event on subscribe, the whole topic on unsubscribe. */
+  events: string[] | null;
+}
+
+function parseSpecs(specs: readonly SubscriptionSpec[]): ParsedSpec[] {
+  const out: ParsedSpec[] = [];
+  for (const spec of specs) {
+    const topic = normalizeTopic(typeof spec === "string" ? spec : spec?.topic);
+    if (!topic) continue;
+    const raw = typeof spec === "string" ? undefined : spec.events;
+    const events = [
+      ...new Set((raw ?? []).map((e) => normalizeTopic(e)).filter(Boolean)),
+    ];
+    out.push({ topic, events: events.length > 0 ? events : null });
+  }
+  return out;
+}
+
+/** A bare string when the topic wants every event — the frame older servers read. */
+function toWire({ topic, events }: TopicSubscription): SubscriptionSpec {
+  if (!events || (events.length === 1 && events[0] === ALL_EVENTS)) {
+    return topic;
+  }
+  return { topic, events: [...events] };
 }
 
 /** Convenience handle for a single channel returned by `subscribe(name)`. */

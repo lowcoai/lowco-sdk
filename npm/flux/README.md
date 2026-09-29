@@ -26,6 +26,9 @@ channel.bind("row.created", (data) => console.log("new row", data));
 // Or subscribe to a batch of topics
 flux.subscribe(["tables:leads", "tables:orders"]);
 
+// Only some events of a topic — the server sends nothing else
+flux.subscribe("channel:<schema>", { events: ["messages.*", "notifications.*"] });
+
 // Send a message
 flux.sendMessage("tables:leads", "ping", { hello: "world" });
 ```
@@ -59,11 +62,30 @@ unbind();           // remove this handler
 channel.destroy();  // unbind all + unsubscribe
 ```
 
-`subscribe(topics: string[])` performs a batch subscribe without returning a handle.
+`subscribe(topics)` performs a batch subscribe without returning a handle. Each entry is a bare topic string or `{ topic, events }`.
+
+## Event filters
+
+A subscription can be narrowed to the events you want, and the server then delivers only those — useful on a busy channel such as a lowcodb schema channel, where every realtime table arrives as `<table>.<insert|update|delete>`:
+
+```ts
+flux.subscribe([
+  "agent:42",                                            // every event
+  { topic: "channel:<schema>", events: ["messages.*"] }, // one table
+]);
+flux.subscribe("channel:<schema>", { events: ["notifications.insert"] }); // adds to the filter
+
+flux.unsubscribe([{ topic: "channel:<schema>", events: ["messages.*"] }]); // drops one pattern
+flux.unsubscribe(["channel:<schema>"]);                                  // drops the topic
+```
+
+Patterns are dot-separated: `*` alone matches every event, and elsewhere `*` matches exactly one token (`messages.*`, `*.delete`). Subscribing adds patterns to what the topic already has, and only the difference is sent. A topic is dropped when its last pattern is. Filters are not access control — channel authorization still applies per topic.
+
+Subscriptions (with their filters) are kept by the client: a subscribe made while the socket is down is sent when it opens, and every reconnect replays them all.
 
 ## Errors
 
-`FluxError` is thrown for invalid input or sending while disconnected. Transient socket errors (parse failures, server-side errors, pong mismatch) are surfaced through `onError`:
+`FluxError` is thrown for invalid input or for `sendMessage` while disconnected (subscribes are kept and sent on the next open instead). Transient socket errors (parse failures, server-side errors, pong mismatch) are surfaced through `onError`:
 
 ```ts
 flux.onError((err) => console.error("flux error", err));
@@ -75,5 +97,6 @@ flux.onError((err) => console.error("flux error", err));
 flux.connect();             // (re)open the socket
 flux.isConnected();         // true once `connected` state fires
 flux.disconnect();          // close and stop auto-reconnect
-flux.getSubscribedTopics(); // current server-acknowledged topics
+flux.getSubscribedTopics(); // topics this client holds (replayed on reconnect)
+flux.getSubscriptions();    // the same, with each topic's event patterns
 ```
