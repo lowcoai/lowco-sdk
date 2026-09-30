@@ -82,8 +82,11 @@ Base path: `/v1/wf`
 
 ## Webhooks
 
-- `client.webhooks.trigger(workflowId, payload, query)` -> `POST /webhook/:id`
-- `client.webhooks.listByWorkflow(workflowId)` -> `GET /webhook/:id`
-- `client.webhooks.create(workflowId, payload)` -> `POST /webhook/:id`
-- `client.webhooks.update(webhookId, payload)` -> `PUT /webhook/:id`
-- `client.webhooks.delete(workflowId)` -> `DELETE /webhook/:id`
+- `client.webhooks.trigger(workflowId, payload, query)` -> `POST /webhook/:id` (runs the workflow with `payload` as input)
+
+Deprecated. The workflow API does not serve these routes, and webhook registration is handled by the integrations service. Each rejects with a `WorkflowError` (`status` `0`, `payload.code` `"unsupported_operation"`) without sending a request:
+
+- `client.webhooks.listByWorkflow(workflowId)`
+- `client.webhooks.create(workflowId, payload)`. It used to POST to the trigger route, so it ran the workflow with the webhook config as input.
+- `client.webhooks.update(webhookId, payload)`
+- `client.webhooks.delete(workflowId)`

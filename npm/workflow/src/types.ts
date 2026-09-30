@@ -180,6 +180,11 @@ export interface DryRunRequest {
   activityId: string;
 }
 
+/**
+ * @deprecated Only used by the deprecated `webhooks.create` and
+ * `webhooks.update`, which always reject. Will be removed in a future major
+ * version.
+ */
 export interface WebhookCreateRequest {
   url: string;
   authenticationType?: string;

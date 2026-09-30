@@ -48,6 +48,19 @@ if (tasks[0]) {
 }
 ```
 
+## Trigger a workflow by webhook
+
+```ts
+// The payload becomes the workflow's input.
+await client.webhooks.trigger("wf_123", { orderId: "o_1" }, { async: true });
+```
+
+`trigger` is the only webhook method that calls the API. `listByWorkflow`, `create`,
+`update` and `delete` are deprecated: the workflow API does not serve those routes,
+and webhook registration is handled by the integrations service. They reject with a
+`WorkflowError` (`status` `0`) without sending a request. `create` used to POST to the
+trigger route, so it ran the workflow with the webhook config as input.
+
 ## Resources
 
 `client.workflows`, `client.environments`, `client.functions`, `client.executions`,

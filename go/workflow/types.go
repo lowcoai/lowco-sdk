@@ -188,6 +188,11 @@ type DryRunRequest struct {
 	ActivityID       string `json:"activityId"`
 }
 
+// WebhookCreateRequest is the payload of the deprecated Webhooks.Create and
+// Webhooks.Update.
+//
+// Deprecated: both methods always return an error. Will be removed in a future
+// major version.
 type WebhookCreateRequest struct {
 	URL                string         `json:"url"`
 	AuthenticationType string         `json:"authenticationType,omitempty"`

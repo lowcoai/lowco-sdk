@@ -93,7 +93,7 @@ class LowcoAnalytics {
             longitude,
             accuracy,
             altitude,
-            altitudeAccuracy,
+            altitude_accuracy: altitudeAccuracy,
             heading,
             speed,
           };

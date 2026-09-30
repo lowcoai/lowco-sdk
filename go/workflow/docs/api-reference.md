@@ -76,8 +76,11 @@ This page maps SDK methods to `workflow-orchestrator` routes.
 
 ## Webhooks
 
-- `Trigger` -> `POST /v1/wf/webhook/:workflowId`
-- `ListByWorkflow` -> `GET /v1/wf/webhook/:workflowId`
-- `Create` -> `POST /v1/wf/webhook/:workflowId`
-- `Update` -> `PUT /v1/wf/webhook/:webhookId`
-- `Delete` -> `DELETE /v1/wf/webhook/:workflowId`
+- `Trigger` -> `POST /v1/wf/webhook/:workflowId` (runs the workflow with the payload as input)
+
+Deprecated. The workflow API does not serve these routes, and webhook registration is handled by the integrations service. Each returns a `*workflow.Error` (`Status` `0`, `Payload["code"]` `"unsupported_operation"`) without sending a request:
+
+- `ListByWorkflow`
+- `Create`. It used to POST to the trigger route, so it ran the workflow with the webhook config as input.
+- `Update`
+- `Delete`

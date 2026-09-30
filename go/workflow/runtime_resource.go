@@ -99,6 +99,8 @@ type WebhooksResource struct {
 	http *httpClient
 }
 
+// Trigger runs the workflow with payload as its input
+// (POST /v1/wf/webhook/{id}).
 func (r *WebhooksResource) Trigger(ctx context.Context, workflowID string, payload map[string]any, query *WebhookTriggerQuery) (map[string]any, error) {
 	if payload == nil {
 		payload = map[string]any{}
@@ -108,26 +110,55 @@ func (r *WebhooksResource) Trigger(ctx context.Context, workflowID string, paylo
 	return result, err
 }
 
+// unsupportedWebhookError is returned by the deprecated webhook methods. The
+// workflow API serves only POST /v1/wf/webhook/{id}, which triggers the
+// workflow. Listing, registering, updating and deleting webhooks are not
+// routed; registration is handled by the integrations service when a workflow
+// is saved with an application trigger. The deprecated methods fail locally so
+// they never reach the trigger route.
+func unsupportedWebhookError(operation, detail string) *Error {
+	return &Error{
+		Status: 0,
+		Message: "Webhooks." + operation + " is not supported and no request was sent: " + detail +
+			" Webhook registration is handled by the integrations service." +
+			" Use Webhooks.Trigger to run a workflow.",
+		Payload: map[string]any{"code": "unsupported_operation", "operation": "Webhooks." + operation},
+	}
+}
+
+// ListByWorkflow always returns a *Error without sending a request.
+//
+// Deprecated: the workflow API does not serve GET /v1/wf/webhook/{id}, and
+// webhook registration is handled by the integrations service. Will be removed
+// in a future major version.
 func (r *WebhooksResource) ListByWorkflow(ctx context.Context, workflowID string) ([]map[string]any, error) {
-	var result []map[string]any
-	err := r.http.Request(ctx, "GET", "/v1/wf/webhook/"+workflowID, nil, nil, &result)
-	return result, err
+	return nil, unsupportedWebhookError("ListByWorkflow", "the workflow API does not serve GET /v1/wf/webhook/{id}.")
 }
 
+// Create always returns a *Error without sending a request.
+//
+// Deprecated: POST /v1/wf/webhook/{id} triggers the workflow, so this call used
+// to run the workflow with the webhook config as its input. Webhook
+// registration is handled by the integrations service; use Trigger to run a
+// workflow. Will be removed in a future major version.
 func (r *WebhooksResource) Create(ctx context.Context, workflowID string, payload WebhookCreateRequest) (map[string]any, error) {
-	result := make(map[string]any)
-	err := r.http.Request(ctx, "POST", "/v1/wf/webhook/"+workflowID, payload, nil, &result)
-	return result, err
+	return nil, unsupportedWebhookError("Create", "POST /v1/wf/webhook/{id} triggers the workflow, so the webhook config would have run as workflow input.")
 }
 
+// Update always returns a *Error without sending a request.
+//
+// Deprecated: the workflow API does not serve PUT /v1/wf/webhook/{id}, and
+// webhook registration is handled by the integrations service. Will be removed
+// in a future major version.
 func (r *WebhooksResource) Update(ctx context.Context, webhookID string, payload WebhookCreateRequest) (map[string]any, error) {
-	result := make(map[string]any)
-	err := r.http.Request(ctx, "PUT", "/v1/wf/webhook/"+webhookID, payload, nil, &result)
-	return result, err
+	return nil, unsupportedWebhookError("Update", "the workflow API does not serve PUT /v1/wf/webhook/{id}.")
 }
 
+// Delete always returns a *Error without sending a request.
+//
+// Deprecated: the workflow API does not serve DELETE /v1/wf/webhook/{id}, and
+// webhook registration is handled by the integrations service. Will be removed
+// in a future major version.
 func (r *WebhooksResource) Delete(ctx context.Context, workflowID string) (map[string]any, error) {
-	result := make(map[string]any)
-	err := r.http.Request(ctx, "DELETE", "/v1/wf/webhook/"+workflowID, nil, nil, &result)
-	return result, err
+	return nil, unsupportedWebhookError("Delete", "the workflow API does not serve DELETE /v1/wf/webhook/{id}.")
 }

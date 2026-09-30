@@ -85,7 +85,7 @@ _ = client.UnsubscribeWith(flux.Subscription{Topic: "channel:<schema>", Events: 
 _ = client.UnsubscribeMany([]string{"channel:<schema>"})                                               // the topic
 ```
 
-Patterns are dot-separated: `*` alone matches every event, and elsewhere `*` matches exactly one token (`messages.*`, `*.delete`). Subscribing adds patterns to what the topic already has, and only the difference is sent. A topic is dropped when its last pattern is. Filters are not access control — channel authorization still applies per topic.
+Patterns are dot-separated: `*` alone matches every event, and elsewhere `*` matches exactly one token (`messages.*`, `*.delete`). Subscribing adds patterns to what the topic already has, and only the difference is sent. A topic is dropped when its last pattern is. Unsubscribing `*` drops only that pattern, and the topic keeps any others. To drop a topic whole, pass it without `Events` or use `UnsubscribeMany`. Filters are not access control — channel authorization still applies per topic.
 
 ## Errors
 

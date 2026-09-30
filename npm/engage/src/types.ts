@@ -52,7 +52,7 @@ export interface LocationInfo {
   longitude?: number;
   accuracy?: number;
   altitude?: number | null;
-  altitudeAccuracy?: number | null;
+  altitude_accuracy?: number | null;
   heading?: number | null;
   speed?: number | null;
 }

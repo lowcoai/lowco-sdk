@@ -44,7 +44,7 @@ interface SDKConfig {
 ## Error model
 
 - Throws `WorkflowError`
-  - `status`: HTTP status code (`0` for transport/setup errors)
+  - `status`: HTTP status code (`0` for transport/setup errors and for the deprecated webhook methods, which send no request)
   - `payload`: parsed JSON payload when available
 
 ## Response model
@@ -141,10 +141,15 @@ Payload:
 ### webhooks
 
 - `trigger(workflowId, payload?, query?)` -> `POST /v1/wf/webhook/:id`
-- `listByWorkflow(workflowId)` -> `GET /v1/wf/webhook/:id`
-- `create(workflowId, payload)` -> `POST /v1/wf/webhook/:id`
-- `update(webhookId, payload)` -> `PUT /v1/wf/webhook/:id`
-- `delete(workflowId)` -> `DELETE /v1/wf/webhook/:id`
+  - Runs the workflow with `payload` as its input
+  - Query: `env`, `triggeredBy`, `async`
+
+Deprecated, do not use. The workflow API serves only the trigger route, and webhook registration is handled by the integrations service. Each method below rejects with `WorkflowError` (`status: 0`, `payload: { code: "unsupported_operation", operation }`) and sends no request:
+
+- `listByWorkflow(workflowId)`
+- `create(workflowId, payload)`. It used to POST to the trigger route, so it ran the workflow with the webhook config as input.
+- `update(webhookId, payload)`
+- `delete(workflowId)`
 
 ## Core exported types
 
@@ -154,7 +159,7 @@ Payload:
 - `Execution`, `ActivityExecutionHistory`, `ActivityHistoryResponse`
 - `HumanTask`, `HumanTaskAction`
 - `WorkflowPublish`
-- `DryRunRequest`, `WebhookCreateRequest`
+- `DryRunRequest`, `WebhookCreateRequest` (deprecated, used only by the deprecated webhook methods)
 - `PaginationQuery`, `RequestOptions`
 
 ## Suggested deployment for LLM consumption

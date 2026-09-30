@@ -7,7 +7,7 @@ Service: **workflow-orchestrator**. All routes are mounted under `/v1/wf/*`.
 - **Host**: always `https://api.lowco.ai`.
 - **Auth**: `Authorization: Bearer <user-token-or-api-key>` — required; identifies the acting user.
 - **Tenancy**: pass `X-Org-Id` on every request.
-- **Response envelope**: `{ success, data, error, message }`. Clients should read the inner `data`. Both SDKs (`@lowcoai/workflow`, `github.com/backend-platform/lowco-sdk/go/workflow`) unwrap automatically.
+- **Response envelope**: `{ success, data, error, message }`. Clients should read the inner `data`. Every SDK (`@lowcoai/workflow`, `github.com/backend-platform/lowco-sdk/go/workflow`, `lowcoai-workflow` on PyPI, `lowcoai_workflow` on pub.dev) unwraps automatically.
 
 ## Endpoints
 
@@ -104,10 +104,11 @@ Service: **workflow-orchestrator**. All routes are mounted under `/v1/wf/*`.
 
 | Method | Path | Purpose |
 | ------ | ---- | ------- |
-| `POST`   | `/webhook/:workflowId` | Trigger a workflow via webhook (also used as create) |
-| `GET`    | `/webhook/:workflowId` | List webhooks bound to a workflow |
-| `PUT`    | `/webhook/:webhookId` | Update a webhook |
-| `DELETE` | `/webhook/:workflowId` | Delete a webhook |
+| `POST` | `/webhook/:workflowId` | Trigger the workflow. The request body becomes its input. Query: `env`, `triggeredBy`, `async`. |
+
+Only the trigger route is served. The workflow API does not serve webhook listing, registration, update or delete: `GET`, `PUT` and `DELETE /webhook/:id` fail with 404 or 405. Registration is handled by the integrations service. Saving a workflow whose start node uses an application trigger registers the workflow's webhook URL with the provider. No public route exposes this.
+
+In `@lowcoai/workflow` and the Go SDK, the webhook `listByWorkflow`, `create`, `update` and `delete` methods are deprecated. They return an SDK error (status `0`) without sending a request. `create` used to `POST` to the trigger route, so it ran the workflow with the webhook config as input.
 
 ## See also
 

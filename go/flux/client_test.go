@@ -132,6 +132,46 @@ func TestSubscriptionFiltersAndReplay(t *testing.T) {
 	}
 }
 
+// A bare topic in a usb frame drops the topic whole, so dropping just "*"
+// while other patterns are held must name it.
+func TestUnsubscribeAllEventsPatternKeepsOthers(t *testing.T) {
+	stub := newFluxStub(t)
+	client, err := NewClient("token", "org-1", WithDialer(stub.dialer), WithReconnectInterval(10*time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Disconnect()
+
+	if err := client.SubscribeWith(Subscription{Topic: "channel:s", Events: []string{"*", "messages.*"}}); err != nil {
+		t.Fatal(err)
+	}
+	client.Connect()
+	first := <-stub.conns
+	stub.expect(t, `sb [{"topic":"channel:s","events":["*","messages.*"]}]`)
+
+	if err := client.UnsubscribeWith(Subscription{Topic: "channel:s", Events: []string{"*"}}); err != nil {
+		t.Fatal(err)
+	}
+	stub.expect(t, `usb [{"topic":"channel:s","events":["*"]}]`)
+	if got := client.Subscriptions(); len(got) != 1 || len(got[0].Events) != 1 || got[0].Events[0] != "messages.*" {
+		t.Fatalf("Subscriptions() = %+v, want channel:s [messages.*]", got)
+	}
+
+	// The replay agrees with what the server was left holding.
+	_ = first.Close()
+	<-stub.conns
+	stub.expect(t, `sb [{"topic":"channel:s","events":["messages.*"]}]`)
+
+	// Releasing the last pattern still drops the topic whole.
+	if err := client.UnsubscribeWith(Subscription{Topic: "channel:s", Events: []string{"messages.*"}}); err != nil {
+		t.Fatal(err)
+	}
+	stub.expect(t, `usb ["channel:s"]`)
+	if got := client.Subscriptions(); len(got) != 0 {
+		t.Fatalf("Subscriptions() = %+v, want none", got)
+	}
+}
+
 func TestSubscribeWithoutEventsIsBare(t *testing.T) {
 	stub := newFluxStub(t)
 	client, err := NewClient("token", "org-1", WithDialer(stub.dialer))

@@ -14,7 +14,7 @@
 - `humanTasks`: list/get/complete
 - `analytics`: metrics endpoints
 - `dryRun`: expression evaluation for debugging execution context
-- `webhooks`: webhook-trigger and webhook management routes
+- `webhooks`: trigger a workflow by webhook (`trigger`). The management methods (`listByWorkflow`, `create`, `update`, `delete`) are deprecated and reject without sending a request
 
 ## Transport behavior
 

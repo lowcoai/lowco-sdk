@@ -1,6 +1,6 @@
 # lowcodb — REST surface
 
-Language-agnostic reference for the lowcodb manager API consumed by the [Go](../go/lowcodb) and [npm](../npm/lowcodb) SDKs.
+Language-agnostic reference for the lowcodb manager API consumed by the [Go](../go/lowcodb), [npm](../npm/lowcodb), [Python](../python/lowcodb) and [Dart / Flutter](../flutter/lowcodb) SDKs.
 
 All routes live under the base path **`/v1/lowcodb`** (overridable per-SDK).
 
@@ -21,6 +21,14 @@ lowcodb.NewClient("<token-or-api-key>", lowcodb.WithOrgID("..."))
 
 ```ts
 new LowcodbClient({ token: "<token-or-api-key>", orgId: "..." })
+```
+
+```python
+LowcodbClient("<token-or-api-key>", org_id="...")  # or AsyncLowcodbClient
+```
+
+```dart
+LowcodbClient(token: '<token-or-api-key>', orgId: '...')
 ```
 
 ---
@@ -60,12 +68,14 @@ Exceptions (returned un-enveloped):
 }
 ```
 
-Both SDKs translate this into a typed exception:
+Every SDK translates this into a typed exception:
 
 | SDK | Exception | Fields |
 | --- | --------- | ------ |
 | Go  | `*lowcodb.RequestError` | `StatusCode`, `Message`, `Code`, `Body` |
 | npm | `LowcodbError`          | `statusCode`, `message`, `code`, `body` |
+| Python | `LowcodbError`       | `status_code`, `message`, `code`, `body` |
+| Dart   | `LowcodbException`   | `statusCode`, `message`, `code`, `body` |
 
 ---
 
@@ -80,7 +90,7 @@ Endpoints that list collections accept these query parameters:
 | `filter` | Manager filter DSL, e.g. `name = "leads"` or `score > 50`.   |
 | `sort`   | Comma-separated; prefix with `-` for descending.             |
 
-The SDKs ship a `ListParams` helper (Go: struct; npm: object literal).
+The SDKs ship a `ListParams` helper (Go: struct; npm: object literal; Dart: `ListParams` class). The Python SDK takes them as keyword arguments (`page_no=`, `size=`, `filter=`, `sort=`).
 
 ---
 
@@ -151,7 +161,7 @@ All record routes are scoped to `{schema}` (the base's `schema` field) and `{tab
 | PUT    | `/data/{schema}/tables/{tableName}/records/bulk`             | Bulk update. Returns `RecordsBulkResult`. |
 | DELETE | `/data/{schema}/tables/{tableName}/records/bulk`             | Bulk delete; body is the criterion. |
 
-Validation errors are returned as `400` with a per-field map (the SDKs surface them through `LowcodbError`/`RequestError`).
+Validation errors are returned as `400` with a per-field map (the SDKs surface them through `LowcodbError`/`RequestError`/`LowcodbException`).
 
 ### Views
 

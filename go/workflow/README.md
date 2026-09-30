@@ -60,6 +60,21 @@ _, err = client.Workflows.Run(ctx, workflow.RunWorkflowRequest{
 })
 ```
 
+## Trigger a workflow by webhook
+
+```go
+// The payload becomes the workflow's input.
+async := true
+_, err = client.Webhooks.Trigger(ctx, "wf_123", map[string]any{"orderId": "o_1"},
+	&workflow.WebhookTriggerQuery{Async: &async})
+```
+
+`Trigger` is the only webhook method that calls the API. `ListByWorkflow`, `Create`,
+`Update` and `Delete` are deprecated: the workflow API does not serve those routes,
+and webhook registration is handled by the integrations service. They return a
+`*workflow.Error` (`Status` `0`) without sending a request. `Create` used to POST to the
+trigger route, so it ran the workflow with the webhook config as input.
+
 ## Resources
 
 `client.Workflows`, `client.Environments`, `client.Functions`, `client.Executions`,

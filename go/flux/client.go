@@ -617,9 +617,9 @@ func bareSubscriptions(topics []string) []Subscription {
 	return subs
 }
 
-// wireSubscription is one entry of an sb/usb frame: a bare topic string when
-// it stands for every event (the frame older servers read), otherwise
-// {topic, events}.
+// wireSubscription is one entry of an sb frame: a bare topic string when it
+// stands for every event (the frame older servers read), otherwise
+// {topic, events}. Not for usb, where a bare topic drops the whole topic.
 func wireSubscription(topic string, events []string) any {
 	if len(events) == 0 || (len(events) == 1 && events[0] == AllEvents) {
 		return topic
@@ -682,7 +682,9 @@ func (c *Client) removeSubscriptions(subs []parsedSubscription) error {
 			delete(c.desired, sub.topic)
 			removed = append(removed, sub.topic)
 		} else if len(dropped) > 0 {
-			removed = append(removed, wireSubscription(sub.topic, dropped))
+			// Always {topic, events}: a bare topic here, even for just "*",
+			// would drop the patterns the topic still holds.
+			removed = append(removed, Subscription{Topic: sub.topic, Events: dropped})
 		}
 	}
 	return c.sendSubscriptionsLocked(EventUnsubscribe, removed)

@@ -7,7 +7,7 @@ The `workflow` Go package is the Go counterpart of the Node `@lowcoai/workflow`,
 - `transport.go`: shared HTTP transport, auth headers, query handling, response envelope parsing
 - `client.go`: top-level `Client` composition with one sub-client per resource
 - `types.go`: request and response models
-- `errors.go`: `Error` type returned for non-2xx responses
+- `errors.go`: `Error` type returned for non-2xx responses, transport failures and the deprecated webhook methods
 - `helpers.go`: internal helpers (query encoding)
 - `*_resource.go`: endpoint groups by domain
 
