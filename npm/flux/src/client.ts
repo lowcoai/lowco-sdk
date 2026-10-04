@@ -1,4 +1,4 @@
-import { FluxError } from "./errors.js";
+import { FluxError, FluxUnauthorizedError } from "./errors.js";
 import {
   ALL_EVENTS,
   type ChannelEventHandler,
@@ -18,9 +18,11 @@ import { buildWebSocketUrl, generateClientId, normalizeTopic } from "./utils.js"
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 5000;
 const DEFAULT_RECONNECT_INTERVAL_MS = 1000;
 const MAX_RECONNECT_INTERVAL_MS = 30_000;
+/** The close code flux sends after rejecting a connection's token. */
+const CLOSE_POLICY_VIOLATION = 1008;
 
 type ResolvedOptions = {
-  token: string;
+  getToken?: FluxClientOptions["getToken"];
   orgId: string;
   clientId: string;
   heartbeatIntervalMs: number;
@@ -69,6 +71,14 @@ export class FluxClient {
   private reconnectAttempt = 0;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private manuallyClosed = false;
+  private token: string;
+  /** Awaiting `getToken` before opening a socket. */
+  private resolvingToken = false;
+  /**
+   * The server rejected the current token and nothing newer was available:
+   * no reconnect is scheduled until `setToken` or `connect()`.
+   */
+  private stoppedForAuth = false;
   /**
    * What this client wants delivered: topic → event patterns (`*` = every
    * event). It is the client's own record rather than a mirror of the
@@ -102,8 +112,9 @@ export class FluxClient {
         "no WebSocket implementation found; pass webSocketImpl in options",
       );
     }
+    this.token = options.token;
     this.options = {
-      token: options.token,
+      getToken: options.getToken,
       orgId: options.orgId,
       clientId: options.clientId ?? generateClientId(),
       heartbeatIntervalMs:
@@ -116,19 +127,52 @@ export class FluxClient {
   }
 
   connect(): void {
-    if (this.ws && this.ws.readyState !== this.options.webSocketImpl.CLOSED) {
+    if (
+      this.resolvingToken ||
+      (this.ws && this.ws.readyState !== this.options.webSocketImpl.CLOSED)
+    ) {
       return;
     }
     this.manuallyClosed = false;
+    this.stoppedForAuth = false;
     this.clearReconnectTimer();
+    if (!this.options.getToken) {
+      this.open(this.token);
+      return;
+    }
+    this.resolvingToken = true;
+    void this.resolveToken().then((token) => {
+      this.resolvingToken = false;
+      if (!this.manuallyClosed) {
+        this.open(token);
+      }
+    });
+  }
 
+  /**
+   * Use `token` from the next connect on. A client stopped by a rejected
+   * token reconnects at once.
+   */
+  setToken(token: string): void {
+    if (!token) {
+      return;
+    }
+    this.token = token;
+    if (this.stoppedForAuth && !this.manuallyClosed) {
+      this.connect();
+    }
+  }
+
+  private open(token: string): void {
     const WSImpl = this.options.webSocketImpl;
-    const ws = new WSImpl(this.buildUrl());
+    const ws = new WSImpl(this.buildUrl(token));
     this.ws = ws;
+    let rejected = false;
 
     ws.onopen = () => {
+      // The backoff is not reset here: flux upgrades before it checks the
+      // token, so a rejected socket opens too. The first pong resets it.
       this._isConnected = true;
-      this.reconnectAttempt = 0;
       this.emitState("connected");
       this.startHeartbeat();
       this.resubscribeTopics();
@@ -144,28 +188,34 @@ export class FluxClient {
         return;
       }
 
-      if (payload.event === "pong" && !this.isExpectedPong(payload.data)) {
-        this.emitError(new Error("pong out of sync, reconnecting"));
-        ws.close();
-        return;
+      if (payload.event === "pong") {
+        if (!this.isExpectedPong(payload.data)) {
+          this.emitError(new Error("pong out of sync, reconnecting"));
+          ws.close();
+          return;
+        }
+        this.reconnectAttempt = 0;
+      }
+      if (isAuthRejection(payload)) {
+        rejected = true;
       }
       this.emitChannelEvent(payload);
       this.emitMessage(payload);
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event?: CloseEvent) => {
       this._isConnected = false;
       this.stopHeartbeat();
       this.emitState("disconnected");
       this.ws = null;
-      if (!this.manuallyClosed) {
-        const delay = Math.min(
-          this.options.reconnectIntervalMs * 2 ** this.reconnectAttempt,
-          MAX_RECONNECT_INTERVAL_MS,
-        );
-        this.reconnectAttempt += 1;
-        this.reconnectTimer = setTimeout(() => this.connect(), delay);
+      if (this.manuallyClosed) {
+        return;
       }
+      if (rejected || event?.code === CLOSE_POLICY_VIOLATION) {
+        this.handleAuthRejection(token);
+        return;
+      }
+      this.scheduleReconnect();
     };
 
     ws.onerror = () => {
@@ -174,12 +224,57 @@ export class FluxClient {
     };
   }
 
+  /**
+   * Retrying a token the server just refused only repeats the refusal, so
+   * reconnect only when a different one is available, else stop.
+   */
+  private handleAuthRejection(rejected: string): void {
+    this.emitError(new FluxUnauthorizedError());
+    void this.resolveToken().then((next) => {
+      if (
+        this.manuallyClosed ||
+        this.ws ||
+        this.reconnectTimer ||
+        this.resolvingToken
+      ) {
+        return;
+      }
+      if (next === rejected) {
+        this.stoppedForAuth = true;
+        return;
+      }
+      this.scheduleReconnect();
+    });
+  }
+
+  private scheduleReconnect(): void {
+    const delay = Math.min(
+      this.options.reconnectIntervalMs * 2 ** this.reconnectAttempt,
+      MAX_RECONNECT_INTERVAL_MS,
+    );
+    this.reconnectAttempt += 1;
+    this.reconnectTimer = setTimeout(() => this.connect(), delay);
+  }
+
+  private async resolveToken(): Promise<string> {
+    try {
+      const token = await this.options.getToken?.();
+      if (token) {
+        this.token = token;
+      }
+    } catch {
+      /* keep the last token */
+    }
+    return this.token;
+  }
+
   isConnected(): boolean {
     return this._isConnected;
   }
 
   disconnect(): void {
     this.manuallyClosed = true;
+    this.stoppedForAuth = false;
     this.clearReconnectTimer();
     this.stopHeartbeat();
     this.ws?.close();
@@ -426,9 +521,9 @@ export class FluxClient {
     this.ws.send(JSON.stringify(msg));
   }
 
-  private buildUrl(): string {
+  private buildUrl(token: string): string {
     return buildWebSocketUrl(
-      this.options.token,
+      token,
       this.options.orgId,
       this.options.clientId,
       // Tells the server this client re-sends every subscription on
@@ -551,6 +646,15 @@ function parseSpecs(specs: readonly SubscriptionSpec[]): ParsedSpec[] {
     out.push({ topic, events: events.length > 0 ? events : null });
   }
   return out;
+}
+
+/** The frame flux sends just before closing a socket whose token it refused. */
+function isAuthRejection(message: SocketMessage): boolean {
+  return (
+    message.type === "error" &&
+    message.channel === "flux:error" &&
+    message.event === "Unauthorized"
+  );
 }
 
 /** A bare string when the topic wants every event — the frame older servers read. */

@@ -9,4 +9,10 @@
 // ("wss://ws.lowco.ai/"). Authentication is supplied via NewClient's required
 // token (a user token or an API key) and orgID; both are sent as query
 // parameters, and user identity is derived from the token server-side.
+//
+// The server checks the token only after the upgrade, so the reconnect
+// backoff starts over only once a socket answers its first ping. A rejected
+// token is reported as ErrUnauthorized, and the client stops reconnecting
+// rather than retry the same token. WithTokenProvider and SetToken supply a
+// fresh one, and SetToken also resumes a client stopped this way.
 package flux

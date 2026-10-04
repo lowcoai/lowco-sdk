@@ -1,15 +1,16 @@
 """End-to-end behaviour against a local flux stub (a real WebSocket server).
 
 The scenarios mirror ``go/flux/client_test.go``: the stub records every frame
-the client sends, can reject handshakes and drop connections, and the client
-is pointed at it with ``connect=`` while it keeps building its real
-``wss://ws.lowco.ai/`` URL.
+the client sends, can reject handshakes, reject tokens after the upgrade (like
+the flux server) and drop connections, and the client is pointed at it with
+``connect=`` while it keeps building its real ``wss://ws.lowco.ai/`` URL.
 """
 
 from __future__ import annotations
 
 import asyncio
 import inspect
+import itertools
 import json
 import time
 from collections.abc import AsyncIterator, Callable
@@ -31,7 +32,9 @@ from lowcoai.flux import (
     ConnectionState,
     FluxClient,
     FluxError,
+    FluxUnauthorizedError,
     SocketMessage,
+    TokenProvider,
 )
 
 T = TypeVar("T")
@@ -42,6 +45,17 @@ TIMEOUT = 5.0
 _DIAL_OPTIONS: dict[str, Any] = (
     {"proxy": None} if "proxy" in inspect.signature(ws_connect).parameters else {}
 )
+
+
+# What the flux server sends a token it rejects after the upgrade, just
+# before it closes the socket with 1008.
+UNAUTHORIZED_FRAME = {
+    "type": "error",
+    "channel": "flux:error",
+    "event": "Unauthorized",
+    "data": {"message": "Unauthorized"},
+    "timestamp": 1700000000,
+}
 
 
 async def get(queue: asyncio.Queue[T]) -> T:
@@ -62,7 +76,13 @@ class FluxStub:
         self.port = 0
         self.accepting = True
         self.echo_pongs = False
+        # Tokens the stub accepts after the upgrade (None: every token). Any
+        # other token gets the error frame and/or the 1008 close.
+        self.valid_tokens: set[str] | None = None
+        self.reject_frame = True
+        self.reject_close = True
         self.dialed: list[str] = []
+        self.dial_times: list[float] = []
         self.request_paths: list[str] = []
         self.accepted: list[ServerConnection] = []
         self.connections: asyncio.Queue[ServerConnection] = asyncio.Queue()
@@ -86,6 +106,11 @@ class FluxStub:
         index = len(self.accepted)
         self.accepted.append(ws)
         self.connections.put_nowait(ws)
+        assert ws.request is not None
+        token = parse_qs(urlsplit(ws.request.path).query)["token"][0]
+        if self.valid_tokens is not None and token not in self.valid_tokens:
+            await self.reject(ws)
+            return
         try:
             async for raw in ws:
                 frame = json.loads(raw)
@@ -108,29 +133,46 @@ class FluxStub:
         except ConnectionClosed:
             pass
 
+    async def reject(self, ws: ServerConnection) -> None:
+        """What the flux server does with a bad token: the socket is already
+        open, so it reports the rejection on it and closes it."""
+        if self.reject_frame:
+            await ws.send(json.dumps(UNAUTHORIZED_FRAME))
+        if self.reject_close:
+            await ws.close(1008, "unauthorized")
+        else:
+            await ws.wait_closed()  # the client has to hang up
+
     async def dial(self, url: str) -> ClientConnection:
         """The client always builds the production URL; send it here instead,
         query string and all."""
         self.dialed.append(url)
+        self.dial_times.append(time.monotonic())
         query = urlsplit(url).query
         return await ws_connect(f"ws://127.0.0.1:{self.port}/?{query}", **_DIAL_OPTIONS)
+
+    def dialed_tokens(self) -> list[str]:
+        return [parse_qs(urlsplit(url).query)["token"][0] for url in self.dialed]
 
     def client(
         self,
         *,
+        token: str = "tok_123",
         heartbeat_interval: float = 60.0,
         reconnect_interval: float = 0.01,
         client_id: str | None = None,
         query_params: dict[str, str] | None = None,
+        token_provider: TokenProvider | None = None,
     ) -> FluxClient:
         client = FluxClient(
-            "tok_123",
+            token,
             "org_1",
             client_id=client_id,
             heartbeat_interval=heartbeat_interval,
             reconnect_interval=reconnect_interval,
             query_params=query_params,
             connect=self.dial,
+            token_provider=token_provider,
         )
         self.clients.append(client)
         return client
@@ -559,3 +601,201 @@ async def test_connect_during_backoff_dials_right_away(stub: FluxStub) -> None:
     await client.connect()
     await stub.next_connection()
     assert await get(states) == "connected"
+
+
+# --- token rejection after the upgrade ----------------------------------------
+
+
+async def test_backoff_resets_on_the_first_expected_pong(stub: FluxStub) -> None:
+    stub.accepting = False
+    client = stub.client()
+    await client.connect()
+    await eventually(lambda: client._reconnect_attempt >= 3)
+
+    stub.accepting = True
+    ws = await stub.next_connection()
+    _, seq = await get(stub.pings)
+    await client.wait_until_connected(TIMEOUT)
+    assert client._reconnect_attempt >= 3  # an open alone proves nothing
+
+    await stub.publish(ws, {"channel": CHANNEL_HEALTH_CHECK, "event": "pong", "data": seq})
+    await eventually(lambda: client._reconnect_attempt == 0)
+
+
+async def test_rejected_open_does_not_reset_the_backoff(stub: FluxStub) -> None:
+    # Every token is rejected after the upgrade. A provider handing out a new
+    # token each time keeps the client redialing, so only the backoff paces it.
+    stub.valid_tokens = set()
+    issued = (f"tok_{n}" for n in itertools.count(1))
+    client = stub.client(reconnect_interval=0.02, token_provider=lambda: next(issued))
+    errors = record_errors(client)
+    await client.connect()
+    for _ in range(5):
+        await stub.next_connection()
+        error = await get(errors)
+        assert isinstance(error, FluxUnauthorizedError)
+    await eventually(lambda: client._reconnect_attempt == 5)
+    await client.disconnect()
+
+    assert stub.dialed_tokens() == ["tok_1", "tok_2", "tok_3", "tok_4", "tok_5"]
+    # 20, 40, 80, 160 ms: each open was rejected, so none reset the counter.
+    gaps = [later - earlier for earlier, later in itertools.pairwise(stub.dial_times)]
+    for attempt, gap in enumerate(gaps):
+        assert gap >= 0.02 * 2**attempt, (attempt, gaps)
+
+
+@pytest.mark.parametrize(
+    ("frame", "close"),
+    [(True, True), (True, False), (False, True)],
+    ids=["frame-and-close", "frame-only", "close-only"],
+)
+async def test_rejected_token_stops_reconnecting(stub: FluxStub, frame: bool, close: bool) -> None:
+    stub.valid_tokens = set()
+    stub.reject_frame, stub.reject_close = frame, close
+    client = stub.client()
+    states = record_states(client)
+    errors = record_errors(client)
+    messages = record_messages(client)
+    await client.connect()
+    await stub.next_connection()
+
+    assert [await get(states) for _ in range(3)] == ["connected", "error", "disconnected"]
+    error = await get(errors)
+    assert isinstance(error, FluxUnauthorizedError)
+    assert isinstance(error, FluxError)
+    # With both, older websockets may drop the frame once the close lands right
+    # behind it; the 1008 close alone is enough then.
+    if not close:
+        assert await get(messages) == UNAUTHORIZED_FRAME  # dispatched like any frame
+    if not frame:
+        assert isinstance(error.__cause__, ConnectionClosed)
+
+    # Stopped on the rejected token: no timer, no redial (the backoff is 10 ms).
+    await eventually(lambda: client._rejected_token == "tok_123")
+    await asyncio.sleep(0.1)
+    assert len(stub.accepted) == 1
+    assert errors.empty()
+    assert states.empty()
+    assert not client.is_connected()
+
+    # connect() tries again right away, and the same token is rejected again.
+    await client.connect()
+    await stub.next_connection()
+    error = await get(errors)
+    assert isinstance(error, FluxUnauthorizedError)
+    await eventually(lambda: client._rejected_token == "tok_123")
+
+    # disconnect() ends the wait cleanly.
+    await asyncio.wait_for(client.disconnect(), TIMEOUT)
+    assert client._rejected_token is None
+    assert len(stub.accepted) == 2
+
+
+@pytest.mark.parametrize("kind", ["sync", "async"])
+async def test_token_provider_supplies_a_new_token(stub: FluxStub, kind: str) -> None:
+    stub.valid_tokens = {"tok_fresh"}
+    stub.echo_pongs = True
+    issued: list[str | None] = [None, "tok_fresh"]  # None: use the stored token
+    calls = 0
+
+    def next_token() -> str | None:
+        nonlocal calls
+        calls += 1
+        return issued.pop(0) if issued else "tok_fresh"
+
+    async def next_token_async() -> str | None:
+        await asyncio.sleep(0)
+        return next_token()
+
+    client = stub.client(token_provider=next_token if kind == "sync" else next_token_async)
+    errors = record_errors(client)
+    await client.connect()
+    await stub.next_connection()  # tok_123: rejected
+    error = await get(errors)
+    assert isinstance(error, FluxUnauthorizedError)
+
+    accepted = await stub.next_connection()
+    await client.wait_until_connected(TIMEOUT)
+    assert stub.dialed_tokens() == ["tok_123", "tok_fresh"]
+    assert calls == 2  # once per dial
+    await eventually(lambda: client._reconnect_attempt == 0)  # the echoed pong
+
+    # Any later reconnect asks the provider again.
+    await accepted.close()
+    await stub.next_connection()
+    assert stub.dialed_tokens()[-1] == "tok_fresh"
+    assert calls == 3
+    assert errors.empty()
+
+
+@pytest.mark.parametrize("outcome", ["raises", "blank", "none"])
+async def test_token_provider_failure_falls_back_to_the_stored_token(
+    stub: FluxStub, outcome: str
+) -> None:
+    def provider() -> str | None:
+        if outcome == "raises":
+            raise RuntimeError("token service down")
+        return "  " if outcome == "blank" else None
+
+    client = stub.client(token_provider=provider)
+    errors = record_errors(client)
+    await client.connect()
+    await stub.next_connection()
+    await client.wait_until_connected(TIMEOUT)
+    assert stub.dialed_tokens() == ["tok_123"]
+    if outcome == "raises":
+        error = await get(errors)
+        assert isinstance(error, RuntimeError)
+    assert errors.empty()
+
+
+async def test_set_token_resumes_a_stopped_client(stub: FluxStub) -> None:
+    stub.valid_tokens = {"tok_new", "tok_newer"}
+    client = stub.client()
+    errors = record_errors(client)
+    await client.connect()
+    await stub.next_connection()
+    error = await get(errors)
+    assert isinstance(error, FluxUnauthorizedError)
+    await eventually(lambda: client._rejected_token == "tok_123")
+
+    client.set_token("tok_123")  # the rejected token: still stopped
+    client.set_token("   ")  # blank: ignored
+    await asyncio.sleep(0.05)
+    assert len(stub.accepted) == 1
+
+    client.set_token("tok_new")
+    accepted = await stub.next_connection()
+    await client.wait_until_connected(TIMEOUT)
+    assert stub.dialed_tokens() == ["tok_123", "tok_new"]
+
+    # While connected the socket is kept; the next dial uses the new token.
+    client.set_token("tok_newer")
+    await asyncio.sleep(0.05)
+    assert client.is_connected()
+    await accepted.close()
+    await stub.next_connection()
+    assert stub.dialed_tokens() == ["tok_123", "tok_new", "tok_newer"]
+    assert errors.empty()
+
+
+async def test_set_token_after_disconnect_does_not_reconnect(stub: FluxStub) -> None:
+    stub.valid_tokens = {"tok_new"}
+    client = stub.client()
+    errors = record_errors(client)
+    await client.connect()
+    await stub.next_connection()
+    error = await get(errors)
+    assert isinstance(error, FluxUnauthorizedError)
+    await eventually(lambda: client._rejected_token == "tok_123")
+
+    await client.disconnect()
+    client.set_token("tok_new")
+    await asyncio.sleep(0.05)
+    assert len(stub.accepted) == 1
+
+    # A later connect() dials with the token set meanwhile.
+    await client.connect()
+    await stub.next_connection()
+    await client.wait_until_connected(TIMEOUT)
+    assert stub.dialed_tokens() == ["tok_123", "tok_new"]

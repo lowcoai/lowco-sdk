@@ -14,7 +14,7 @@ from typing_extensions import Self
 from websockets.asyncio.client import connect as _websockets_connect
 from websockets.exceptions import ConnectionClosed
 
-from ._errors import FluxError
+from ._errors import FluxError, FluxUnauthorizedError
 from ._utils import build_websocket_url, generate_client_id, normalize_topic
 from .types import (
     ALL_EVENTS,
@@ -32,6 +32,7 @@ from .types import (
     SocketMessage,
     StateHandler,
     SubscriptionSpec,
+    TokenProvider,
     TopicSubscription,
 )
 
@@ -44,6 +45,13 @@ MAX_RECONNECT_INTERVAL = 30.0
 # The event the server answers a ping with (``SocketEvent.PONG`` is the
 # request-side name and is not what arrives).
 _PONG_REPLY = "pong"
+
+# The server upgrades the socket before it checks the token. A rejected token
+# then gets an ``Unauthorized`` frame on ``flux:error`` and a close with 1008
+# (policy violation); either one marks the socket as rejected.
+_CHANNEL_ERROR = "flux:error"
+_EVENT_UNAUTHORIZED = "Unauthorized"
+_CLOSE_POLICY_VIOLATION = 1008
 
 _H = TypeVar("_H")
 
@@ -63,6 +71,12 @@ class FluxClient:
     ``connect()`` returns immediately; a background task dials, reads and
     reconnects until ``disconnect()``. Use ``async with FluxClient(...)`` to
     tie the connection to a block.
+
+    ``token_provider`` (plain or ``async``) is asked for the token before
+    every connection attempt. When the server rejects a token the client
+    reports ``FluxUnauthorizedError`` and reconnects only with a different
+    one: it stops until ``set_token()`` or ``connect()`` instead of retrying
+    the same token.
     """
 
     def __init__(
@@ -75,6 +89,7 @@ class FluxClient:
         reconnect_interval: float = DEFAULT_RECONNECT_INTERVAL,
         query_params: Mapping[str, str] | None = None,
         connect: ConnectFactory | None = None,
+        token_provider: TokenProvider | None = None,
     ) -> None:
         if not isinstance(token, str) or not token.strip():
             raise FluxError("token is required")
@@ -92,15 +107,21 @@ class FluxClient:
         self._reconnect_interval = float(reconnect_interval)
         self._query_params = dict(query_params or {})
         self._connect_factory: ConnectFactory = connect or _default_connect
+        self._token_provider = token_provider
 
         self._ws: FluxConnection | None = None
         self._connected = False
         self._manually_closed = False
         self._ping_seq = 1
         self._last_sent_seq: int | None = None
+        # Reset by the first expected pong, never by an open: the server opens
+        # the socket before it checks the token.
         self._reconnect_attempt = 0
         self._supervisor: asyncio.Task[None] | None = None
         self._in_backoff = False
+        # The token the server rejected, while the client waits for another.
+        self._rejected_token: str | None = None
+        # Ends a backoff early, or a wait after a rejected token.
         self._wake = asyncio.Event()
         self._connected_event = asyncio.Event()
         # Held across every subscription change *and* the frame reporting it,
@@ -138,12 +159,13 @@ class FluxClient:
         """Start connecting in the background and return immediately.
 
         A no-op while the client is already connected or connecting; while it
-        is waiting to reconnect, it skips the rest of the backoff.
+        is waiting to reconnect, it skips the rest of the backoff, and after
+        a rejected token it tries again right away.
         """
         self._manually_closed = False
         supervisor = self._supervisor
         if supervisor is not None and not supervisor.done():
-            if self._in_backoff:
+            if self._in_backoff or self._rejected_token is not None:
                 self._wake.set()
             return
         task = asyncio.create_task(self._supervise(), name=f"flux-{self._client_id}")
@@ -159,6 +181,21 @@ class FluxClient:
             return
         task.cancel()
         await asyncio.wait({task})
+
+    def set_token(self, token: str) -> None:
+        """Use ``token`` from the next connection attempt on (a blank one is
+        ignored). An open socket is kept.
+
+        A client stopped by a rejected token reconnects right away when
+        ``token`` differs from the rejected one, unless ``disconnect()`` was
+        called.
+        """
+        if not isinstance(token, str) or not token.strip():
+            return
+        self._token = token
+        rejected = self._rejected_token
+        if rejected is not None and token != rejected and not self._manually_closed:
+            self._wake.set()
 
     def is_connected(self) -> bool:
         """``True`` from the ``"connected"`` state until the socket closes."""
@@ -318,18 +355,61 @@ class FluxClient:
 
     # --- connection supervisor ---------------------------------------------
 
-    def _url(self) -> str:
+    def _url(self, token: str) -> str:
         # replay=1 tells the server this client re-sends every subscription on
         # connect, so it starts the socket clean.
         params = {**self._query_params, "replay": "1"}
-        return build_websocket_url(self._token, self._org_id, self._client_id, params)
+        return build_websocket_url(token, self._org_id, self._client_id, params)
 
     async def _supervise(self) -> None:
+        # Resolved ahead of a dial only after a rejection, to decide whether
+        # the next dial is worth making; otherwise resolved just before it.
+        token: str | None = None
         while not self._manually_closed:
-            await self._run_connection()
+            if token is None:
+                token = await self._resolve_token()
+            rejected = await self._run_connection(token)
             if self._manually_closed:
                 return
-            await self._backoff()
+            if not rejected:
+                token = None
+                await self._backoff()
+                continue
+            # The same token would only be rejected again: wait for another
+            # instead of redialing it on a timer.
+            rejected_token, token = token, await self._resolve_token()
+            if token == rejected_token:
+                token = None
+                await self._park(rejected_token)
+            else:
+                await self._backoff()
+
+    async def _resolve_token(self) -> str:
+        """The provider's token when it returns one, else the current token.
+        A provider token becomes the current one (the fallback next time)."""
+        provider = self._token_provider
+        if provider is None:
+            return self._token
+        try:
+            result = provider()
+            if inspect.isawaitable(result):
+                result = await result
+        except Exception as exc:
+            self._emit_error(exc)
+            return self._token
+        if isinstance(result, str) and result.strip():
+            self._token = result
+        return self._token
+
+    async def _park(self, rejected_token: str) -> None:
+        # No timer: only set_token() with another token, connect() or
+        # disconnect() (which cancels this task) ends the wait.
+        self._wake.clear()
+        self._rejected_token = rejected_token
+        try:
+            await self._wake.wait()
+        finally:
+            self._rejected_token = None
 
     async def _backoff(self) -> None:
         # The exponent is capped only to keep the float finite; the delay
@@ -346,27 +426,28 @@ class FluxClient:
         finally:
             self._in_backoff = False
 
-    async def _run_connection(self) -> None:
+    async def _run_connection(self, token: str) -> bool:
+        """Dial with ``token`` and read until the socket closes. ``True`` when
+        the server rejected the token."""
         try:
-            ws = await self._connect_factory(self._url())
+            ws = await self._connect_factory(self._url(token))
         except Exception as exc:  # a failed dial counts as a close: back off
             self._emit_state("error")
             self._emit_error(exc)
             self._emit_state("disconnected")
-            return
+            return False
 
         heartbeat: asyncio.Task[None] | None = None
         try:
             async with self._sub_lock:
                 self._ws = ws
                 self._connected = True
-                self._reconnect_attempt = 0
                 self._connected_event.set()
                 self._emit_state("connected")
                 await self._send_first_ping(ws)
                 heartbeat = asyncio.create_task(self._heartbeat(ws))
                 await self._replay(ws)
-            await self._read(ws)
+            return await self._read(ws)
         finally:
             if self._ws is ws:
                 self._ws = None
@@ -379,34 +460,57 @@ class FluxClient:
             if heartbeat is not None:
                 await asyncio.wait({heartbeat})
 
-    async def _read(self, ws: FluxConnection) -> None:
+    async def _read(self, ws: FluxConnection) -> bool:
+        """Read until the socket closes. ``True`` when the server rejected the
+        token (an ``Unauthorized`` error frame or a 1008 close)."""
         try:
             async for frame in ws:
-                if not self._handle_frame(frame):
-                    self._emit_error(FluxError("pong out of sync, reconnecting"))
-                    await _close_quietly(ws)
-                    return
+                error = self._handle_frame(frame)
+                if error is None:
+                    continue
+                rejected = isinstance(error, FluxUnauthorizedError)
+                if rejected:
+                    self._emit_state("error")
+                self._emit_error(error)
+                await _close_quietly(ws)
+                return rejected
         except Exception as exc:  # abnormal closure or transport failure
             self._emit_state("error")
+            if _close_code(exc) == _CLOSE_POLICY_VIOLATION:
+                unauthorized = FluxUnauthorizedError()
+                unauthorized.__cause__ = exc
+                self._emit_error(unauthorized)
+                return True
             self._emit_error(exc)
+        return False
 
-    def _handle_frame(self, frame: str | bytes) -> bool:
-        """Dispatch one frame. ``False`` means the pong was out of sync."""
+    def _handle_frame(self, frame: str | bytes) -> FluxError | None:
+        """Dispatch one frame. Returns why the socket must be dropped: a pong
+        out of sync, or the server rejecting the token."""
         text = frame if isinstance(frame, str) else bytes(frame).decode("utf-8", "replace")
         try:
             payload = json.loads(text)
         except ValueError:
             self._emit_error(FluxError(f"received non-JSON message: {text}"))
-            return True
+            return None
         if not isinstance(payload, dict):
             self._emit_error(FluxError(f"received non-object message: {text}"))
-            return True
+            return None
         message = cast(SocketMessage, payload)
-        if message.get("event") == _PONG_REPLY and not self._is_expected_pong(message.get("data")):
-            return False
+        if message.get("event") == _PONG_REPLY:
+            if not self._is_expected_pong(message.get("data")):
+                return FluxError("pong out of sync, reconnecting")
+            # A matching pong proves the socket healthy (token accepted,
+            # server answering), so only now does the backoff start over.
+            self._reconnect_attempt = 0
         self._emit_channel_event(message)
         self._emit_message(message)
-        return True
+        if (
+            normalize_topic(message.get("channel")) == _CHANNEL_ERROR
+            and normalize_topic(message.get("event")) == _EVENT_UNAUTHORIZED
+        ):
+            return FluxUnauthorizedError()
+        return None
 
     # --- heartbeat ---------------------------------------------------------
 
@@ -701,6 +805,19 @@ def _register(registry: dict[_H, None], handler: _H) -> Callable[[], None]:
         registry.pop(handler, None)
 
     return remove
+
+
+def _close_code(exc: Exception) -> int | None:
+    """The close code the server sent, when ``exc`` is a websockets closure."""
+    if not isinstance(exc, ConnectionClosed):
+        return None
+    # websockets >= 10 carries the received Close frame as ``rcvd`` (``None``
+    # when none arrived) and deprecates ``code`` since 13.1; ``code`` is only
+    # read where ``rcvd`` does not exist.
+    if hasattr(exc, "rcvd"):
+        return exc.rcvd.code if exc.rcvd is not None else None
+    code = getattr(exc, "code", None)
+    return code if isinstance(code, int) else None
 
 
 async def _close_quietly(ws: FluxConnection) -> None:

@@ -40,6 +40,7 @@ The client always connects to `wss://ws.lowco.ai/`.
 | Option                 | Description                                                          |
 | ---------------------- | -------------------------------------------------------------------- |
 | `token`                | Auth token (user token or API key) sent as the `token` query parameter. Required. |
+| `getToken`             | Optional `() => string \| null \| Promise<…>` called before every (re)connect, so a refreshed token is used. Empty or a throw falls back to the last token. |
 | `orgId`                | Organization id sent as `orgId`. Required.                           |
 | `clientId`             | Stable client id; defaults to a generated value.                     |
 | `heartbeatIntervalMs`  | Ping interval (default `5000`).                                      |
@@ -91,12 +92,27 @@ Subscriptions (with their filters) are kept by the client: a subscribe made whil
 flux.onError((err) => console.error("flux error", err));
 ```
 
+### Rejected tokens
+
+When the server rejects the token (an `Unauthorized` error frame, then close code `1008`), the client emits a `FluxUnauthorizedError` through `onError`. It reconnects only if a different token is available, either from `getToken` or from `setToken`. If the token is unchanged, it stops reconnecting instead of retrying in a loop:
+
+```ts
+flux.onError((err) => {
+  if (err instanceof FluxUnauthorizedError) {
+    refreshSession().then((token) => flux.setToken(token)); // reconnects at once
+  }
+});
+```
+
+The reconnect backoff (1 s doubling to 30 s) resets only after the server answers the first heartbeat, not when the socket opens. This is because the server accepts the upgrade before it checks the token.
+
 ## Lifecycle
 
 ```ts
 flux.connect();             // (re)open the socket
 flux.isConnected();         // true once `connected` state fires
 flux.disconnect();          // close and stop auto-reconnect
+flux.setToken(token);       // use a new token; resumes a client stopped by a rejected one
 flux.getSubscribedTopics(); // topics this client holds (replayed on reconnect)
 flux.getSubscriptions();    // the same, with each topic's event patterns
 ```

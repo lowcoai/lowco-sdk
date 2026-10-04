@@ -27,6 +27,7 @@ __all__ = [
     "SocketMessage",
     "StateHandler",
     "SubscriptionSpec",
+    "TokenProvider",
     "TopicSubscription",
 ]
 
@@ -120,3 +121,7 @@ class FluxConnection(Protocol):
 
 ConnectFactory: TypeAlias = Callable[[str], Awaitable[FluxConnection]]
 """Opens a connection to the given ``wss://`` URL."""
+
+TokenProvider: TypeAlias = Callable[[], str | None | Awaitable[str | None]]
+"""Returns the token for the next connection attempt (plain or ``async``).
+``None``, a blank string or an exception keeps the current token."""

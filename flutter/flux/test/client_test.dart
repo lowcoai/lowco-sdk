@@ -643,6 +643,250 @@ void main() {
     });
   });
 
+  group('backoff', () {
+    test('an open socket does not reset the backoff; the first good pong does', () async {
+      final stub = await FluxStub.start();
+      final client = stub.client(reconnectInterval: const Duration(milliseconds: 100));
+      final pongs = <Object?>[];
+      client
+        ..onMessage((m) {
+          if (m.event == 'pong') pongs.add(m.data);
+        })
+        ..connect();
+
+      // Two sockets that open and drop before any pong: 100 ms, then 200 ms.
+      expect(await stub.opened(client), 0);
+      stub.drop();
+      expect(await stub.opened(client), 1);
+      stub.drop();
+      expect(await stub.opened(client), 2);
+
+      // The third answers its ping, so the next drop starts over at 100 ms.
+      await stub.pong();
+      await until(() => pongs.isNotEmpty);
+      stub.drop();
+      expect(await stub.opened(client), 3);
+
+      final at = stub.dialledAt;
+      const slack = Duration(milliseconds: 2);
+      expect(at[1] - at[0], greaterThanOrEqualTo(const Duration(milliseconds: 100) - slack));
+      expect(at[2] - at[1], greaterThanOrEqualTo(const Duration(milliseconds: 200) - slack));
+      // 400 ms had the backoff kept growing.
+      expect(at[3] - at[2], greaterThanOrEqualTo(const Duration(milliseconds: 100) - slack));
+      expect(at[3] - at[2], lessThan(const Duration(milliseconds: 300)));
+    });
+  });
+
+  group('auth rejection', () {
+    test('a token rejected after the upgrade keeps growing the backoff', () async {
+      final stub = await FluxStub.start();
+      // Every token is rejected, but each attempt gets a new one, so the
+      // client keeps retrying: it must not reset to 20 ms on each open.
+      stub.rejectedTokens.addAll([for (var i = 1; i <= 10; i++) 'tok_$i']);
+      var calls = 0;
+      final client = stub.client(
+        reconnectInterval: const Duration(milliseconds: 20),
+        tokenProvider: () => 'tok_${++calls}',
+      );
+      final errors = <Object>[];
+      client
+        ..onError(errors.add)
+        ..connect();
+
+      // Four sockets the server upgraded, then rejected.
+      await until(() => stub.sockets.length >= 4);
+      client.disconnect();
+      // The token asked for after a rejection is the one retried with.
+      expect(stub.tokens.take(4), ['tok_1', 'tok_2', 'tok_3', 'tok_4']);
+      expect(errors.take(3), everyElement(isA<FluxUnauthorizedException>()));
+
+      final at = stub.dialledAt;
+      const slack = Duration(milliseconds: 2);
+      expect(at[1] - at[0], greaterThanOrEqualTo(const Duration(milliseconds: 20) - slack));
+      expect(at[2] - at[1], greaterThanOrEqualTo(const Duration(milliseconds: 40) - slack));
+      expect(at[3] - at[2], greaterThanOrEqualTo(const Duration(milliseconds: 80) - slack));
+    });
+
+    test('a rejected, unchanged token stops reconnecting', () async {
+      final stub = await FluxStub.start();
+      stub.rejectedTokens.add('tok_123');
+      final client = stub.client(reconnectInterval: const Duration(milliseconds: 5));
+      final errors = <Object>[];
+      final messages = <SocketMessage>[];
+      final states = <ConnectionState>[];
+      client
+        ..onError(errors.add)
+        ..onMessage(messages.add)
+        ..onState(states.add)
+        ..connect();
+
+      expect(await stub.connections.next(), 0);
+      await stub.socketClosed.single.future.timeout(waitTimeout);
+      await until(() => states.contains(ConnectionState.disconnected));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(stub.dials, hasLength(1));
+      expect(client.isConnected, isFalse);
+      expect(errors.single, isA<FluxUnauthorizedException>());
+      expect(errors.single, isA<FluxException>());
+      // The server's frame is still delivered as a message.
+      expect(messages.single.channel, 'flux:error');
+      expect(messages.single.event, 'Unauthorized');
+      expect(states.last, ConnectionState.disconnected);
+
+      // connect() tries again even with the same token.
+      client.connect();
+      expect(await stub.connections.next(), 1);
+      await until(() => errors.length == 2);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(stub.dials, hasLength(2));
+    });
+
+    test('close code 1008 alone, or the frame alone, is a rejection', () async {
+      for (final (frame, close) in [(false, true), (true, false)]) {
+        final stub = await FluxStub.start();
+        stub
+          ..rejectedTokens.add('tok_123')
+          ..rejectWithFrame = frame
+          ..rejectWithClose = close;
+        final client = stub.client(reconnectInterval: const Duration(milliseconds: 5));
+        final errors = <Object>[];
+        client
+          ..onError(errors.add)
+          ..connect();
+
+        expect(await stub.connections.next(), 0);
+        // Without the close frame the client closes the socket itself.
+        await stub.socketClosed.single.future.timeout(waitTimeout);
+        await until(() => errors.isNotEmpty);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(errors.single, isA<FluxUnauthorizedException>(), reason: 'frame=$frame');
+        expect(stub.dials, hasLength(1), reason: 'frame=$frame');
+      }
+    });
+
+    test('a tokenProvider returning a new token reconnects with it', () async {
+      final stub = await FluxStub.start();
+      stub.rejectedTokens.add('tok_old');
+      var calls = 0;
+      final client = stub.client(
+        token: 'tok_stored',
+        tokenProvider: () async => ++calls == 1 ? 'tok_old' : 'tok_new',
+      );
+      final errors = <Object>[];
+      client
+        ..onError(errors.add)
+        ..connect();
+
+      expect(await stub.connections.next(), 0);
+      expect(await stub.opened(client), 1);
+      expect(stub.tokens, ['tok_old', 'tok_new']);
+      expect(calls, 2, reason: 'asked once per attempt, the rejection included');
+      expect(errors.single, isA<FluxUnauthorizedException>());
+    });
+
+    test('a throwing or blank tokenProvider falls back to the stored token', () async {
+      final stub = await FluxStub.start();
+      final answers = <Object?>[StateError('offline'), null, '  ', 'tok_p'];
+      var calls = 0;
+      final client = stub.client(
+        token: 'tok_stored',
+        reconnectInterval: const Duration(milliseconds: 5),
+        tokenProvider: () async {
+          final answer = answers[calls++ % answers.length];
+          if (answer is Error) throw answer;
+          return answer as String?;
+        },
+      );
+      final errors = <Object>[];
+      client
+        ..onError(errors.add)
+        ..connect();
+
+      for (var i = 0; i < 4; i++) {
+        expect(await stub.opened(client), i);
+        stub.drop();
+      }
+      expect(await stub.opened(client), 4);
+      // A token from the provider becomes the stored one.
+      expect(stub.tokens, ['tok_stored', 'tok_stored', 'tok_stored', 'tok_p', 'tok_p']);
+      expect(errors.whereType<StateError>(), hasLength(2));
+    });
+
+    test('setToken resumes a stopped client with a different token', () async {
+      final stub = await FluxStub.start();
+      stub.rejectedTokens.add('tok_123');
+      final client = stub.client(reconnectInterval: const Duration(milliseconds: 5));
+      final errors = <Object>[];
+      client
+        ..onError(errors.add)
+        ..connect();
+      expect(await stub.connections.next(), 0);
+      await until(() => errors.isNotEmpty);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(stub.dials, hasLength(1));
+
+      // The rejected token again, or a blank one: still stopped.
+      client
+        ..setToken('tok_123')
+        ..setToken('   ');
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(stub.dials, hasLength(1));
+
+      client.setToken('tok_fresh');
+      expect(stub.dials, hasLength(2), reason: 'reconnects at once');
+      expect(await stub.opened(client), 1);
+      expect(stub.tokens, ['tok_123', 'tok_fresh']);
+
+      // While connected, setToken only changes the token of the next attempt.
+      client.setToken('tok_next');
+      stub.drop();
+      expect(await stub.opened(client), 2);
+      expect(stub.tokens.last, 'tok_next');
+    });
+
+    test('setToken after disconnect() does not reconnect', () async {
+      final stub = await FluxStub.start();
+      stub.rejectedTokens.add('tok_123');
+      final client = stub.client();
+      final errors = <Object>[];
+      client
+        ..onError(errors.add)
+        ..connect();
+      await until(() => errors.isNotEmpty);
+      client
+        ..disconnect()
+        ..setToken('tok_fresh');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(stub.dials, hasLength(1));
+    });
+
+    test('connect() while the provider is pending is a no-op; disconnect() wins', () async {
+      final stub = await FluxStub.start();
+      final pending = <Completer<String?>>[];
+      final client = stub.client(tokenProvider: () {
+        final c = Completer<String?>();
+        pending.add(c);
+        return c.future;
+      });
+
+      client
+        ..connect()
+        ..connect();
+      expect(pending, hasLength(1));
+      client.disconnect();
+      pending.single.complete('tok_late');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(stub.dials, isEmpty);
+
+      // A connect() after the disconnect() asks again; the stale answer is dropped.
+      client.connect();
+      expect(pending, hasLength(2));
+      pending.last.complete('tok_now');
+      expect(await stub.opened(client), 0);
+      expect(stub.tokens, ['tok_now']);
+    });
+  });
+
   group('singleton', () {
     test('getInstance creates and connects once; destroyInstance tears it down', () async {
       final stub = await FluxStub.start();

@@ -2,6 +2,6 @@
 library;
 
 export 'src/client.dart' show FluxClient, FluxChannel, WebSocketChannelFactory;
-export 'src/errors.dart' show FluxException;
+export 'src/errors.dart' show FluxException, FluxUnauthorizedException;
 export 'src/types.dart';
 export 'src/utils.dart' show wsUrl, buildWebSocketUrl, generateClientId;

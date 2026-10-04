@@ -12,3 +12,17 @@ class FluxException implements Exception {
   @override
   String toString() => 'FluxException: $message';
 }
+
+/// Reported through `FluxClient.onError` / `FluxClient.errors` (never thrown)
+/// when the server rejects the connection's token: it sends a `flux:error`
+/// frame whose event is `Unauthorized`, or closes the socket with code 1008.
+///
+/// The client then reconnects only if a different token is available (from
+/// its `tokenProvider` or `FluxClient.setToken`); otherwise it stops until
+/// one is supplied or `FluxClient.connect` is called.
+class FluxUnauthorizedException extends FluxException {
+  const FluxUnauthorizedException([super.message = 'token rejected by the server']);
+
+  @override
+  String toString() => 'FluxUnauthorizedException: $message';
+}

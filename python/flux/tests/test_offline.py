@@ -14,6 +14,7 @@ from lowcoai.flux import (
     WS_URL,
     FluxClient,
     FluxError,
+    FluxUnauthorizedError,
     SocketEvent,
     SocketMessage,
     build_websocket_url,
@@ -78,6 +79,23 @@ def test_constructor_rejects_non_positive_intervals() -> None:
         make_client(heartbeat_interval=0)
     with pytest.raises(FluxError):
         make_client(reconnect_interval=-1)
+
+
+def test_unauthorized_error() -> None:
+    error = FluxUnauthorizedError()
+    assert isinstance(error, FluxError)
+    assert error.message == "the server rejected the token (unauthorized)"
+    assert repr(error) == "FluxUnauthorizedError('the server rejected the token (unauthorized)')"
+    assert repr(FluxError("x")) == "FluxError('x')"
+
+
+def test_set_token_replaces_the_token_and_ignores_blanks() -> None:
+    client = make_client()
+    client.set_token("tok_456")
+    client.set_token("   ")
+    client.set_token("")
+    assert client._token == "tok_456"
+    assert "token=tok_456&" in client._url(client._token)
 
 
 def test_client_id_defaults_to_a_uuid_and_can_be_set() -> None:

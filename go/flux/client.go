@@ -1,6 +1,7 @@
 package flux
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -47,7 +48,8 @@ func WithHeartbeatInterval(d time.Duration) Option {
 }
 
 // WithReconnectInterval overrides the initial reconnect backoff (1s); the
-// effective backoff doubles on each failure and is capped at 30s.
+// effective backoff doubles on each failure and is capped at 30s. It starts
+// over only once a socket answers its first ping.
 func WithReconnectInterval(d time.Duration) Option {
 	return func(c *Client) {
 		if d > 0 {
@@ -75,9 +77,23 @@ func WithDialer(d *websocket.Dialer) Option {
 	}
 }
 
+// WithTokenProvider sets a function asked for the token before every
+// connection attempt, so a long-lived client can hand over a fresh token
+// before the old one expires. An error or empty token falls back to the
+// stored token (NewClient's, or the last SetToken). After the server rejects
+// a token the provider is asked once more, and the client stops reconnecting
+// if it yields the same token (see ErrUnauthorized). ctx is cancelled by
+// Disconnect.
+func WithTokenProvider(provider func(ctx context.Context) (string, error)) Option {
+	return func(c *Client) {
+		if provider != nil {
+			c.tokenProvider = provider
+		}
+	}
+}
+
 // Client is a thread-safe flux WebSocket client.
 type Client struct {
-	token    string
 	orgID    string
 	clientID string
 
@@ -85,15 +101,35 @@ type Client struct {
 	reconnectInterval time.Duration
 	queryParams       map[string]string
 	dialer            *websocket.Dialer
+	tokenProvider     func(ctx context.Context) (string, error)
 
 	mu          sync.Mutex
 	conn        *websocket.Conn
 	connected   bool
-	closed      bool
 	pingSeq     int
 	lastSentSeq int
 	hasLastSeq  bool
 	channels    map[string]*Channel
+
+	// The reconnect loop's state, also guarded by mu.
+	//
+	// token is the stored token: NewClient's, then the last SetToken. It is
+	// used when there is no provider or the provider yields none. tokenGen
+	// counts changes to it, so a loop deciding whether to park can tell that
+	// SetToken ran meanwhile.
+	token    string
+	tokenGen uint64
+	// stop ends the running loop; nil while none runs. It is only called
+	// with mu held, so a loop whose context is still live is the current one.
+	stop context.CancelFunc
+	// attempt counts reconnects since a socket last answered a ping; it sets
+	// the backoff.
+	attempt int
+	// parked is non-nil while the loop waits for a token other than
+	// rejectedToken, which the server turned away; closing it resumes the
+	// loop.
+	parked        chan struct{}
+	rejectedToken string
 
 	// subMu guards desired and is held across the frame that reports a
 	// change to it, so a reconnect's replay cannot interleave with a
@@ -106,19 +142,18 @@ type Client struct {
 
 	writeMu sync.Mutex
 
-	handlersMu       sync.RWMutex
-	messageHandlers  map[uint64]MessageHandler
-	errorHandlers    map[uint64]ErrorHandler
-	stateHandlers    map[uint64]StateHandler
-	channelHandlers  map[string]map[string]map[uint64]ChannelEventHandler
-	nextHandlerID    uint64
-
-	closeCh chan struct{}
+	handlersMu      sync.RWMutex
+	messageHandlers map[uint64]MessageHandler
+	errorHandlers   map[uint64]ErrorHandler
+	stateHandlers   map[uint64]StateHandler
+	channelHandlers map[string]map[string]map[uint64]ChannelEventHandler
+	nextHandlerID   uint64
 }
 
 // NewClient creates a Client that connects to the flux service at
 // DefaultWSURL. token is required and may hold a user token or an API key;
-// it is sent as the `token` query parameter on every connection.
+// it is sent as the `token` query parameter on every connection, unless
+// SetToken or a WithTokenProvider provider supplies a newer one.
 func NewClient(token, orgID string, opts ...Option) (*Client, error) {
 	if token == "" {
 		return nil, fmt.Errorf("flux: token is required")
@@ -141,7 +176,6 @@ func NewClient(token, orgID string, opts ...Option) (*Client, error) {
 		errorHandlers:     make(map[uint64]ErrorHandler),
 		stateHandlers:     make(map[uint64]StateHandler),
 		channelHandlers:   make(map[string]map[string]map[uint64]ChannelEventHandler),
-		closeCh:           make(chan struct{}),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -149,17 +183,40 @@ func NewClient(token, orgID string, opts ...Option) (*Client, error) {
 	return c, nil
 }
 
-// Connect opens the WebSocket connection (no-op if already open) and starts
-// the read pump, heartbeat, and auto-reconnect loop.
+// Connect opens the WebSocket connection and starts the read pump,
+// heartbeat, and auto-reconnect loop. It is a no-op while that loop runs,
+// except that a client stopped by an auth rejection retries at once.
 func (c *Client) Connect() {
 	c.mu.Lock()
-	if c.conn != nil {
-		c.mu.Unlock()
+	defer c.mu.Unlock()
+	if c.stop != nil {
+		c.resumeLocked()
 		return
 	}
-	c.closed = false
-	c.mu.Unlock()
-	go c.run()
+	ctx, stop := context.WithCancel(context.Background())
+	c.stop = stop
+	c.attempt = 0
+	go c.run(ctx)
+}
+
+// SetToken replaces the stored token, which later connection attempts use
+// when there is no provider or the provider yields none; an empty token is
+// ignored, and the open socket keeps the token it connected with. A client
+// stopped by an auth rejection resumes connecting at once when given a token
+// other than the rejected one — unless Disconnect stopped it.
+func (c *Client) SetToken(token string) {
+	if token == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if token != c.token {
+		c.token = token
+		c.tokenGen++
+	}
+	if token != c.rejectedToken {
+		c.resumeLocked()
+	}
 }
 
 // IsConnected returns whether the underlying socket is currently open.
@@ -169,19 +226,19 @@ func (c *Client) IsConnected() bool {
 	return c.connected
 }
 
-// Disconnect closes the connection and stops the auto-reconnect loop.
+// Disconnect closes the connection and stops the auto-reconnect loop, also
+// one stopped by an auth rejection.
 func (c *Client) Disconnect() {
 	c.mu.Lock()
-	if c.closed {
-		c.mu.Unlock()
-		return
+	if c.stop != nil {
+		c.stop()
+		c.stop = nil
 	}
-	c.closed = true
+	c.parked = nil
 	conn := c.conn
 	c.conn = nil
 	c.connected = false
 	c.mu.Unlock()
-	close(c.closeCh)
 	if conn != nil {
 		// The heartbeat may be mid-write on this socket; gorilla allows one
 		// writer at a time.
@@ -295,7 +352,8 @@ func (c *Client) OnMessage(h MessageHandler) func() {
 	}
 }
 
-// OnError registers a handler invoked for transient socket errors.
+// OnError registers a handler invoked for transient socket errors, and with
+// ErrUnauthorized when the server rejects the token.
 func (c *Client) OnError(h ErrorHandler) func() {
 	id := c.allocID()
 	c.handlersMu.Lock()
@@ -392,85 +450,192 @@ func (c *Client) allocID() uint64 {
 	return c.nextHandlerID
 }
 
-func (c *Client) run() {
-	attempt := 0
+func (c *Client) run(ctx context.Context) {
 	for {
-		c.mu.Lock()
-		if c.closed {
+		token := c.resolveToken(ctx)
+		dialURL, err := c.buildURL(token)
+		if err != nil {
+			c.emitError(err)
+			c.emitState(StateError)
+			c.mu.Lock()
+			if ctx.Err() == nil {
+				// Let a later Connect start over.
+				c.stop()
+				c.stop = nil
+			}
 			c.mu.Unlock()
 			return
 		}
-		c.mu.Unlock()
 
-		dialURL, err := c.buildURL()
+		conn, _, err := c.dialer.DialContext(ctx, dialURL, nil)
 		if err != nil {
+			if ctx.Err() != nil {
+				return // Disconnect abandoned the dial.
+			}
 			c.emitError(err)
 			c.emitState(StateError)
-			return
-		}
-
-		conn, _, err := c.dialer.Dial(dialURL, nil)
-		if err != nil {
-			c.emitError(err)
-			c.emitState(StateError)
-			if c.sleepBackoff(&attempt) {
+			if c.sleepBackoff(ctx) {
 				return
 			}
 			continue
 		}
 
 		c.mu.Lock()
+		if ctx.Err() != nil {
+			// Disconnect ran while the upgrade was finishing.
+			c.mu.Unlock()
+			_ = conn.Close()
+			return
+		}
 		c.conn = conn
 		c.connected = true
 		c.pingSeq = 1
 		c.hasLastSeq = false
 		c.mu.Unlock()
 
-		attempt = 0
+		// The backoff is not reset here: the server completes the upgrade
+		// before it checks the token, so a rejected token would reconnect at
+		// the initial interval forever. The first pong resets it (readLoop).
 		c.emitState(StateConnected)
 		c.resubscribe()
 
 		stopHeartbeat := make(chan struct{})
 		go c.heartbeat(conn, stopHeartbeat)
-		c.readLoop(conn)
+		rejected := c.readLoop(conn)
 		close(stopHeartbeat)
+		_ = conn.Close()
 
 		c.mu.Lock()
-		c.connected = false
-		c.conn = nil
-		closed := c.closed
+		if c.conn == conn {
+			c.connected = false
+			c.conn = nil
+		}
 		c.mu.Unlock()
 		c.emitState(StateDisconnected)
 
-		if closed {
+		if ctx.Err() != nil {
 			return
 		}
-		if c.sleepBackoff(&attempt) {
+		if rejected {
+			if c.awaitNewToken(ctx, token) {
+				return
+			}
+			continue
+		}
+		if c.sleepBackoff(ctx) {
 			return
 		}
 	}
 }
 
-func (c *Client) sleepBackoff(attempt *int) (closed bool) {
-	delay := time.Duration(float64(c.reconnectInterval) * math.Pow(2, float64(*attempt)))
-	if delay > maxReconnectInterval {
-		delay = maxReconnectInterval
+// resolveToken returns the token for the next connection attempt: the
+// provider's when it yields one, else the stored token.
+func (c *Client) resolveToken(ctx context.Context) string {
+	if c.tokenProvider != nil {
+		token, err := c.tokenProvider(ctx)
+		if err == nil && token != "" {
+			return token
+		}
+		if err != nil && ctx.Err() == nil {
+			c.emitError(fmt.Errorf("flux: token provider: %w", err))
+		}
 	}
-	*attempt++
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.token
+}
+
+// awaitNewToken follows a socket the server rejected for carrying token. A
+// different token (from the provider, or stored by SetToken) is tried after
+// the usual backoff. The same one would only be rejected again, so the loop
+// parks, with no timer, until SetToken stores another token, Connect is
+// called, or Disconnect ends the loop.
+func (c *Client) awaitNewToken(ctx context.Context, token string) (closed bool) {
+	for {
+		c.mu.Lock()
+		gen := c.tokenGen
+		c.mu.Unlock()
+		if c.resolveToken(ctx) != token {
+			return c.sleepBackoff(ctx)
+		}
+
+		c.mu.Lock()
+		if ctx.Err() != nil {
+			c.mu.Unlock()
+			return true
+		}
+		if c.tokenGen != gen {
+			// SetToken ran while the provider was asked; decide again.
+			c.mu.Unlock()
+			continue
+		}
+		parked := make(chan struct{})
+		c.parked = parked
+		c.rejectedToken = token
+		c.mu.Unlock()
+
+		select {
+		case <-parked:
+			return false
+		case <-ctx.Done():
+			return true
+		}
+	}
+}
+
+// resumeLocked wakes a reconnect loop parked on a rejected token. The caller
+// holds mu.
+func (c *Client) resumeLocked() {
+	if c.parked != nil {
+		close(c.parked)
+		c.parked = nil
+	}
+}
+
+// sleepBackoff waits out the reconnect delay: the initial interval doubled
+// per attempt since a socket last answered a ping, capped at 30s.
+func (c *Client) sleepBackoff(ctx context.Context) (closed bool) {
+	c.mu.Lock()
+	if ctx.Err() != nil {
+		c.mu.Unlock()
+		return true
+	}
+	// Doubled as a float: after enough failures the product overflows
+	// time.Duration.
+	delay := maxReconnectInterval
+	if d := float64(c.reconnectInterval) * math.Pow(2, float64(c.attempt)); d < float64(maxReconnectInterval) {
+		delay = time.Duration(d)
+	}
+	c.attempt++
+	c.mu.Unlock()
+
+	t := time.NewTimer(delay)
+	defer t.Stop()
 	select {
-	case <-time.After(delay):
+	case <-t.C:
 		return false
-	case <-c.closeCh:
+	case <-ctx.Done():
 		return true
 	}
 }
 
+// resetBackoff starts the reconnect backoff over once conn, still the
+// current socket, answers a ping: only then has the server accepted it.
+func (c *Client) resetBackoff(conn *websocket.Conn) {
+	c.mu.Lock()
+	if c.conn == conn {
+		c.attempt = 0
+	}
+	c.mu.Unlock()
+}
+
 func (c *Client) heartbeat(conn *websocket.Conn, stop <-chan struct{}) {
 	c.mu.Lock()
-	c.lastSentSeq = c.pingSeq
+	first := c.pingSeq
+	c.lastSentSeq = first
 	c.hasLastSeq = true
 	c.mu.Unlock()
-	_ = c.sendOn(conn, ChannelHealthCheck, EventPing, strconv.Itoa(c.pingSeq), MessageTypeAction)
+	_ = c.sendOn(conn, ChannelHealthCheck, EventPing, strconv.Itoa(first), MessageTypeAction)
 
 	t := time.NewTicker(c.heartbeatInterval)
 	defer t.Stop()
@@ -494,28 +659,55 @@ func (c *Client) heartbeat(conn *websocket.Conn, stop <-chan struct{}) {
 	}
 }
 
-func (c *Client) readLoop(conn *websocket.Conn) {
+// readLoop pumps conn until it fails, and reports whether the server
+// rejected the socket's token: an Unauthorized frame on flux:error, or a
+// close with code 1008. Either is reported to OnError as ErrUnauthorized.
+func (c *Client) readLoop(conn *websocket.Conn) (rejected bool) {
 	for {
 		_, payload, err := conn.ReadMessage()
 		if err != nil {
+			var closeErr *websocket.CloseError
+			if errors.As(err, &closeErr) && closeErr.Code == websocket.ClosePolicyViolation {
+				c.emitError(fmt.Errorf("%w: %w", ErrUnauthorized, err))
+				return true
+			}
 			if !websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 				c.emitError(err)
 			}
-			return
+			return false
 		}
 		var msg SocketMessage
 		if err := json.Unmarshal(payload, &msg); err != nil {
 			c.emitError(fmt.Errorf("flux: received non-JSON message: %w", err))
 			continue
 		}
-		if msg.Event == EventPongReply && !c.isExpectedPong(msg.Data) {
-			c.emitError(fmt.Errorf("flux: pong out of sync, reconnecting"))
-			_ = conn.Close()
-			return
+		if msg.Event == EventPongReply {
+			if !c.isExpectedPong(msg.Data) {
+				c.emitError(fmt.Errorf("flux: pong out of sync, reconnecting"))
+				_ = conn.Close()
+				return false
+			}
+			c.resetBackoff(conn)
 		}
 		c.emitChannelEvent(msg)
 		c.emitMessage(msg)
+		if msg.Channel == ChannelError && msg.Event == EventUnauthorized {
+			// The server closes the socket next; don't wait for it.
+			c.emitError(unauthorizedError(msg))
+			return true
+		}
 	}
+}
+
+// unauthorizedError wraps ErrUnauthorized with the message the server's
+// error frame carries, if any.
+func unauthorizedError(msg SocketMessage) error {
+	if data, ok := msg.Data.(map[string]any); ok {
+		if text, _ := data["message"].(string); text != "" {
+			return fmt.Errorf("%w: %s", ErrUnauthorized, text)
+		}
+	}
+	return ErrUnauthorized
 }
 
 func (c *Client) send(channel, event string, data any, mt MessageType) error {
@@ -547,13 +739,13 @@ func (c *Client) sendOn(conn *websocket.Conn, channel, event string, data any, m
 	return conn.WriteMessage(websocket.TextMessage, buf)
 }
 
-func (c *Client) buildURL() (string, error) {
+func (c *Client) buildURL(token string) (string, error) {
 	u, err := url.Parse(DefaultWSURL)
 	if err != nil {
 		return "", fmt.Errorf("flux: parse endpoint URL: %w", err)
 	}
 	q := u.Query()
-	q.Set("token", c.token)
+	q.Set("token", token)
 	q.Set("orgId", c.orgID)
 	q.Set("cli", c.clientID)
 	for k, v := range c.queryParams {

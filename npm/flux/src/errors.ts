@@ -9,3 +9,15 @@ export class FluxError extends Error {
     this.name = "FluxError";
   }
 }
+
+/**
+ * Emitted through `onError` when the server rejects the connection's token.
+ * The client then stops reconnecting until a different token is available
+ * (`setToken`, or `getToken` returning a new one) or `connect()` is called.
+ */
+export class FluxUnauthorizedError extends FluxError {
+  constructor() {
+    super("flux rejected the token; reconnecting stops until it changes");
+    this.name = "FluxUnauthorizedError";
+  }
+}

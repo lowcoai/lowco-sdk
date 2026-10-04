@@ -2,7 +2,7 @@
 
 from . import types as _types
 from ._client import FluxChannel, FluxClient
-from ._errors import FluxError
+from ._errors import FluxError, FluxUnauthorizedError
 from ._utils import WS_URL, build_websocket_url, generate_client_id
 from .types import *  # noqa: F403
 
@@ -13,6 +13,7 @@ __all__ = [
     "FluxChannel",
     "FluxClient",
     "FluxError",
+    "FluxUnauthorizedError",
     "__version__",
     "build_websocket_url",
     "generate_client_id",

@@ -18,12 +18,16 @@ const (
 	EventPongReply   = "pong"
 	EventSubscribe   = "sb"
 	EventUnsubscribe = "usb"
+	// EventUnauthorized is the event of the ChannelError frame the server
+	// sends before closing a socket whose token it rejects.
+	EventUnauthorized = "Unauthorized"
 )
 
 // Reserved channels.
 const (
 	ChannelSubscription = "flux:subscription"
 	ChannelHealthCheck  = "flux:health_check"
+	ChannelError        = "flux:error"
 )
 
 // MessageMeta carries optional metadata transmitted alongside a message.
@@ -34,12 +38,12 @@ type MessageMeta struct {
 
 // SocketMessage is the JSON envelope exchanged with the flux server.
 type SocketMessage struct {
-	Type      MessageType `json:"type,omitempty"`
-	Channel   string      `json:"channel,omitempty"`
-	Event     string      `json:"event,omitempty"`
-	Data      any         `json:"data,omitempty"`
-	RequestID string      `json:"request_id,omitempty"`
-	Timestamp int64       `json:"timestamp,omitempty"`
+	Type      MessageType  `json:"type,omitempty"`
+	Channel   string       `json:"channel,omitempty"`
+	Event     string       `json:"event,omitempty"`
+	Data      any          `json:"data,omitempty"`
+	RequestID string       `json:"request_id,omitempty"`
+	Timestamp int64        `json:"timestamp,omitempty"`
 	Meta      *MessageMeta `json:"meta,omitempty"`
 }
 

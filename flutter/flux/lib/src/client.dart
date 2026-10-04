@@ -20,17 +20,33 @@ const _maxReconnectInterval = Duration(seconds: 30);
 
 const _subscriptionChannel = 'flux:subscription';
 const _healthCheckChannel = 'flux:health_check';
+const _errorChannel = 'flux:error';
 const _pongReply = 'pong';
+const _unauthorizedEvent = 'Unauthorized';
 const _normalClosure = 1000;
+const _policyViolation = 1008;
 
 /// WebSocket client for the flux realtime service.
 ///
 /// One instance owns a single connection, automatically reconnects with
 /// exponential backoff, and replays every subscription (event filters
 /// included) on each reconnect.
+///
+/// The server upgrades the socket before it checks the token, so a rejected
+/// token shows up as an open socket that is then closed. The backoff is
+/// therefore reset only once the server answers a heartbeat ping, and a
+/// rejected token stops the reconnects until a different one is available
+/// (see [setToken] and `tokenProvider`).
 class FluxClient {
   /// Creates a client for `wss://ws.lowco.ai/`. Nothing is dialled until
   /// [connect] is called.
+  ///
+  /// [tokenProvider], when given, supplies the token of every connection
+  /// attempt; a token it returns becomes the stored one. After the server
+  /// rejects a token it is asked right away, and its answer both decides
+  /// whether to retry and is the token retried with. When it throws
+  /// (reported through [onError]) or returns null / blank, the stored token
+  /// is used: [token], or the latest from [setToken] or the provider.
   ///
   /// Throws [FluxException] when [token] or [orgId] is blank, or when an
   /// interval is not positive.
@@ -42,11 +58,13 @@ class FluxClient {
     this.reconnectInterval = _defaultReconnectInterval,
     Map<String, String>? queryParams,
     WebSocketChannelFactory? channelFactory,
+    FutureOr<String?> Function()? tokenProvider,
   })  : _token = token,
         _orgId = orgId,
         clientId = clientId == null || clientId.trim().isEmpty ? generateClientId() : clientId,
         _queryParams = Map.unmodifiable(queryParams ?? const <String, String>{}),
-        _channelFactory = channelFactory ?? WebSocketChannel.connect {
+        _channelFactory = channelFactory ?? WebSocketChannel.connect,
+        _tokenProvider = tokenProvider {
     if (token.trim().isEmpty) throw const FluxException('token is required');
     if (orgId.trim().isEmpty) throw const FluxException('orgId is required');
     if (heartbeatInterval <= Duration.zero) {
@@ -72,6 +90,7 @@ class FluxClient {
     Duration? reconnectInterval,
     Map<String, String>? queryParams,
     WebSocketChannelFactory? channelFactory,
+    FutureOr<String?> Function()? tokenProvider,
   }) {
     final existing = _instance;
     if (existing != null) return existing;
@@ -87,6 +106,7 @@ class FluxClient {
       reconnectInterval: reconnectInterval ?? _defaultReconnectInterval,
       queryParams: queryParams,
       channelFactory: channelFactory,
+      tokenProvider: tokenProvider,
     );
     _instance = created;
     created.connect();
@@ -99,7 +119,8 @@ class FluxClient {
     _instance = null;
   }
 
-  final String _token;
+  /// Sent as the `token` query parameter when [_tokenProvider] has none.
+  String _token;
   final String _orgId;
 
   /// Sent as the `cli` query parameter; a random UUID unless given.
@@ -109,11 +130,13 @@ class FluxClient {
   final Duration heartbeatInterval;
 
   /// Initial reconnect backoff (default 1 s). It doubles after every failed
-  /// attempt and is capped at 30 s.
+  /// attempt (a socket that opens but never answers a ping counts as failed)
+  /// and is capped at 30 s.
   final Duration reconnectInterval;
 
   final Map<String, String> _queryParams;
   final WebSocketChannelFactory _channelFactory;
+  final FutureOr<String?> Function()? _tokenProvider;
 
   _Connection? _conn;
   int _pingSeq = 1;
@@ -123,6 +146,17 @@ class FluxClient {
   Timer? _heartbeatTimer;
   bool _manuallyClosed = false;
   bool _connected = false;
+
+  /// True while [connect] awaits the token provider (counts as connecting).
+  bool _resolvingToken = false;
+
+  /// Bumped by [connect] and [disconnect]: an awaited token provider whose
+  /// epoch is stale lost the race and must not act.
+  int _epoch = 0;
+
+  /// The token the server rejected while no different one was available.
+  /// Non-null means reconnecting is stopped until [setToken] or [connect].
+  String? _rejectedToken;
 
   /// What this client wants delivered: topic -> event patterns ([allEvents] =
   /// every event). It is the client's own record rather than a mirror of the
@@ -153,15 +187,76 @@ class FluxClient {
   bool get isConnected => _connected;
 
   /// Opens the socket. A no-op while a socket is open or connecting; clears a
-  /// previous [disconnect] so auto-reconnect is back on.
-  void connect() {
-    if (_conn != null) return;
-    _manuallyClosed = false;
-    _clearReconnectTimer();
+  /// previous [disconnect] (so auto-reconnect is back on) and a stop after a
+  /// rejected token (so the current token is tried again).
+  void connect() => _connect();
 
+  /// [tokenResolved]: the stored token was just resolved (after a rejection),
+  /// so the provider is not asked again for this attempt.
+  void _connect({bool tokenResolved = false}) {
+    if (_conn != null || _resolvingToken) return;
+    _manuallyClosed = false;
+    _rejectedToken = null;
+    _clearReconnectTimer();
+    final epoch = ++_epoch;
+    if (tokenResolved) {
+      _dial(_token);
+      return;
+    }
+
+    // Set before asking the provider: a connect() meanwhile (even from an
+    // error handler reporting a throwing provider) is a no-op.
+    _resolvingToken = true;
+    final token = _resolveToken();
+    if (token is Future<String>) {
+      unawaited(token.then((token) => _dialResolved(epoch, token)));
+    } else {
+      _dialResolved(epoch, token);
+    }
+  }
+
+  void _dialResolved(int epoch, String token) {
+    // disconnect() (or a connect() after it) won the race.
+    if (epoch != _epoch) return;
+    _resolvingToken = false;
+    _dial(token);
+  }
+
+  /// Closes the socket and stops auto-reconnect until the next [connect].
+  void disconnect() {
+    _manuallyClosed = true;
+    _epoch++;
+    _resolvingToken = false;
+    _rejectedToken = null;
+    _clearReconnectTimer();
+    _stopHeartbeat();
+    final conn = _conn;
+    _conn = null;
+    _connected = false;
+    if (conn != null && !conn.closed) {
+      conn.closed = true;
+      conn.close();
+      _emitState(ConnectionState.disconnected);
+    }
+  }
+
+  /// Replaces the stored token used for the next connection attempt (the
+  /// fallback when a `tokenProvider` is set). A blank [token] is ignored.
+  ///
+  /// When reconnecting stopped because the server rejected the token, a
+  /// different [token] reconnects at once (unless [disconnect] was called).
+  /// The open socket, if any, keeps its token until it is replaced.
+  void setToken(String token) {
+    if (token.trim().isEmpty) return;
+    _token = token;
+    final rejected = _rejectedToken;
+    if (rejected != null && token != rejected && !_manuallyClosed) connect();
+  }
+
+  void _dial(String token) {
     final WebSocketChannel channel;
     try {
-      channel = _channelFactory(Uri.parse(_buildUrl()));
+      channel = _channelFactory(Uri.parse(_buildUrl(token)));
     } catch (error) {
       // A factory that throws is treated like a socket that failed to open.
       _emitState(ConnectionState.error);
@@ -171,7 +266,7 @@ class FluxClient {
       return;
     }
 
-    final conn = _Connection(channel);
+    final conn = _Connection(channel, token);
     _conn = conn;
     conn.subscription = channel.stream.listen(
       (data) => _onData(conn, data),
@@ -185,21 +280,6 @@ class FluxClient {
         _onClosed(conn);
       },
     ));
-  }
-
-  /// Closes the socket and stops auto-reconnect until the next [connect].
-  void disconnect() {
-    _manuallyClosed = true;
-    _clearReconnectTimer();
-    _stopHeartbeat();
-    final conn = _conn;
-    _conn = null;
-    _connected = false;
-    if (conn != null && !conn.closed) {
-      conn.closed = true;
-      conn.close();
-      _emitState(ConnectionState.disconnected);
-    }
   }
 
   /// Asks the server for a topic's events and returns its (cached) handle.
@@ -342,7 +422,9 @@ class FluxClient {
     if (!_isCurrent(conn)) return;
     conn.open = true;
     _connected = true;
-    _reconnectAttempt = 0;
+    // The backoff is not reset here: the server authenticates after the
+    // upgrade, so an open socket may still be rejected. The first expected
+    // pong resets it (see _onData).
     _emitState(ConnectionState.connected);
     // A state handler may have disconnected already.
     if (!_isCurrent(conn)) return;
@@ -369,13 +451,24 @@ class FluxClient {
       return;
     }
     final message = SocketMessage.fromJson(readMap(decoded)!);
-    if (message.event == _pongReply && !_isExpectedPong(message.data)) {
-      _emitError(const FluxException('pong out of sync, reconnecting'));
-      _onClosed(conn, closeSocket: true);
-      return;
+    if (message.event == _pongReply) {
+      if (!_isExpectedPong(message.data)) {
+        _emitError(const FluxException('pong out of sync, reconnecting'));
+        _onClosed(conn, closeSocket: true);
+        return;
+      }
+      // The server answered: this socket is healthy, so the backoff starts over.
+      _reconnectAttempt = 0;
     }
+    final unauthorized = _isUnauthorized(message);
+    // Still delivered: before FluxUnauthorizedException it was the only signal.
     _emitChannelEvent(message);
     _emitMessage(message);
+    if (unauthorized) {
+      // The server closes with 1008 next; do not wait for it.
+      conn.unauthorized = true;
+      _onClosed(conn, closeSocket: true);
+    }
   }
 
   void _onSocketError(_Connection conn, Object error) {
@@ -392,13 +485,75 @@ class FluxClient {
     _conn = null;
     _connected = false;
     _stopHeartbeat();
+    final unauthorized = conn.unauthorized || conn.channel.closeCode == _policyViolation;
+    if (unauthorized) _emitError(const FluxUnauthorizedException());
     _emitState(ConnectionState.disconnected);
-    _scheduleReconnect();
+    if (unauthorized) {
+      _reconnectAfterRejection(conn.token);
+    } else {
+      _scheduleReconnect();
+    }
   }
 
-  void _scheduleReconnect() {
+  /// The server rejected [rejected]. Reconnects (the backoff still growing)
+  /// only when the next token differs; otherwise stops until [setToken]
+  /// supplies a different one, or [connect] / [disconnect] is called.
+  void _reconnectAfterRejection(String rejected) {
+    // A handler may have called connect() or disconnect() meanwhile.
+    if (_manuallyClosed || _conn != null || _resolvingToken || _reconnectTimer != null) return;
+    final epoch = _epoch;
+    void decide(String next) {
+      if (epoch != _epoch) return;
+      if (next == rejected) {
+        _rejectedToken = rejected;
+      } else {
+        // `next` is now the stored token (or a newer one from setToken by
+        // the time the timer fires).
+        _scheduleReconnect(tokenResolved: true);
+      }
+    }
+
+    final next = _resolveToken();
+    if (next is Future<String>) {
+      unawaited(next.then(decide));
+    } else {
+      decide(next);
+    }
+  }
+
+  /// The token for the next attempt: the provider's, else the stored one.
+  /// Synchronous unless the provider returns a [Future].
+  FutureOr<String> _resolveToken() {
+    final provider = _tokenProvider;
+    if (provider == null) return _token;
+    final FutureOr<String?> result;
+    try {
+      result = provider();
+    } catch (error) {
+      _emitError(error);
+      return _token;
+    }
+    if (result is Future<String?>) {
+      return result.then(_adoptToken, onError: (Object error) {
+        _emitError(error);
+        return _token;
+      });
+    }
+    return _adoptToken(result);
+  }
+
+  String _adoptToken(String? token) {
+    if (token != null && token.trim().isNotEmpty) _token = token;
+    return _token;
+  }
+
+  static bool _isUnauthorized(SocketMessage message) =>
+      normalizeTopic(message.channel) == _errorChannel &&
+      normalizeTopic(message.event) == _unauthorizedEvent;
+
+  void _scheduleReconnect({bool tokenResolved = false}) {
     // A state handler may have called connect() or disconnect() meanwhile.
-    if (_manuallyClosed || _conn != null || _reconnectTimer != null) return;
+    if (_manuallyClosed || _conn != null || _resolvingToken || _reconnectTimer != null) return;
     // Computed in doubles: 2^attempt must not overflow after many failures.
     final micros = math.min(
       reconnectInterval.inMicroseconds * math.pow(2.0, _reconnectAttempt),
@@ -407,7 +562,7 @@ class FluxClient {
     _reconnectAttempt += 1;
     _reconnectTimer = Timer(Duration(microseconds: micros.round()), () {
       _reconnectTimer = null;
-      connect();
+      _connect(tokenResolved: tokenResolved);
     });
   }
 
@@ -416,8 +571,8 @@ class FluxClient {
     _reconnectTimer = null;
   }
 
-  String _buildUrl() => buildWebSocketUrl(
-        _token,
+  String _buildUrl(String token) => buildWebSocketUrl(
+        token,
         _orgId,
         clientId,
         // Tells the server this client re-sends every subscription on
@@ -627,12 +782,18 @@ class _ParsedSpec {
 /// One dialled socket. Events from a socket that is no longer current (or
 /// that was closed locally) are ignored.
 class _Connection {
-  _Connection(this.channel);
+  _Connection(this.channel, this.token);
 
   final WebSocketChannel channel;
+
+  /// The token this socket was dialled with.
+  final String token;
   StreamSubscription<dynamic>? subscription;
   bool open = false;
   bool closed = false;
+
+  /// Set when the server's `flux:error` / `Unauthorized` frame arrived.
+  bool unauthorized = false;
 
   void close() {
     final sub = subscription;

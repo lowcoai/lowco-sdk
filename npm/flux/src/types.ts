@@ -57,6 +57,15 @@ export type SubscriptionSpec = string | TopicSubscription;
 export interface FluxClientOptions {
   /** Authentication token (user token or API key) sent as the `token` query parameter. Required. */
   token: string;
+  /**
+   * Called before every (re)connect so a refreshed token is picked up.
+   * Returning empty/null, or throwing, falls back to the last token used.
+   */
+  getToken?: () =>
+    | string
+    | null
+    | undefined
+    | Promise<string | null | undefined>;
   /** Organization id. */
   orgId: string;
   /** Optional stable client id (defaults to a generated value). */

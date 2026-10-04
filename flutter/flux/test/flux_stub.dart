@@ -47,7 +47,8 @@ class Frame {
 
 /// A loopback flux server. It rejects dials that do not announce `replay=1`,
 /// reports every subscription frame as `"<sb|usb> <data as JSON>"`, records
-/// pings and other frames per socket, and can push frames or drop sockets.
+/// pings and other frames per socket, can push frames or drop sockets, and
+/// turns away [rejectedTokens] the way the real server does.
 class FluxStub {
   FluxStub._(this._server) {
     _server.listen(_handle);
@@ -64,6 +65,10 @@ class FluxStub {
   /// URIs the client asked the factory to dial (before rewriting).
   final dials = <Uri>[];
 
+  /// When each of [dials] happened, on a clock started with the stub.
+  final dialledAt = <Duration>[];
+  final _clock = Stopwatch()..start();
+
   /// Request URIs as seen by the server.
   final requests = <Uri>[];
   final sockets = <WebSocket>[];
@@ -77,12 +82,24 @@ class FluxStub {
   final pings = AsyncQueue<Frame>();
   final otherFrames = AsyncQueue<Frame>();
 
+  /// Tokens the stub rejects like the flux server: it completes the upgrade
+  /// (the socket counts in [connections]), then sends the `flux:error` /
+  /// `Unauthorized` frame and closes with 1008. [rejectWithFrame] and
+  /// [rejectWithClose] turn either half off.
+  final rejectedTokens = <String>{};
+  bool rejectWithFrame = true;
+  bool rejectWithClose = true;
+
   int get port => _server.port;
+
+  /// The `token` query parameter of every request, in order.
+  List<String?> get tokens => [for (final r in requests) r.queryParameters['token']];
 
   /// A [WebSocketChannelFactory] that sends the client here instead of
   /// `wss://ws.lowco.ai/`, keeping the path and query.
   WebSocketChannel dial(Uri uri) {
     dials.add(uri);
+    dialledAt.add(_clock.elapsed);
     return WebSocketChannel.connect(uri.replace(scheme: 'ws', host: '127.0.0.1', port: port));
   }
 
@@ -91,15 +108,18 @@ class FluxStub {
     Duration reconnectInterval = const Duration(milliseconds: 10),
     Map<String, String>? queryParams,
     String? clientId,
+    String token = 'tok_123',
+    FutureOr<String?> Function()? tokenProvider,
   }) {
     final client = FluxClient(
-      token: 'tok_123',
+      token: token,
       orgId: 'org-1',
       clientId: clientId,
       heartbeatInterval: heartbeatInterval,
       reconnectInterval: reconnectInterval,
       queryParams: queryParams,
       channelFactory: dial,
+      tokenProvider: tokenProvider,
     );
     addTearDown(client.disconnect);
     return client;
@@ -133,6 +153,27 @@ class FluxStub {
       onError: (Object _) {},
       onDone: () => socketClosed[index].complete(),
     );
+    if (rejectedTokens.contains(request.uri.queryParameters['token'])) {
+      if (rejectWithFrame) {
+        socket.add(jsonEncode({
+          'type': 'error',
+          'channel': 'flux:error',
+          'event': 'Unauthorized',
+          'data': {'message': 'Unauthorized'},
+          'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        }));
+      }
+      if (rejectWithClose) unawaited(socket.close(1008, 'unauthorized'));
+    }
+  }
+
+  /// Answers the latest ping on its socket with the matching pong.
+  Future<void> pong() async {
+    Frame ping;
+    do {
+      ping = await pings.next();
+    } while (ping.socket != sockets.length - 1);
+    send({'channel': 'flux:health_check', 'event': 'pong', 'data': ping.data});
   }
 
   /// Waits until the server accepted the next socket and [client] saw it
