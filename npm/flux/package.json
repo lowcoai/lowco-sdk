@@ -1,6 +1,6 @@
 {
   "name": "@lowcoai/flux",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Official Node/TypeScript client for the lowco flux realtime WebSocket service.",
   "license": "MIT",
   "repository": {

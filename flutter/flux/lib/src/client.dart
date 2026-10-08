@@ -38,7 +38,7 @@ const _policyViolation = 1008;
 /// rejected token stops the reconnects until a different one is available
 /// (see [setToken] and `tokenProvider`).
 class FluxClient {
-  /// Creates a client for `wss://ws.lowco.ai/`. Nothing is dialled until
+  /// Creates a client for `wss://api.lowco.ai/v1/ws`. Nothing is dialled until
   /// [connect] is called.
   ///
   /// [tokenProvider], when given, supplies the token of every connection

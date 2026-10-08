@@ -3,7 +3,7 @@ import 'package:test/test.dart';
 
 void main() {
   test('wire constants', () {
-    expect(wsUrl, 'wss://ws.lowco.ai/');
+    expect(wsUrl, 'wss://api.lowco.ai/v1/ws');
     expect(allEvents, '*');
     expect(MessageType.values, ['action', 'event', 'system', 'error', 'ack']);
     expect(
@@ -25,14 +25,14 @@ void main() {
   test('buildWebSocketUrl encodes params and lets extras override in place', () {
     expect(
       buildWebSocketUrl('t k&1', 'org_1', 'cli-1', {'app': 'crm'}),
-      'wss://ws.lowco.ai/?token=t+k%261&orgId=org_1&cli=cli-1&app=crm',
+      'wss://api.lowco.ai/v1/ws?token=t+k%261&orgId=org_1&cli=cli-1&app=crm',
     );
     expect(
       buildWebSocketUrl('tok', 'org', 'cli', {'token': 'other', 'replay': '1'}),
-      'wss://ws.lowco.ai/?token=other&orgId=org&cli=cli&replay=1',
+      'wss://api.lowco.ai/v1/ws?token=other&orgId=org&cli=cli&replay=1',
     );
     expect(
-        buildWebSocketUrl('tok', 'org', 'cli'), 'wss://ws.lowco.ai/?token=tok&orgId=org&cli=cli');
+        buildWebSocketUrl('tok', 'org', 'cli'), 'wss://api.lowco.ai/v1/ws?token=tok&orgId=org&cli=cli');
   });
 
   test('generateClientId returns distinct UUID v4 values', () {

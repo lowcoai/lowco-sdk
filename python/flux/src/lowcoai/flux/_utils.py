@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlencode
 
-WS_URL = "wss://ws.lowco.ai/"
+WS_URL = "wss://api.lowco.ai/v1/ws"
 """The fixed flux endpoint every client connects to."""
 
 

@@ -61,6 +61,10 @@ func newFluxStub(t *testing.T) *fluxStub {
 		done:   make(chan struct{}),
 	}
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/ws" {
+			http.NotFound(w, r)
+			return
+		}
 		if r.URL.Query().Get("replay") != "1" {
 			http.Error(w, "client must announce replay=1", http.StatusBadRequest)
 			return
@@ -216,6 +220,21 @@ func (s *fluxStub) expect(t *testing.T, want ...string) {
 		if got := s.next(t); got != w {
 			t.Fatalf("frame = %s\nwant    %s", got, w)
 		}
+	}
+}
+
+func TestBuildURL(t *testing.T) {
+	client, err := NewClient("t k&1", "org_1", WithClientID("cli-1"), WithQueryParam("app", "crm"), WithQueryParam("replay", "0"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := client.buildURL("t k&1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "wss://api.lowco.ai/v1/ws?app=crm&cli=cli-1&orgId=org_1&replay=1&token=t+k%261"
+	if got != want {
+		t.Fatalf("buildURL = %s\nwant       %s", got, want)
 	}
 }
 

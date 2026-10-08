@@ -96,7 +96,7 @@ class FluxStub {
   List<String?> get tokens => [for (final r in requests) r.queryParameters['token']];
 
   /// A [WebSocketChannelFactory] that sends the client here instead of
-  /// `wss://ws.lowco.ai/`, keeping the path and query.
+  /// `wss://api.lowco.ai/v1/ws`, keeping the path and query.
   WebSocketChannel dial(Uri uri) {
     dials.add(uri);
     dialledAt.add(_clock.elapsed);

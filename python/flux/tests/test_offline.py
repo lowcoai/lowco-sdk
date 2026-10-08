@@ -30,7 +30,7 @@ def test_public_surface() -> None:
     assert flux.__version__ == "0.1.0"
     for name in flux.__all__:
         assert hasattr(flux, name), name
-    assert WS_URL == "wss://ws.lowco.ai/"
+    assert WS_URL == "wss://api.lowco.ai/v1/ws"
     assert ALL_EVENTS == "*"
     assert (
         SocketEvent.PING,

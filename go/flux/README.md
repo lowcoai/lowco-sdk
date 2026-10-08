@@ -2,7 +2,7 @@
 
 Go client for the **lowco flux** realtime WebSocket service. Built on `github.com/gorilla/websocket`.
 
-Every client connects to the fixed endpoint `wss://ws.lowco.ai/` (`flux.DefaultWSURL`). Authentication uses a required token (a user token or an API key); user identity is derived from the token server-side.
+Every client connects to the fixed endpoint `wss://api.lowco.ai/v1/ws` (`flux.DefaultWSURL`). Authentication uses a required token (a user token or an API key); user identity is derived from the token server-side.
 
 ```
 go get github.com/lowcoai/lowco-sdk/go/flux

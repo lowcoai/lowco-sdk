@@ -399,7 +399,7 @@ Each package is self-contained; run its checks from its own folder.
 
 ## Repository conventions
 
-- Every SDK targets the fixed API host `https://api.lowco.ai` (`wss://ws.lowco.ai/` for flux) — base URLs are not configurable.
+- Every SDK targets the fixed API host `https://api.lowco.ai` (`wss://api.lowco.ai/v1/ws` for flux) — base URLs are not configurable.
 - Every SDK authenticates with a required user token or API key sent as `Authorization: Bearer <value>`; user identity is derived from the token, so there is no `X-User-Id` header.
 - Org scoping uses the `X-Org-Id` header — never query params.
 - Every SDK speaks its service's enveloped JSON response shape (`{ success, data, error, message }`; `{ status, data }` for docs) and unwraps `data` for the caller.

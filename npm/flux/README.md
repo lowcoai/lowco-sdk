@@ -35,7 +35,7 @@ flux.sendMessage("tables:leads", "ping", { hello: "world" });
 
 ## Options
 
-The client always connects to `wss://ws.lowco.ai/`.
+The client always connects to `wss://api.lowco.ai/v1/ws`.
 
 | Option                 | Description                                                          |
 | ---------------------- | -------------------------------------------------------------------- |
