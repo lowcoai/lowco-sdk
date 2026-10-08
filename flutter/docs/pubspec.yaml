@@ -1,0 +1,19 @@
+name: lowcoai_docs
+description: Official Dart and Flutter client for the lowco document service (files, folders, sharing, triggers, webhooks).
+version: 0.1.0
+repository: https://github.com/lowcoai/lowco-sdk/tree/main/flutter/docs
+topics:
+  - lowco
+  - documents
+  - storage
+  - sdk
+
+environment:
+  sdk: ^3.4.0
+
+dependencies:
+  http: ^1.5.0
+
+dev_dependencies:
+  lints: ">=5.0.0 <7.0.0"
+  test: ^1.25.0
