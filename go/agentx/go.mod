@@ -1,3 +1,3 @@
-module github.com/backend-platform/lowco-sdk/go/agentx
+module github.com/lowcoai/lowco-sdk/go/agentx
 
 go 1.22

@@ -3,7 +3,7 @@
 Official Go client for the **workflow-orchestrator** product (routes under `/v1/wf/*`).
 
 ```bash
-go get github.com/backend-platform/lowco-sdk/go/workflow
+go get github.com/lowcoai/lowco-sdk/go/workflow
 ```
 
 ## Quick start
@@ -15,7 +15,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/backend-platform/lowco-sdk/go/workflow"
+	"github.com/lowcoai/lowco-sdk/go/workflow"
 )
 
 func main() {

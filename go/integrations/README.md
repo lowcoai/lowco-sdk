@@ -3,7 +3,7 @@
 Official Go client for the **integrations-manager** product (routes under `/v1/integrations/*`).
 
 ```bash
-go get github.com/backend-platform/lowco-sdk/go/integrations
+go get github.com/lowcoai/lowco-sdk/go/integrations
 ```
 
 ## Quick start
@@ -15,7 +15,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/backend-platform/lowco-sdk/go/integrations"
+	"github.com/lowcoai/lowco-sdk/go/integrations"
 )
 
 func main() {

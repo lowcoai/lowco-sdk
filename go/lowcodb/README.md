@@ -5,7 +5,7 @@ Go client for the lowcodb manager service.
 Every request is sent to the fixed host `https://api.lowco.ai` (`lowcodb.DefaultBaseURL`). `NewClient` requires a token (a user token or an API key) that is sent as `Authorization: Bearer <token>` on every request.
 
 ```
-go get github.com/backend-platform/lowco-sdk/go/lowcodb
+go get github.com/lowcoai/lowco-sdk/go/lowcodb
 ```
 
 ## Quick start
@@ -18,7 +18,7 @@ import (
     "fmt"
     "log"
 
-    lowcodb "github.com/backend-platform/lowco-sdk/go/lowcodb"
+    lowcodb "github.com/lowcoai/lowco-sdk/go/lowcodb"
 )
 
 func main() {

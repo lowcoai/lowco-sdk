@@ -1,17 +1,17 @@
 # lowco-sdk
 
-Official client SDKs for the [lowco](https://github.com/backend-platform) backend-platform services.
+Official client SDKs for the [lowco](https://lowco.ai) platform services.
 
 The repository is a **multi-module monorepo**: one folder per ecosystem (Go / npm / Python / Flutter), and one sub-folder per backend product.
 
 ```
 lowco-sdk/
 ├── go/
-│   ├── lowcodb/        ← github.com/backend-platform/lowco-sdk/go/lowcodb
-│   ├── agentx/         ← github.com/backend-platform/lowco-sdk/go/agentx
-│   ├── workflow/       ← github.com/backend-platform/lowco-sdk/go/workflow
-│   ├── integrations/   ← github.com/backend-platform/lowco-sdk/go/integrations
-│   └── flux/           ← github.com/backend-platform/lowco-sdk/go/flux
+│   ├── lowcodb/        ← github.com/lowcoai/lowco-sdk/go/lowcodb
+│   ├── agentx/         ← github.com/lowcoai/lowco-sdk/go/agentx
+│   ├── workflow/       ← github.com/lowcoai/lowco-sdk/go/workflow
+│   ├── integrations/   ← github.com/lowcoai/lowco-sdk/go/integrations
+│   └── flux/           ← github.com/lowcoai/lowco-sdk/go/flux
 ├── npm/
 │   ├── lowcodb/        ← @lowcoai/lowcodb
 │   ├── agentx/         ← @lowcoai/agentx
@@ -54,11 +54,11 @@ The Dart API clients are pure Dart (`package:http` / `web_socket_channel`), so t
 
 | Product        | Services covered                          | Go module                                               | npm package             | PyPI package           | pub.dev package        | Docs                                         |
 | -------------- | ----------------------------------------- | ------------------------------------------------------- | ----------------------- | ---------------------- | ---------------------- | -------------------------------------------- |
-| `lowcodb`      | lowcodb manager                           | `github.com/backend-platform/lowco-sdk/go/lowcodb`      | `@lowcoai/lowcodb`      | `lowcoai-lowcodb`      | `lowcoai_lowcodb`      | [docs/lowcodb.md](docs/lowcodb.md)           |
-| `agentx`       | agent-manager · agent-kb · agent-executor | `github.com/backend-platform/lowco-sdk/go/agentx`       | `@lowcoai/agentx`       | `lowcoai-agentx`       | `lowcoai_agentx`       | [go/agentx/README.md](go/agentx/README.md)   |
-| `workflow`     | workflow-orchestrator                     | `github.com/backend-platform/lowco-sdk/go/workflow`     | `@lowcoai/workflow`     | `lowcoai-workflow`     | `lowcoai_workflow`     | [docs/workflow.md](docs/workflow.md)         |
-| `integrations` | integrations-manager                      | `github.com/backend-platform/lowco-sdk/go/integrations` | `@lowcoai/integrations` | `lowcoai-integrations` | `lowcoai_integrations` | [docs/integrations.md](docs/integrations.md) |
-| `flux`         | flux realtime WebSocket                   | `github.com/backend-platform/lowco-sdk/go/flux`         | `@lowcoai/flux`         | `lowcoai-flux`         | `lowcoai_flux`         | [npm/flux/README.md](npm/flux/README.md)     |
+| `lowcodb`      | lowcodb manager                           | `github.com/lowcoai/lowco-sdk/go/lowcodb`      | `@lowcoai/lowcodb`      | `lowcoai-lowcodb`      | `lowcoai_lowcodb`      | [docs/lowcodb.md](docs/lowcodb.md)           |
+| `agentx`       | agent-manager · agent-kb · agent-executor | `github.com/lowcoai/lowco-sdk/go/agentx`       | `@lowcoai/agentx`       | `lowcoai-agentx`       | `lowcoai_agentx`       | [go/agentx/README.md](go/agentx/README.md)   |
+| `workflow`     | workflow-orchestrator                     | `github.com/lowcoai/lowco-sdk/go/workflow`     | `@lowcoai/workflow`     | `lowcoai-workflow`     | `lowcoai_workflow`     | [docs/workflow.md](docs/workflow.md)         |
+| `integrations` | integrations-manager                      | `github.com/lowcoai/lowco-sdk/go/integrations` | `@lowcoai/integrations` | `lowcoai-integrations` | `lowcoai_integrations` | [docs/integrations.md](docs/integrations.md) |
+| `flux`         | flux realtime WebSocket                   | `github.com/lowcoai/lowco-sdk/go/flux`         | `@lowcoai/flux`         | `lowcoai-flux`         | `lowcoai_flux`         | [npm/flux/README.md](npm/flux/README.md)     |
 | `auth`         | lowco OAuth (Authorization Code + PKCE)   | —                                                       | `@lowcoai/auth`         | `lowcoai-auth`         | `lowcoai_auth`         | [npm/auth/README.md](npm/auth/README.md)     |
 | `engage`       | engage event tracking                     | —                                                       | `@lowcoai/engage`       | `lowcoai-engage`       | `lowcoai_engage`       | [npm/engage/README.md](npm/engage/README.md) |
 
@@ -73,11 +73,11 @@ Every package has its own README with the full surface (`python/<product>/README
 ### Go
 
 ```bash
-go get github.com/backend-platform/lowco-sdk/go/lowcodb
+go get github.com/lowcoai/lowco-sdk/go/lowcodb
 ```
 
 ```go
-import lowcodb "github.com/backend-platform/lowco-sdk/go/lowcodb"
+import lowcodb "github.com/lowcoai/lowco-sdk/go/lowcodb"
 
 client, _ := lowcodb.NewClient("<token-or-api-key>",
     lowcodb.WithOrgID("org_123"),
@@ -88,11 +88,11 @@ bases, _ := client.ListBases(ctx, nil)
 See [go/lowcodb/README.md](go/lowcodb/README.md).
 
 ```bash
-go get github.com/backend-platform/lowco-sdk/go/agentx
+go get github.com/lowcoai/lowco-sdk/go/agentx
 ```
 
 ```go
-import "github.com/backend-platform/lowco-sdk/go/agentx"
+import "github.com/lowcoai/lowco-sdk/go/agentx"
 
 client, _ := agentx.NewClient("<token-or-api-key>",
     agentx.WithOrgID("org_123"),
@@ -105,11 +105,11 @@ resp,   _ := client.Executor.SendMessage(ctx, "agent_abc", params)
 See [go/agentx/README.md](go/agentx/README.md).
 
 ```bash
-go get github.com/backend-platform/lowco-sdk/go/workflow
+go get github.com/lowcoai/lowco-sdk/go/workflow
 ```
 
 ```go
-import "github.com/backend-platform/lowco-sdk/go/workflow"
+import "github.com/lowcoai/lowco-sdk/go/workflow"
 
 client, _ := workflow.NewClient(workflow.Config{
     Token: "<token-or-api-key>",
@@ -121,11 +121,11 @@ workflows, _ := client.Workflows.List(ctx, nil)
 See [go/workflow/README.md](go/workflow/README.md).
 
 ```bash
-go get github.com/backend-platform/lowco-sdk/go/integrations
+go get github.com/lowcoai/lowco-sdk/go/integrations
 ```
 
 ```go
-import "github.com/backend-platform/lowco-sdk/go/integrations"
+import "github.com/lowcoai/lowco-sdk/go/integrations"
 
 client, _ := integrations.NewClient(integrations.Config{
     Token: "<token-or-api-key>",
@@ -296,7 +296,7 @@ In Flutter apps, `lowcoai_auth` provides `LowcoAuth` (a `ChangeNotifier`), `Lowc
 
 ## Adding a new product to this SDK
 
-1. Create `go/<product>/` with its own `go.mod` (module path `github.com/backend-platform/lowco-sdk/go/<product>`).
+1. Create `go/<product>/` with its own `go.mod` (module path `github.com/lowcoai/lowco-sdk/go/<product>`).
 2. Create `npm/<product>/` with its own `package.json` (name `@lowcoai/<product>`).
 3. Create `python/<product>/` with its own `pyproject.toml` (distribution `lowcoai-<product>`, package `src/lowcoai/<product>/` — no `src/lowcoai/__init__.py`, it is a namespace package) and matching sync + async clients.
 4. Create `flutter/<product>/` with its own `pubspec.yaml` (name `lowcoai_<product>`), pure Dart unless it needs Flutter plugins.

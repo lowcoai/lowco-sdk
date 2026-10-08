@@ -7,7 +7,7 @@ Service: **workflow-orchestrator**. All routes are mounted under `/v1/wf/*`.
 - **Host**: always `https://api.lowco.ai`.
 - **Auth**: `Authorization: Bearer <user-token-or-api-key>` — required; identifies the acting user.
 - **Tenancy**: pass `X-Org-Id` on every request.
-- **Response envelope**: `{ success, data, error, message }`. Clients should read the inner `data`. Every SDK (`@lowcoai/workflow`, `github.com/backend-platform/lowco-sdk/go/workflow`, `lowcoai-workflow` on PyPI, `lowcoai_workflow` on pub.dev) unwraps automatically.
+- **Response envelope**: `{ success, data, error, message }`. Clients should read the inner `data`. Every SDK (`@lowcoai/workflow`, `github.com/lowcoai/lowco-sdk/go/workflow`, `lowcoai-workflow` on PyPI, `lowcoai_workflow` on pub.dev) unwraps automatically.
 
 ## Endpoints
 

@@ -7,7 +7,7 @@ three services live behind the fixed host `https://api.lowco.ai`
 API key) sent as `Authorization: Bearer <token>` on every request.
 
 ```bash
-go get github.com/backend-platform/lowco-sdk/go/agentx
+go get github.com/lowcoai/lowco-sdk/go/agentx
 ```
 
 One `Client`, three sub-clients:
@@ -16,7 +16,7 @@ One `Client`, three sub-clients:
 import (
     "context"
 
-    "github.com/backend-platform/lowco-sdk/go/agentx"
+    "github.com/lowcoai/lowco-sdk/go/agentx"
 )
 
 ctx := context.Background()

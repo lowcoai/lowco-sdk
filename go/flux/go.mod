@@ -1,4 +1,4 @@
-module github.com/backend-platform/lowco-sdk/go/flux
+module github.com/lowcoai/lowco-sdk/go/flux
 
 go 1.22
 

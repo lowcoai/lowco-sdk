@@ -1,3 +1,3 @@
-module github.com/backend-platform/lowco-sdk/go/integrations
+module github.com/lowcoai/lowco-sdk/go/integrations
 
 go 1.22

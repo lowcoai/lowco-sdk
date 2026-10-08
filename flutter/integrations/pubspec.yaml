@@ -1,7 +1,7 @@
 name: lowcoai_integrations
 description: Official Dart and Flutter client for the lowco integrations-manager (applications, actions, connections, triggers, OAuth, MCP).
 version: 0.1.0
-repository: https://github.com/backend-platform/lowco-sdk/tree/main/flutter/integrations
+repository: https://github.com/lowcoai/lowco-sdk/tree/main/flutter/integrations
 topics:
   - lowco
   - integrations

@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/backend-platform/lowco-sdk.git",
+    "url": "https://github.com/lowcoai/lowco-sdk.git",
     "directory": "npm/workflow"
   },
   "type": "module",

@@ -1,7 +1,7 @@
 name: lowcoai_engage
 description: Official Flutter analytics SDK for the lowco engage service (events, page views, sessions, attribution) for iOS, Android, web and desktop apps.
 version: 0.1.0
-repository: https://github.com/backend-platform/lowco-sdk/tree/main/flutter/engage
+repository: https://github.com/lowcoai/lowco-sdk/tree/main/flutter/engage
 topics:
   - lowco
   - analytics

@@ -1,11 +1,11 @@
 {
   "name": "@lowcoai/agentx",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Official Node/TypeScript client for the agentx backend (agent-manager, agent-kb, agent-executor).",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/backend-platform/lowco-sdk.git",
+    "url": "https://github.com/lowcoai/lowco-sdk.git",
     "directory": "npm/agentx"
   },
   "type": "module",
