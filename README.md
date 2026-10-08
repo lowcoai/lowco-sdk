@@ -11,7 +11,8 @@ lowco-sdk/
 │   ├── agentx/         ← github.com/lowcoai/lowco-sdk/go/agentx
 │   ├── workflow/       ← github.com/lowcoai/lowco-sdk/go/workflow
 │   ├── integrations/   ← github.com/lowcoai/lowco-sdk/go/integrations
-│   └── flux/           ← github.com/lowcoai/lowco-sdk/go/flux
+│   ├── flux/           ← github.com/lowcoai/lowco-sdk/go/flux
+│   └── docs/           ← github.com/lowcoai/lowco-sdk/go/docs
 ├── npm/
 │   ├── lowcodb/        ← @lowcoai/lowcodb
 │   ├── agentx/         ← @lowcoai/agentx
@@ -19,7 +20,8 @@ lowco-sdk/
 │   ├── integrations/   ← @lowcoai/integrations
 │   ├── flux/           ← @lowcoai/flux
 │   ├── auth/           ← @lowcoai/auth      (React)
-│   └── engage/         ← @lowcoai/engage    (browser)
+│   ├── engage/         ← @lowcoai/engage    (browser)
+│   └── docs/           ← @lowcoai/docs
 ├── python/
 │   ├── lowcodb/        ← lowcoai-lowcodb       (import lowcoai.lowcodb)
 │   ├── agentx/         ← lowcoai-agentx        (import lowcoai.agentx)
@@ -27,7 +29,8 @@ lowco-sdk/
 │   ├── integrations/   ← lowcoai-integrations  (import lowcoai.integrations)
 │   ├── flux/           ← lowcoai-flux          (import lowcoai.flux, asyncio)
 │   ├── auth/           ← lowcoai-auth          (import lowcoai.auth)
-│   └── engage/         ← lowcoai-engage        (import lowcoai.engage)
+│   ├── engage/         ← lowcoai-engage        (import lowcoai.engage)
+│   └── docs/           ← lowcoai-docs          (import lowcoai.docs)
 ├── flutter/
 │   ├── lowcodb/        ← lowcoai_lowcodb       (pure Dart)
 │   ├── agentx/         ← lowcoai_agentx        (pure Dart)
@@ -35,11 +38,13 @@ lowco-sdk/
 │   ├── integrations/   ← lowcoai_integrations  (pure Dart)
 │   ├── flux/           ← lowcoai_flux          (pure Dart)
 │   ├── auth/           ← lowcoai_auth          (Flutter)
-│   └── engage/         ← lowcoai_engage        (Flutter)
+│   ├── engage/         ← lowcoai_engage        (Flutter)
+│   └── docs/           ← lowcoai_docs          (pure Dart)
 └── docs/
     ├── lowcodb.md       ← REST surface reference (language-agnostic)
     ├── workflow.md      ← REST surface reference (language-agnostic)
-    └── integrations.md  ← REST surface reference (language-agnostic)
+    ├── integrations.md  ← REST surface reference (language-agnostic)
+    └── docs.md          ← REST surface reference (language-agnostic)
 ```
 
 `agentx` is a single SDK covering three services – **agent-manager**, **agent-kb** and **agent-executor** – exposed as `client.Manager`, `client.KB` and `client.Executor` sub-clients (`client.manager` / `client.kb` / `client.executor` in Python and Dart) sharing one HTTP transport.
@@ -58,6 +63,7 @@ The Dart API clients are pure Dart (`package:http` / `web_socket_channel`), so t
 | `agentx`       | agent-manager · agent-kb · agent-executor | `github.com/lowcoai/lowco-sdk/go/agentx`       | `@lowcoai/agentx`       | `lowcoai-agentx`       | `lowcoai_agentx`       | [go/agentx/README.md](go/agentx/README.md)   |
 | `workflow`     | workflow-orchestrator                     | `github.com/lowcoai/lowco-sdk/go/workflow`     | `@lowcoai/workflow`     | `lowcoai-workflow`     | `lowcoai_workflow`     | [docs/workflow.md](docs/workflow.md)         |
 | `integrations` | integrations-manager                      | `github.com/lowcoai/lowco-sdk/go/integrations` | `@lowcoai/integrations` | `lowcoai-integrations` | `lowcoai_integrations` | [docs/integrations.md](docs/integrations.md) |
+| `docs`         | document manager                          | `github.com/lowcoai/lowco-sdk/go/docs`         | `@lowcoai/docs`         | `lowcoai-docs`         | `lowcoai_docs`         | [docs/docs.md](docs/docs.md)                 |
 | `flux`         | flux realtime WebSocket                   | `github.com/lowcoai/lowco-sdk/go/flux`         | `@lowcoai/flux`         | `lowcoai-flux`         | `lowcoai_flux`         | [npm/flux/README.md](npm/flux/README.md)     |
 | `auth`         | lowco OAuth (Authorization Code + PKCE)   | —                                                       | `@lowcoai/auth`         | `lowcoai-auth`         | `lowcoai_auth`         | [npm/auth/README.md](npm/auth/README.md)     |
 | `engage`       | engage event tracking                     | —                                                       | `@lowcoai/engage`       | `lowcoai-engage`       | `lowcoai_engage`       | [npm/engage/README.md](npm/engage/README.md) |
@@ -140,6 +146,28 @@ result, _ := client.Actions.Run(ctx, "action_123", integrations.RunActionRequest
 
 See [go/integrations/README.md](go/integrations/README.md).
 
+```bash
+go get github.com/lowcoai/lowco-sdk/go/docs
+```
+
+```go
+import "github.com/lowcoai/lowco-sdk/go/docs"
+
+client, _ := docs.NewClient(docs.Config{
+    Token: "<token-or-api-key>",
+    OrgID: "org_123",
+})
+bucket, _ := client.Buckets.Get(ctx)
+items, _ := client.Folders.List(ctx, bucket.Name, nil)
+file, _ := client.Files.Upload(ctx, bucket.Name,
+    docs.UploadFile{FileName: "q3.pdf", Data: data},
+    &docs.FileUploadOptions{ParentID: "reports"},
+)
+url, _ := client.Files.DownloadURL(ctx, bucket.Name, "reports/q3.pdf") // short-lived signed URL
+```
+
+See [go/docs/README.md](go/docs/README.md).
+
 ### npm
 
 ```bash
@@ -216,6 +244,31 @@ const result = await client.actions.run("action_123", {
 
 See [npm/integrations/README.md](npm/integrations/README.md).
 
+```bash
+npm install @lowcoai/docs
+```
+
+```ts
+import { readFile } from "node:fs/promises";
+import { DocsClient } from "@lowcoai/docs";
+
+const client = new DocsClient({
+  token: "<token-or-api-key>",
+  orgId: "org_123",
+});
+
+const bucket = (await client.buckets.get()).name!;
+const items = await client.folders.list(bucket);
+const file = await client.files.upload(
+  bucket,
+  { data: await readFile("q3.pdf"), fileName: "q3.pdf" },
+  { parentId: "reports" },
+);
+const url = await client.files.downloadUrl(bucket, "reports/q3.pdf"); // server runtimes only
+```
+
+See [npm/docs/README.md](npm/docs/README.md).
+
 ### Python
 
 Python 3.10+. Every HTTP product ships a sync client and an asyncio twin (`LowcodbClient` / `AsyncLowcodbClient`, …) with the same methods, built on httpx.
@@ -247,6 +300,17 @@ from lowcoai.integrations import IntegrationsClient
 
 workflows = WorkflowClient("<token-or-api-key>", org_id="org_123").workflows.list()
 apps = IntegrationsClient("<token-or-api-key>", org_id="org_123").applications.list()
+```
+
+```python
+from lowcoai.docs import DocsClient
+
+with DocsClient("<token-or-api-key>", org_id="org_123") as client:
+    bucket = client.buckets.get()["name"]
+    items = client.folders.list(bucket)
+    with open("q3.pdf", "rb") as f:
+        file = client.files.upload(bucket, ("q3.pdf", f), parent_id="reports")
+    url = client.files.download_url(bucket, "reports/q3.pdf")
 ```
 
 ```python
@@ -290,6 +354,18 @@ final flux = FluxClient(token: '<token-or-api-key>', orgId: 'org_123')..connect(
 flux.subscribe('channel:<schema>', events: ['messages.*']).bind('messages.insert', (data, msg) => print(data));
 ```
 
+```dart
+import 'package:lowcoai_docs/lowcoai_docs.dart';
+
+final client = DocsClient(token: '<token-or-api-key>', orgId: 'org_123');
+final bucket = (await client.buckets.get()).name!;
+final items = await client.folders.list(bucket);
+final file = await client.files.upload(
+    bucket, UploadFile(bytes: await File('q3.pdf').readAsBytes(), fileName: 'q3.pdf'),
+    parentId: 'reports');
+final url = await client.files.downloadUrl(bucket, 'reports/q3.pdf'); // not on Flutter web
+```
+
 In Flutter apps, `lowcoai_auth` provides `LowcoAuth` (a `ChangeNotifier`), `LowcoAuthProvider` and `WithAuthenticationRequired` for the lowco PKCE login. `lowcoai_engage` provides `LowcoAnalytics.instance` and a `LowcoAnalyticsObserver` for automatic screen views. See `flutter/<product>/README.md`.
 
 ---
@@ -326,13 +402,13 @@ Each package is self-contained; run its checks from its own folder.
 - Every SDK targets the fixed API host `https://api.lowco.ai` (`wss://ws.lowco.ai/` for flux) — base URLs are not configurable.
 - Every SDK authenticates with a required user token or API key sent as `Authorization: Bearer <value>`; user identity is derived from the token, so there is no `X-User-Id` header.
 - Org scoping uses the `X-Org-Id` header — never query params.
-- Every SDK speaks the service's enveloped JSON response shape (`{ success, data, error, message }`) and unwraps `data` for the caller.
+- Every SDK speaks its service's enveloped JSON response shape (`{ success, data, error, message }`; `{ status, data }` for docs) and unwraps `data` for the caller.
 - Errors surface as a typed exception (`*RequestError` / `*Error` class; `…Exception` in Dart) with `statusCode`, `message`, `code`, and the raw body for debugging.
 - Method names mirror the controller verbs in the corresponding service so the SDKs and server stay in lockstep (snake_case in Python, lowerCamelCase in Dart).
 - Wire payloads keep the server's field names in every language: TypedDicts with camelCase keys in Python, model classes with `fromJson` / `toJson` (nulls omitted) in Dart.
 
-NPM packages — `@lowcoai/lowcodb`, `@lowcoai/agentx`, `@lowcoai/workflow`, `@lowcoai/integrations`, `@lowcoai/flux`, `@lowcoai/auth`, `@lowcoai/engage`.
+NPM packages — `@lowcoai/lowcodb`, `@lowcoai/agentx`, `@lowcoai/workflow`, `@lowcoai/integrations`, `@lowcoai/docs`, `@lowcoai/flux`, `@lowcoai/auth`, `@lowcoai/engage`.
 
-PyPI packages — `lowcoai-lowcodb`, `lowcoai-agentx`, `lowcoai-workflow`, `lowcoai-integrations`, `lowcoai-flux`, `lowcoai-auth`, `lowcoai-engage`.
+PyPI packages — `lowcoai-lowcodb`, `lowcoai-agentx`, `lowcoai-workflow`, `lowcoai-integrations`, `lowcoai-docs`, `lowcoai-flux`, `lowcoai-auth`, `lowcoai-engage`.
 
-pub.dev packages — `lowcoai_lowcodb`, `lowcoai_agentx`, `lowcoai_workflow`, `lowcoai_integrations`, `lowcoai_flux`, `lowcoai_auth`, `lowcoai_engage`.
+pub.dev packages — `lowcoai_lowcodb`, `lowcoai_agentx`, `lowcoai_workflow`, `lowcoai_integrations`, `lowcoai_docs`, `lowcoai_flux`, `lowcoai_auth`, `lowcoai_engage`.
