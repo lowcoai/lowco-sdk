@@ -4,7 +4,7 @@ Dart / Flutter client for the **lowco flux** realtime WebSocket service. Pure Da
 
 ```yaml
 dependencies:
-  lowcoai_flux: ^0.1.0
+  lowcoai_flux: ^0.1.1
 ```
 
 ## Quick start
@@ -33,7 +33,7 @@ flux.sendMessage('tables:leads', 'ping', {'hello': 'world'});
 
 ## Options
 
-The client always connects to `wss://ws.lowco.ai/` (`wsUrl`).
+The client always connects to `wss://api.lowco.ai/v1/ws` (`wsUrl`).
 
 | Parameter           | Description                                                                          |
 | ------------------- | ------------------------------------------------------------------------------------ |

@@ -1,6 +1,6 @@
 name: lowcoai_flux
 description: Official Dart and Flutter client for the lowco flux realtime WebSocket pub/sub service (channels, event filters, auto-reconnect).
-version: 0.1.0
+version: 0.1.1
 repository: https://github.com/lowcoai/lowco-sdk/tree/main/flutter/flux
 topics:
   - lowco

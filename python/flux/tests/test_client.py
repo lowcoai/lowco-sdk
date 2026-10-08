@@ -3,7 +3,7 @@
 The scenarios mirror ``go/flux/client_test.go``: the stub records every frame
 the client sends, can reject handshakes, reject tokens after the upgrade (like
 the flux server) and drop connections, and the client is pointed at it with
-``connect=`` while it keeps building its real ``wss://ws.lowco.ai/`` URL.
+``connect=`` while it keeps building its real ``wss://api.lowco.ai/v1/ws`` URL.
 """
 
 from __future__ import annotations

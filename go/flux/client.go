@@ -18,7 +18,7 @@ import (
 )
 
 // DefaultWSURL is the fixed flux WebSocket endpoint every client connects to.
-const DefaultWSURL = "wss://ws.lowco.ai/"
+const DefaultWSURL = "wss://api.lowco.ai/v1/ws"
 
 const (
 	defaultHeartbeatInterval = 5 * time.Second

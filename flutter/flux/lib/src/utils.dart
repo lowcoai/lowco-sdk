@@ -1,7 +1,7 @@
 import 'dart:math';
 
 /// The fixed flux WebSocket endpoint every client connects to.
-const wsUrl = 'wss://ws.lowco.ai/';
+const wsUrl = 'wss://api.lowco.ai/v1/ws';
 
 /// Builds the connection URL: [wsUrl] with `token`, `orgId`, `cli` and then
 /// [queryParams] as query parameters. A key in [queryParams] that repeats one

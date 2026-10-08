@@ -46,7 +46,7 @@ asyncio.run(main())
 
 ## Options
 
-The client always connects to `wss://ws.lowco.ai/?token=…&orgId=…&cli=…&replay=1`. `replay=1` tells the server the client re-sends every subscription on connect.
+The client always connects to `wss://api.lowco.ai/v1/ws?token=…&orgId=…&cli=…&replay=1`. `replay=1` tells the server the client re-sends every subscription on connect.
 
 | Argument             | Description                                                                          |
 | -------------------- | ------------------------------------------------------------------------------------ |

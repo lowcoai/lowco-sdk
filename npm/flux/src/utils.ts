@@ -1,4 +1,4 @@
-export const WS_URL = "wss://ws.lowco.ai/";
+export const WS_URL = "wss://api.lowco.ai/v1/ws";
 
 export const generateClientId = (): string => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {

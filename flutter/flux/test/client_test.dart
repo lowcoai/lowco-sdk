@@ -40,7 +40,7 @@ void main() {
   });
 
   group('connection', () {
-    test('dials wss://ws.lowco.ai/ with token, orgId, cli, extra params and replay=1', () async {
+    test('dials wss://api.lowco.ai/v1/ws with token, orgId, cli, extra params and replay=1', () async {
       final stub = await FluxStub.start();
       final client = stub.client(queryParams: {'app': 'crm', 'replay': '0'});
       client.connect();
@@ -57,7 +57,7 @@ void main() {
       };
       expect(dialled.queryParameters, want);
       expect(stub.requests.single.queryParameters, want);
-      expect(stub.requests.single.path, '/');
+      expect(stub.requests.single.path, '/v1/ws');
     });
 
     test('connect() is a no-op while connecting or open', () async {

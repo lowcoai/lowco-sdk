@@ -64,7 +64,7 @@ async def _default_connect(url: str) -> FluxConnection:
 class FluxClient:
     """asyncio client for the flux realtime service.
 
-    One instance owns a single connection to ``wss://ws.lowco.ai/``,
+    One instance owns a single connection to ``wss://api.lowco.ai/v1/ws``,
     reconnects with exponential backoff, and replays every subscription
     (event filters included) on each reconnect.
 
