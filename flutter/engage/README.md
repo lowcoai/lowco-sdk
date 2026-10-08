@@ -16,8 +16,7 @@ import 'package:lowcoai_engage/lowcoai_engage.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LowcoAnalytics.instance.init(
-    // apiKey: the app's write key (engage → Settings → Apps).
-    EngageConfig(apiKey: 'ewk_…', onError: (e) => debugPrint('$e')),
+    EngageConfig(apiKey: '<api-key>', orgId: 'org_123', onError: (e) => debugPrint('$e')),
   );
   runApp(
     MaterialApp(
@@ -38,24 +37,10 @@ LowcoAnalytics.instance.identifyUser('user_123', {'email': 'alice@example.com'})
 
 | Field       | Description                                                                                          |
 | ----------- | ---------------------------------------------------------------------------------------------------- |
-| `apiKey`    | Sent as `Authorization: Bearer …`. Required; never logged (`toString()` redacts it). Use the app's write key (`ewk_…`). |
-| `orgId`     | Sent as the `X-Org-Id` header. Not needed with a write key; required with any other key.            |
-| `appId`     | Sent as the `X-Engage-App-Id` header, only when `apiKey` is not a write key. Defaults to the org's default app. |
+| `apiKey`    | API key sent as `Authorization: Bearer …`. Required; never logged (`toString()` redacts it).         |
+| `orgId`     | Sent as the `X-Org-Id` header. Required.                                                             |
 | `autoTrack` | On web, capture attribution from the page URL (`Uri.base`) during `init`. Default `false`.           |
 | `onError`   | Receives every delivery and storage error. Without it errors are only `debugPrint`ed in debug mode. |
-
-### Write keys
-
-Each engage app (a website, an iOS app, an Android app…) has a public **write key**, `ewk_` followed by 32 hex characters. Find it in engage under **Settings → Apps** and pass it as `apiKey` with no `orgId`: the key alone tells the service which organization and which app the events belong to.
-
-- A write key only authorizes event tracking (`POST /v1/engage/track`). It is meant to ship inside your app; it cannot read data or call any other API.
-- With a write key, `X-Engage-App-Id` is never sent, and the service ignores `X-Org-Id` if you also pass `orgId`.
-
-Other keys (a user JWT or platform API key) still work. Then `orgId` is required (`init` throws `ArgumentError` without it) and `appId` picks the app; without `appId` events go to the org's default app:
-
-```dart
-EngageConfig(apiKey: '<jwt-or-api-key>', orgId: 'org_123', appId: '<app-id>')
-```
 
 `init(config, {storage, httpClient})` also takes an `EngageStorage` (default `SharedPreferencesEngageStorage`) and your own `http.Client` (never closed by the SDK). Calling `init` again reconfigures the client.
 

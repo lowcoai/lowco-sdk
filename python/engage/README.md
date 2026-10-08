@@ -11,7 +11,7 @@ pip install lowcoai-engage
 ```python
 from lowcoai.engage import EngageClient
 
-engage = EngageClient("ewk_…")  # the app's write key; create once, share across requests
+engage = EngageClient("<api-key>", "org_123")  # create once, share across requests
 
 engage.track("signup_completed", {"plan": "pro"}, user_id="user_123")
 engage.page({"path": "/pricing", "title": "Pricing"}, user_id="user_123")
@@ -25,31 +25,11 @@ engage.close()  # or use `with EngageClient(...) as engage:`
 ```python
 from lowcoai.engage import AsyncEngageClient
 
-async with AsyncEngageClient("ewk_…") as engage:
+async with AsyncEngageClient("<api-key>", "org_123") as engage:
     await engage.track("order_paid", {"amount": 4999, "currency": "INR"}, user_id="user_123")
 ```
 
 `AsyncEngageClient` has the same methods as `EngageClient`; each one is a coroutine. Close it with `await engage.aclose()` if you don't use `async with`.
-
-## Authentication
-
-Each engage app (a website, an iOS app, a backend…) has a **write key**, `ewk_`
-followed by 32 hex characters. Find it in engage under **Settings → Apps** and
-pass it as `api_key` with no `org_id`: the key alone tells the service which org
-and which app the events belong to.
-
-- A write key only authorizes event tracking (`POST /v1/engage/track`); it
-  cannot read data or call any other API.
-- With a write key, `X-Engage-App-Id` is never sent, and the service ignores
-  `X-Org-Id` if you also pass `org_id`.
-
-Other keys (a user JWT or platform API key) still work. Then `org_id` is
-required (`ValueError` without it) and `app_id` picks the app; without `app_id`
-events go to the org's default app:
-
-```python
-engage = EngageClient("<jwt-or-api-key>", "org_123", app_id="<app-id>")
-```
 
 ## Stateless by design
 
@@ -69,9 +49,8 @@ Each call sends exactly one event (one HTTP request) and returns once the servic
 
 | Argument      | Description                                                                               |
 | ------------- | ----------------------------------------------------------------------------------------- |
-| `api_key`     | Sent as `Authorization: Bearer <api_key>`. Required. Use the app's write key (`ewk_…`).   |
-| `org_id`      | Sent as the `X-Org-Id` header. Not needed with a write key; required with any other key.  |
-| `app_id`      | Keyword-only. Sent as `X-Engage-App-Id`, only when `api_key` is not a write key. Defaults to the org's default app. |
+| `api_key`     | Engage API key, sent as `Authorization: Bearer <api_key>`. Required.                      |
+| `org_id`      | Sent as the `X-Org-Id` header. Required.                                                  |
 | `device_id`   | Default `device_id` for events that don't pass one. Defaults to a uuid4 per client.       |
 | `timeout`     | Per-request timeout in seconds (default `30`). `None` disables it.                        |
 | `http_client` | Your own `httpx.Client` / `httpx.AsyncClient` (proxies, retries, test transports). It is not closed by the SDK. |
@@ -134,6 +113,6 @@ except EngageError as err:
     print(err.status_code, err.message, err.code)
 ```
 
-When the service answers with an opaque platform code (`"AAS-00105"`) as the message, `message` carries the human-readable `error.details` instead; the code is still in `body`. Network failures and timeouts surface as `httpx` exceptions. `ValueError` is raised for a blank `api_key`, a missing or blank `org_id` when `api_key` is not a write key, a blank `event_name` or a blank `identify_user` `user_id`.
+When the service answers with an opaque platform code (`"AAS-00105"`) as the message, `message` carries the human-readable `error.details` instead; the code is still in `body`. Network failures and timeouts surface as `httpx` exceptions. `ValueError` is raised for a blank `api_key`, `org_id`, `event_name` or `identify_user` `user_id`.
 
 Unlike the browser SDK (which fires and forgets), calls wait for the service's answer. To keep tracking off the request path, call it from a background task or worker.

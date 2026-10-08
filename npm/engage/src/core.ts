@@ -1,4 +1,4 @@
-import { generateId, isWriteKey } from "./utils";
+import { generateId } from "./utils";
 import { Config, DeviceInfo, Event, LocationInfo, Metadata } from "./types";
 import UAParser from "ua-parser-js";
 
@@ -41,12 +41,6 @@ class LowcoAnalytics {
   }
 
   public init(config: Config) {
-    const configError = this.validateConfig(config);
-    if (configError) {
-      console.error(`Analytics initialization failed. ${configError}`);
-      return;
-    }
-
     this.config = { ...config };
     console.log("Analytics initialized with config:", config);
     this.initializeSession();
@@ -59,36 +53,6 @@ class LowcoAnalytics {
     if (this.canUseBrowserApis()) {
       this.setDeviceInfo();
     }
-  }
-
-  /**
-   * An app write key (`ewk_…`) identifies the org and the app by itself. Any
-   * other key needs `orgId`.
-   */
-  private validateConfig(config: Config): string | null {
-    if (!isWriteKey(config.apiKey) && config.orgId == null) {
-      return "Provide config.orgId, or use an app write key (ewk_…) as config.apiKey.";
-    }
-    return null;
-  }
-
-  /**
-   * `X-Org-Id` is sent only when `orgId` is set. `X-Engage-App-Id` is sent
-   * only when `appId` is set and `apiKey` is not a write key (a write key
-   * already selects the app, and the service ignores both headers then).
-   */
-  private buildHeaders(config: Config): Record<string, string> {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    };
-    if (config.orgId != null) {
-      headers["X-Org-Id"] = config.orgId;
-    }
-    if (config.appId && !isWriteKey(config.apiKey)) {
-      headers["X-Engage-App-Id"] = config.appId;
-    }
-    return headers;
   }
 
   private canUseBrowserApis(): boolean {
@@ -413,7 +377,11 @@ class LowcoAnalytics {
     fetch(`${BASE_URL}/v1/engage/track`, {
       method: "POST",
       body: JSON.stringify(event),
-      headers: this.buildHeaders(this.config),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.config.apiKey}`,
+        "X-Org-Id": this.config.orgId,
+      },
     });
   }
 }

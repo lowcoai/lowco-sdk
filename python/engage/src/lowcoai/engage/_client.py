@@ -24,12 +24,7 @@ class EngageClient(BaseClient):
     """Server-side client for the lowco engage track API.
 
     Every call sends one event to ``POST https://api.lowco.ai/v1/engage/track``
-    with ``Authorization: Bearer <api_key>``. Use the app's write key
-    (``ewk_...``, engage -> Settings -> Apps) as ``api_key``: it selects the
-    org and the app on its own, so ``org_id`` is not needed. With any other key
-    (a user JWT or platform API key) ``org_id`` is required and is sent as
-    ``X-Org-Id``; ``app_id`` (sent as ``X-Engage-App-Id``) then picks the app,
-    defaulting to the org's default app.
+    with ``Authorization: Bearer <api_key>`` and ``X-Org-Id: <org_id>``.
 
     Unlike the browser SDK, the client is **stateless**: it never remembers a
     user id (``identify_user`` does not bind later events to that user), keeps
@@ -46,30 +41,23 @@ class EngageClient(BaseClient):
     def __init__(
         self,
         api_key: str,
-        org_id: str | None = None,
+        org_id: str,
         *,
-        app_id: str | None = None,
         device_id: str | None = None,
         timeout: float | None = DEFAULT_TIMEOUT,
         http_client: httpx.Client | None = None,
     ) -> None:
         """
         Args:
-            api_key: Sent as ``Authorization: Bearer <api_key>``. Required. Use the
-                app's write key (``ewk_...``, engage -> Settings -> Apps); a write
-                key only authorizes event tracking.
-            org_id: Organisation id, sent as the ``X-Org-Id`` header when set.
-                Required unless ``api_key`` is an app write key.
-            app_id: Engage app id, sent as ``X-Engage-App-Id`` only when
-                ``api_key`` is not a write key. Without it events go to the
-                org's default app. Ignored with a write key.
+            api_key: Engage API key, sent as ``Authorization: Bearer <api_key>``. Required.
+            org_id: Organisation id, sent as the ``X-Org-Id`` header. Required.
             device_id: Default ``device_id`` for events that don't pass one.
                 Defaults to a uuid4 generated for this client instance.
             timeout: Per-request timeout in seconds (default 30). ``None`` disables it.
             http_client: Custom ``httpx.Client`` (proxies, retries, mocks). It is
                 not closed by :meth:`close`.
         """
-        super().__init__(api_key, org_id, app_id=app_id, device_id=device_id)
+        super().__init__(api_key, org_id, device_id=device_id)
         self._timeout = timeout
         self._owns_http = http_client is None
         self._http = http_client if http_client is not None else httpx.Client()
@@ -191,30 +179,23 @@ class AsyncEngageClient(BaseClient):
     def __init__(
         self,
         api_key: str,
-        org_id: str | None = None,
+        org_id: str,
         *,
-        app_id: str | None = None,
         device_id: str | None = None,
         timeout: float | None = DEFAULT_TIMEOUT,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         """
         Args:
-            api_key: Sent as ``Authorization: Bearer <api_key>``. Required. Use the
-                app's write key (``ewk_...``, engage -> Settings -> Apps); a write
-                key only authorizes event tracking.
-            org_id: Organisation id, sent as the ``X-Org-Id`` header when set.
-                Required unless ``api_key`` is an app write key.
-            app_id: Engage app id, sent as ``X-Engage-App-Id`` only when
-                ``api_key`` is not a write key. Without it events go to the
-                org's default app. Ignored with a write key.
+            api_key: Engage API key, sent as ``Authorization: Bearer <api_key>``. Required.
+            org_id: Organisation id, sent as the ``X-Org-Id`` header. Required.
             device_id: Default ``device_id`` for events that don't pass one.
                 Defaults to a uuid4 generated for this client instance.
             timeout: Per-request timeout in seconds (default 30). ``None`` disables it.
             http_client: Custom ``httpx.AsyncClient`` (proxies, retries, mocks). It is
                 not closed by :meth:`aclose`.
         """
-        super().__init__(api_key, org_id, app_id=app_id, device_id=device_id)
+        super().__init__(api_key, org_id, device_id=device_id)
         self._timeout = timeout
         self._owns_http = http_client is None
         self._http = http_client if http_client is not None else httpx.AsyncClient()

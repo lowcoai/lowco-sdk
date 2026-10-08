@@ -8,29 +8,16 @@ typedef Metadata = Map<String, dynamic>;
 class EngageConfig {
   const EngageConfig({
     required this.apiKey,
-    this.orgId,
-    this.appId,
+    required this.orgId,
     this.autoTrack = false,
     this.onError,
   });
 
-  /// Sent as `Authorization: Bearer <apiKey>`. Never logged.
-  ///
-  /// Use the app's write key (`ewk_...`, engage → Settings → Apps): it selects
-  /// the organization and the app on its own, so [orgId] and [appId] are not
-  /// needed. A write key is public (it ships inside your app) and only
-  /// authorizes event tracking. Any other key (a user JWT or platform API key)
-  /// needs [orgId].
+  /// API key, sent as `Authorization: Bearer <apiKey>`. Never logged.
   final String apiKey;
 
-  /// Organization id, sent as the `X-Org-Id` header when set. Required unless
-  /// [apiKey] is an app write key (`ewk_...`).
-  final String? orgId;
-
-  /// Engage app id, sent as the `X-Engage-App-Id` header when [apiKey] is not
-  /// a write key. Without it events go to the organization's default app.
-  /// Ignored with a write key, which already identifies the app.
-  final String? appId;
+  /// Organization id, sent as the `X-Org-Id` header.
+  final String orgId;
 
   /// On web, also capture attribution from the page URL (`Uri.base`) during
   /// `init`. Route page views come from `LowcoAnalyticsObserver`.
@@ -41,8 +28,7 @@ class EngageConfig {
   final void Function(Object error)? onError;
 
   @override
-  String toString() =>
-      'EngageConfig(orgId: $orgId, appId: $appId, autoTrack: $autoTrack, apiKey: <redacted>)';
+  String toString() => 'EngageConfig(orgId: $orgId, autoTrack: $autoTrack, apiKey: <redacted>)';
 }
 
 /// `device_info.browser` (web only).

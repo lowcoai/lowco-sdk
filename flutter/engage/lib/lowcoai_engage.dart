@@ -9,14 +9,12 @@ export 'src/analytics.dart'
         deviceIdStorageKey,
         engageTrackPath,
         firstTouchStorageKey,
-        headerAppId,
         headerOrgId,
         lowcoBaseUrl,
         sessionIdStorageKey,
         sessionLastEventStorageKey,
         sessionTimeout,
-        uuidV4,
-        writeKeyPrefix;
+        uuidV4;
 export 'src/models.dart' hide isoTimestamp;
 export 'src/observer.dart' show LowcoAnalyticsObserver;
 export 'src/storage.dart';

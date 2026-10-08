@@ -193,65 +193,6 @@ void main() {
     });
   });
 
-  group('write keys and apps', () {
-    const writeKey = 'ewk_0123456789abcdef0123456789abcdef';
-
-    test('a non-write key without orgId fails init', () async {
-      expect(
-        () => analytics().init(const EngageConfig(apiKey: 'key_secret')),
-        throwsArgumentError,
-      );
-      expect(
-        () => analytics().init(const EngageConfig(apiKey: 'key_secret', appId: 'app_9')),
-        throwsArgumentError,
-      );
-      expect(analytics().isInitialized, isFalse);
-    });
-
-    test('a write key needs no orgId and sends no X-Org-Id', () async {
-      await init(cfg: const EngageConfig(apiKey: writeKey));
-      await analytics().track('signup_completed');
-
-      final headers = rec.requests.single.headers;
-      expect(headers['Authorization'], 'Bearer $writeKey');
-      expect(headers.containsKey(headerOrgId), isFalse);
-      expect(headers.containsKey(headerAppId), isFalse);
-      expect(headers['Content-Type'], 'application/json');
-    });
-
-    test('a write key never sends X-Engage-App-Id', () async {
-      await init(cfg: const EngageConfig(apiKey: writeKey, orgId: 'org_1', appId: 'app_9'));
-      await analytics().track('x');
-
-      final headers = rec.requests.single.headers;
-      expect(headers['Authorization'], 'Bearer $writeKey');
-      expect(headers['X-Org-Id'], 'org_1'); // sent when set; the service ignores it
-      expect(headers.containsKey('X-Engage-App-Id'), isFalse);
-    });
-
-    test('appId is sent as X-Engage-App-Id with a non-write key', () async {
-      await init(cfg: const EngageConfig(apiKey: 'key_secret', orgId: 'org_1', appId: 'app_9'));
-      await analytics().track('x');
-
-      final headers = rec.requests.single.headers;
-      expect(headers['Authorization'], 'Bearer key_secret');
-      expect(headers['X-Org-Id'], 'org_1');
-      expect(headers['X-Engage-App-Id'], 'app_9');
-    });
-
-    test('no X-Engage-App-Id without appId', () async {
-      await init();
-      await analytics().track('x');
-      expect(rec.requests.single.headers.containsKey('X-Engage-App-Id'), isFalse);
-    });
-
-    test('toString shows appId and still redacts the key', () {
-      const cfg = EngageConfig(apiKey: writeKey, appId: 'app_9');
-      expect(cfg.toString(), contains('appId: app_9'));
-      expect(cfg.toString(), isNot(contains(writeKey)));
-    });
-  });
-
   group('errors', () {
     test('non-2xx answers go to onError, never to the caller', () async {
       final errors = <Object>[];
