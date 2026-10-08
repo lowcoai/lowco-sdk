@@ -113,10 +113,33 @@ export function LowcoAuthProvider({
   const [user, setUser] = useState<UserProfile | null>(null);
   const callbackHandled = useRef(false);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * De-duplicates concurrent refreshes. The server rotates refresh tokens and
+   * revokes the presented one, so two parallel exchanges would invalidate each
+   * other and drop the session.
+   */
+  const refreshInFlightRef = useRef<Promise<string> | null>(null);
 
   const storage = getStorage(cacheLocation);
   const transactionStorage = getTransactionStorage();
   const cacheKey = `lowco:tokens:${tenantId}:${clientId}`;
+
+  /** Persists a token set and pushes it to state, the host app and the user. */
+  function applyTokens(nextTokens: TokenSet) {
+    persistTokens(cacheKey, storage, nextTokens);
+    adoptTokens(nextTokens);
+  }
+
+  /**
+   * Pushes a token set already in storage to state, the host app and the user,
+   * and re-arms the proactive refresh for it.
+   */
+  function adoptTokens(stored: TokenSet) {
+    setTokens(stored);
+    onTokens(stored);
+    setUser(extractUser(stored));
+    scheduleTokenRefresh(stored);
+  }
 
   function scheduleTokenRefresh(tokenSet: TokenSet) {
     if (refreshTimerRef.current) {
@@ -126,30 +149,68 @@ export function LowcoAuthProvider({
     if (!tokenSet.refresh_token) return;
     const delay = tokenSet.expires_at - Date.now() - TOKEN_REFRESH_SKEW_MS;
     if (delay <= 0) return;
+    // Every open tab arms this timer for the same moment; runRefresh lets one
+    // of them exchange the token and the others adopt the result.
     refreshTimerRef.current = setTimeout(() => {
-      void (async () => {
-        try {
-          const refreshed = await refreshTokens({
-            domain,
-            tenantId,
-            clientId,
-            refreshToken: tokenSet.refresh_token!,
-          });
-          const nextTokens: TokenSet = {
-            ...tokenSet,
-            ...refreshed,
-            expires_at: Date.now() + refreshed.expires_in * 1000,
-          };
-          persistTokens(cacheKey, storage, nextTokens);
-          setTokens(nextTokens);
-          onTokens(nextTokens);
-          setUser(extractUser(nextTokens));
-          scheduleTokenRefresh(nextTokens);
-        } catch {
-          sessionExpiredRedirect();
-        }
-      })();
+      runRefresh().catch(() => sessionExpiredRedirect());
     }, delay);
+  }
+
+  /**
+   * Exchanges the stored refresh token for a new token set. Single-flighted in
+   * the tab and serialized across tabs by a Web Lock, and it always re-reads
+   * storage rather than closing over a token set, so a token another tab has
+   * already rotated is never replayed.
+   */
+  function runRefresh(): Promise<string> {
+    if (refreshInFlightRef.current) {
+      return refreshInFlightRef.current;
+    }
+    const pending = withCrossTabLock(`${cacheKey}:refresh`, async () => {
+      const current = readTokens(cacheKey, storage);
+      // Another tab may have refreshed while this one waited for the lock.
+      if (current?.access_token && isAccessTokenValid(current)) {
+        adoptTokens(current);
+        return current.access_token;
+      }
+      if (!current?.refresh_token) {
+        throw new Error("No refresh token available.");
+      }
+      try {
+        const refreshed = await refreshTokens({
+          domain,
+          tenantId,
+          clientId,
+          refreshToken: current.refresh_token,
+        });
+        const nextTokens: TokenSet = {
+          ...current,
+          ...refreshed,
+          expires_at: Date.now() + refreshed.expires_in * 1000,
+        };
+        applyTokens(nextTokens);
+        return nextTokens.access_token;
+      } catch (cause) {
+        // Without Web Locks another tab may have rotated the token while this
+        // exchange was in flight, which invalidates ours but leaves the
+        // session healthy.
+        const latest = readTokens(cacheKey, storage);
+        if (
+          latest?.access_token &&
+          latest.refresh_token !== current.refresh_token &&
+          isAccessTokenValid(latest)
+        ) {
+          adoptTokens(latest);
+          return latest.access_token;
+        }
+        throw cause;
+      }
+    });
+    refreshInFlightRef.current = pending;
+    void pending.catch(() => {}).finally(() => {
+      refreshInFlightRef.current = null;
+    });
+    return pending;
   }
 
   function sessionExpiredRedirect() {
@@ -213,22 +274,7 @@ export function LowcoAuthProvider({
 
       setIsLoading(true);
       try {
-        const refreshed = await refreshTokens({
-          domain,
-          tenantId,
-          clientId,
-          refreshToken: parsed.refresh_token,
-        });
-        const nextTokens: TokenSet = {
-          ...parsed,
-          ...refreshed,
-          expires_at: Date.now() + refreshed.expires_in * 1000,
-        };
-        persistTokens(cacheKey, storage, nextTokens);
-        setTokens(nextTokens);
-        onTokens(nextTokens);
-        setUser(extractUser(nextTokens));
-        scheduleTokenRefresh(nextTokens);
+        await runRefresh();
       } catch {
         clearTokens(cacheKey, storage);
         setTokens(null);
@@ -241,7 +287,29 @@ export function LowcoAuthProvider({
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    // Adopt tokens another tab minted; rotation makes ours stale the moment it
+    // refreshes, and replaying a revoked refresh token would end the session.
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== cacheKey || !event.newValue) {
+        return;
+      }
+      try {
+        const incoming = JSON.parse(event.newValue) as TokenSet;
+        if (incoming.access_token) {
+          adoptTokens(incoming);
+        }
+      } catch {
+        /* ignore malformed cross-tab writes */
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
     return () => {
+      window.removeEventListener("storage", onStorage);
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current);
       }
@@ -323,15 +391,10 @@ export function LowcoAuthProvider({
         redirectUri: transaction.redirectUri,
       });
 
-      const nextTokens: TokenSet = {
+      applyTokens({
         ...tokenResponse,
         expires_at: Date.now() + tokenResponse.expires_in * 1000,
-      };
-      persistTokens(cacheKey, storage, nextTokens);
-      setTokens(nextTokens);
-      onTokens(nextTokens);
-      setUser(extractUser(nextTokens));
-      scheduleTokenRefresh(nextTokens);
+      });
 
       const target = transaction.appState?.returnTo;
       onRedirectCallback?.(transaction.appState);
@@ -355,7 +418,8 @@ export function LowcoAuthProvider({
   }
 
   async function getAccessTokenSilently() {
-    const current = tokens ?? readTokens(cacheKey, storage);
+    // Storage first: another tab may have rotated the tokens held in state.
+    const current = readTokens(cacheKey, storage) ?? tokens;
     if (!current) {
       throw new Error("Not authenticated.");
     }
@@ -369,23 +433,7 @@ export function LowcoAuthProvider({
     }
 
     try {
-      const refreshed = await refreshTokens({
-        domain,
-        tenantId,
-        clientId,
-        refreshToken: current.refresh_token,
-      });
-      const nextTokens: TokenSet = {
-        ...current,
-        ...refreshed,
-        expires_at: Date.now() + refreshed.expires_in * 1000,
-      };
-      persistTokens(cacheKey, storage, nextTokens);
-      setTokens(nextTokens);
-      onTokens(nextTokens);
-      setUser(extractUser(nextTokens));
-      scheduleTokenRefresh(nextTokens);
-      return nextTokens.access_token;
+      return await runRefresh();
     } catch {
       sessionExpiredRedirect();
       throw new Error("Session expired.");
@@ -446,6 +494,22 @@ export function withAuthenticationRequired<P extends object>(
 
     return <Component {...props} />;
   };
+}
+
+/**
+ * Runs `task` holding a Web Lock shared by every tab of the origin. Tabs share
+ * one stored refresh token and the server rotates it, so two tabs exchanging it
+ * at once leaves the loser holding a revoked token. Runs unlocked where Web
+ * Locks are unavailable (insecure contexts, old browsers).
+ */
+async function withCrossTabLock<T>(
+  name: string,
+  task: () => Promise<T>,
+): Promise<T> {
+  if (typeof navigator === "undefined" || !navigator.locks) {
+    return task();
+  }
+  return navigator.locks.request(name, task);
 }
 
 function getStorage(cacheLocation: "memory" | "localstorage") {
