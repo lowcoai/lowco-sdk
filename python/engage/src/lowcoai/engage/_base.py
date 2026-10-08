@@ -15,6 +15,9 @@ from .types import DeviceInfo, Event, LocationInfo
 BASE_URL = "https://api.lowco.ai"
 TRACK_PATH = "/v1/engage/track"
 HEADER_ORG_ID = "X-Org-Id"
+HEADER_APP_ID = "X-Engage-App-Id"
+WRITE_KEY_PREFIX = "ewk_"
+"""An engage app write key is ``ewk_`` followed by 32 lowercase hex characters."""
 PAGE_VIEW_EVENT = "page_view"
 IDENTIFY_EVENT = "_lowco_identify"
 DEFAULT_TIMEOUT = 30.0
@@ -36,18 +39,34 @@ ATTRIBUTION_KEYS: tuple[str, ...] = (
 class BaseClient:
     """Holds configuration and builds / encodes events for both clients."""
 
-    def __init__(self, api_key: str, org_id: str, *, device_id: str | None) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        org_id: str | None,
+        *,
+        app_id: str | None,
+        device_id: str | None,
+    ) -> None:
         if not api_key or not api_key.strip():
             raise ValueError("EngageClient: api_key is required")
-        if not org_id or not org_id.strip():
-            raise ValueError("EngageClient: org_id is required")
+        write_key = is_write_key(api_key)
+        if org_id is not None and not org_id.strip():
+            org_id = None
+        if org_id is None and not write_key:
+            raise ValueError(
+                "EngageClient: org_id is required unless api_key is an app write key (ewk_...)"
+            )
         self._device_id = device_id or str(uuid.uuid4())
         self._track_url = BASE_URL + TRACK_PATH
         self._headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
-            HEADER_ORG_ID: org_id,
         }
+        if org_id is not None:
+            self._headers[HEADER_ORG_ID] = org_id
+        # A write key already selects the app; the service ignores the header then.
+        if app_id is not None and app_id.strip() and not write_key:
+            self._headers[HEADER_APP_ID] = app_id
 
     @property
     def device_id(self) -> str:
@@ -80,6 +99,15 @@ class BaseClient:
             "event_time": iso(event_time if event_time is not None else _utcnow()),
         }
         return cast(Event, {k: v for k, v in event.items() if v is not None})
+
+
+def is_write_key(api_key: str) -> bool:
+    """Whether ``api_key`` is an engage app write key (``ewk_...``).
+
+    A write key selects the org and the app on its own. Any other key (a user
+    JWT or platform API key) needs ``org_id``, and optionally ``app_id``.
+    """
+    return api_key.startswith(WRITE_KEY_PREFIX)
 
 
 def encode_event(event: Event) -> bytes:

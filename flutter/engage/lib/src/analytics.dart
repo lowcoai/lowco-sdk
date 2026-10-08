@@ -16,8 +16,16 @@ const String lowcoBaseUrl = 'https://api.lowco.ai';
 /// Path of the event ingestion endpoint.
 const String engageTrackPath = '/v1/engage/track';
 
-/// Header carrying the organization id.
+/// Header carrying the organization id (sent only when `orgId` is set).
 const String headerOrgId = 'X-Org-Id';
+
+/// Header carrying the engage app id. Sent only when `appId` is set and the
+/// api key is not a write key.
+const String headerAppId = 'X-Engage-App-Id';
+
+/// Prefix of an engage app write key (`ewk_` followed by 32 hex characters).
+/// A write key selects the organization and the app on its own.
+const String writeKeyPrefix = 'ewk_';
 
 /// Storage key of the persistent device (anonymous) id.
 const String deviceIdStorageKey = 'lowco_uuid';
@@ -54,7 +62,8 @@ final Uri _trackUri = Uri.parse('$lowcoBaseUrl$engageTrackPath');
 /// [instance] (the TS SDK's default export).
 ///
 /// ```dart
-/// await LowcoAnalytics.instance.init(const EngageConfig(apiKey: '...', orgId: 'org_123'));
+/// // apiKey: the app's write key (engage → Settings → Apps).
+/// await LowcoAnalytics.instance.init(const EngageConfig(apiKey: 'ewk_...'));
 /// LowcoAnalytics.instance.track('signup_completed', {'plan': 'pro'});
 /// ```
 ///
@@ -132,6 +141,10 @@ class LowcoAnalytics {
   ///
   /// On web with [EngageConfig.autoTrack], attribution is captured from the
   /// page URL ([Uri.base]).
+  ///
+  /// Throws [ArgumentError] when [EngageConfig.apiKey] is blank, or when
+  /// [EngageConfig.orgId] is missing or blank and the api key is not an app
+  /// write key (`ewk_...`).
   Future<void> init(
     EngageConfig config, {
     EngageStorage? storage,
@@ -140,8 +153,10 @@ class LowcoAnalytics {
     if (config.apiKey.trim().isEmpty) {
       throw ArgumentError('LowcoAnalytics: apiKey is required');
     }
-    if (config.orgId.trim().isEmpty) {
-      throw ArgumentError('LowcoAnalytics: orgId is required');
+    if (!_isWriteKey(config.apiKey) && _isBlank(config.orgId)) {
+      throw ArgumentError(
+        'LowcoAnalytics: orgId is required unless apiKey is an app write key ($writeKeyPrefix...)',
+      );
     }
     final generation = ++_generation;
     _config = null;
@@ -328,11 +343,7 @@ class LowcoAnalytics {
     try {
       final abort = Completer<void>();
       final request = http.AbortableRequest('POST', _trackUri, abortTrigger: abort.future)
-        ..headers.addAll({
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${config.apiKey}',
-          headerOrgId: config.orgId,
-        })
+        ..headers.addAll(_headers(config))
         ..bodyBytes = utf8.encode(jsonEncode(event.toJson(), toEncodable: _toEncodable));
       final response = await client.send(request).then(http.Response.fromStream).timeout(
         _requestTimeout,
@@ -347,6 +358,21 @@ class LowcoAnalytics {
     } catch (error) {
       _report(config, error);
     }
+  }
+
+  /// `X-Org-Id` only when an org id is set; `X-Engage-App-Id` only when an app
+  /// id is set and the key is not a write key (a write key already selects
+  /// the app, and the service ignores both headers then).
+  Map<String, String> _headers(EngageConfig config) {
+    final orgId = config.orgId;
+    final appId = config.appId;
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ${config.apiKey}',
+      if (orgId != null && orgId.trim().isNotEmpty) headerOrgId: orgId,
+      if (appId != null && appId.trim().isNotEmpty && !_isWriteKey(config.apiKey))
+        headerAppId: appId,
+    };
   }
 
   // --- Helpers -------------------------------------------------------------
@@ -392,6 +418,10 @@ class LowcoAnalytics {
     _ownsHttp = false;
   }
 }
+
+bool _isWriteKey(String apiKey) => apiKey.startsWith(writeKeyPrefix);
+
+bool _isBlank(String? value) => value == null || value.trim().isEmpty;
 
 /// Extracts the [attributionKeys] from [uri]'s query string and from the query
 /// part of its fragment (hash routing: `/#/landing?utm_source=x`). Empty values

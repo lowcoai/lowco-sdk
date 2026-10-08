@@ -49,10 +49,74 @@ def make_client(rec: Recorder, **kwargs: Any) -> EngageClient:
     )
 
 
-@pytest.mark.parametrize(("api_key", "org_id"), [("", "org_1"), ("  ", "org_1"), ("k", " ")])
-def test_api_key_and_org_id_are_required(api_key: str, org_id: str) -> None:
+@pytest.mark.parametrize(
+    ("api_key", "org_id"),
+    [("", "org_1"), ("  ", "org_1"), ("k", " "), ("k", ""), ("k", None), ("", None)],
+)
+def test_api_key_and_org_id_are_required(api_key: str, org_id: str | None) -> None:
     with pytest.raises(ValueError):
         EngageClient(api_key, org_id)
+
+
+def test_non_write_key_without_org_id_is_rejected() -> None:
+    with pytest.raises(ValueError, match="org_id is required"):
+        EngageClient("key_123")
+    with pytest.raises(ValueError, match="org_id is required"):
+        EngageClient("key_123", app_id="app_9")
+
+
+WRITE_KEY = "ewk_0123456789abcdef0123456789abcdef"
+
+
+def make_write_key_client(rec: Recorder, **kwargs: Any) -> EngageClient:
+    return EngageClient(
+        WRITE_KEY,
+        http_client=httpx.Client(transport=httpx.MockTransport(rec)),
+        **kwargs,
+    )
+
+
+def test_write_key_without_org_id_sends_no_org_header() -> None:
+    rec = Recorder()
+    client = make_write_key_client(rec)
+    client.track("signup_completed")
+    headers = rec.last.headers
+    assert headers["Authorization"] == f"Bearer {WRITE_KEY}"
+    assert "X-Org-Id" not in headers
+    assert "X-Engage-App-Id" not in headers
+
+
+def test_write_key_never_sends_app_header() -> None:
+    rec = Recorder()
+    client = make_write_key_client(rec, org_id="org_1", app_id="app_9")
+    client.track("x")
+    headers = rec.last.headers
+    assert headers["Authorization"] == f"Bearer {WRITE_KEY}"
+    assert headers["X-Org-Id"] == "org_1"  # sent when set; the service ignores it
+    assert "X-Engage-App-Id" not in headers
+
+
+def test_write_key_with_blank_org_id_sends_no_org_header() -> None:
+    rec = Recorder()
+    make_write_key_client(rec, org_id=" ").track("x")
+    assert "X-Org-Id" not in rec.last.headers
+
+
+def test_app_id_is_sent_with_a_non_write_key() -> None:
+    rec = Recorder()
+    make_client(rec, app_id="app_9").track("x")
+    headers = rec.last.headers
+    assert headers["Authorization"] == "Bearer key_123"
+    assert headers["X-Org-Id"] == "org_1"
+    assert headers["X-Engage-App-Id"] == "app_9"
+
+
+def test_no_app_header_without_app_id() -> None:
+    rec = Recorder()
+    make_client(rec).track("x")
+    assert "X-Engage-App-Id" not in rec.last.headers
+    make_client(rec, app_id="  ").track("x")
+    assert "X-Engage-App-Id" not in rec.last.headers
 
 
 def test_track_sends_one_event_with_headers_and_url() -> None:

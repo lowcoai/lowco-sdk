@@ -1,8 +1,17 @@
 import type { Metadata } from "./types";
+import { isWriteKey } from "./utils";
 
 export interface InlineSnippetOptions {
+  /**
+   * The app's write key (`ewk_…`, recommended) or another API key. With a
+   * write key the snippet passes `apiKey` only: the key selects the org and
+   * the app.
+   */
   apiKey?: string;
+  /** Emitted only when `apiKey` is not a write key. */
   orgId?: string;
+  /** Emitted, when given, only when `apiKey` is not a write key. */
+  appId?: string;
   autoTrack?: boolean;
   eventName?: string;
   eventData?: Metadata;
@@ -27,13 +36,14 @@ function stringifyObject(value: Record<string, unknown>): string {
 export function createInlineSnippet({
   apiKey = "YOUR_API_KEY",
   orgId = "YOUR_ORG_ID",
+  appId,
   autoTrack = true,
   eventName = "signup_completed",
   eventData,
 }: InlineSnippetOptions = {}): string {
   const config = stringifyObject({
     apiKey,
-    orgId,
+    ...(isWriteKey(apiKey) ? {} : { orgId, appId }),
     autoTrack,
   });
 

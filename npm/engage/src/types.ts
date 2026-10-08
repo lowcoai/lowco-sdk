@@ -1,6 +1,26 @@
 export interface Config {
+  /**
+   * Sent as `Authorization: Bearer <apiKey>`.
+   *
+   * Use the app's write key (`ewk_…`, engage → Settings → Apps): it selects
+   * the org and the app on its own, so `orgId` and `appId` are not needed. A
+   * write key is public (it ships inside your app) and only authorizes event
+   * tracking.
+   *
+   * Any other key (a user JWT or platform API key) needs `orgId`.
+   */
   apiKey: string;
-  orgId: string;
+  /**
+   * Sent as `X-Org-Id`. Required unless `apiKey` is an app write key
+   * (`ewk_…`), which already identifies the org.
+   */
+  orgId?: string;
+  /**
+   * Engage app to track into, sent as `X-Engage-App-Id` when `apiKey` is not a
+   * write key. Without it, events go to the org's default app. Ignored with a
+   * write key, which already identifies the app.
+   */
+  appId?: string;
   autoTrack?: boolean;
 }
 

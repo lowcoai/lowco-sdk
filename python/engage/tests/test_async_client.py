@@ -54,6 +54,31 @@ async def test_async_track_page_identify() -> None:
     assert bodies[2]["device_id"] == "dev_2"
 
 
+async def test_async_write_key_and_app_id_headers() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200)
+
+    write_key = "ewk_0123456789abcdef0123456789abcdef"
+    transport = httpx.MockTransport(handler)
+    async with AsyncEngageClient(
+        write_key, app_id="app_9", http_client=httpx.AsyncClient(transport=transport)
+    ) as client:
+        await client.track("x")
+    async with make_client(handler, app_id="app_9") as client:
+        await client.track("x")
+
+    assert seen[0].headers["Authorization"] == f"Bearer {write_key}"
+    assert "X-Org-Id" not in seen[0].headers
+    assert "X-Engage-App-Id" not in seen[0].headers
+    assert seen[1].headers["X-Org-Id"] == "org_1"
+    assert seen[1].headers["X-Engage-App-Id"] == "app_9"
+    with pytest.raises(ValueError, match="org_id is required"):
+        AsyncEngageClient("key_123")
+
+
 async def test_async_error_mapping() -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(
