@@ -1,0 +1,19 @@
+name: lowcoai_agentx
+description: Official Dart and Flutter client for the lowco agentx services (agent manager, knowledge bases, A2A executor with SSE streaming).
+version: 0.1.0
+repository: https://github.com/lowcoai/lowco-sdk/tree/main/flutter/agentx
+topics:
+  - lowco
+  - ai
+  - agents
+  - sdk
+
+environment:
+  sdk: ^3.4.0
+
+dependencies:
+  http: ^1.5.0
+
+dev_dependencies:
+  lints: ">=5.0.0 <7.0.0"
+  test: ^1.25.0

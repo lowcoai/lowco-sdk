@@ -1,0 +1,17 @@
+node_modules
+npm/engage/dist
+dist
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+
+# Dart / Flutter
+.dart_tool/
+pubspec.lock

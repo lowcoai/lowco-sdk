@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lowcoai-agentx"
+version = "0.1.0"
+description = "Official Python client for the agentx backend (agent-manager, agent-kb, agent-executor)."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.25,<1",
+    "typing-extensions>=4.7",
+]
+keywords = ["agentx", "lowco", "sdk", "client", "agents", "a2a", "llm"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+    "Framework :: AsyncIO",
+]
+
+[project.urls]
+Repository = "https://github.com/lowcoai/lowco-sdk"
+Source = "https://github.com/lowcoai/lowco-sdk/tree/main/python/agentx"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "mypy>=1.10", "ruff>=0.5"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lowcoai"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+explicit_package_bases = true
+# Responses are decoded JSON typed as the documented TypedDict (like `as T` in
+# the TypeScript SDK), so returning `Any` from endpoint methods is intended.
+warn_return_any = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]

@@ -1,0 +1,169 @@
+# @lowcoai/workflow full specification
+
+## Package
+
+- Name: `@lowcoai/workflow`
+- Language: TypeScript
+- Entrypoint: `src/index.ts`
+- Runtime requirement: Fetch API available (Node 18+ or browser) or custom `fetch` injected
+
+## Root client
+
+```ts
+class WorkflowClient {
+  readonly workflows: WorkflowsResource;
+  readonly environments: EnvironmentsResource;
+  readonly functions: FunctionsResource;
+  readonly executions: ExecutionsResource;
+  readonly activities: ActivitiesResource;
+  readonly humanTasks: HumanTasksResource;
+  readonly analytics: AnalyticsResource;
+  readonly dryRun: DryRunResource;
+  readonly webhooks: WebhooksResource;
+}
+```
+
+Access pattern:
+
+- `const client = new WorkflowClient(config)`
+- `client.workflows.list(...)`
+
+## Configuration
+
+```ts
+interface SDKConfig {
+  token: string;   // required; user token or API key, becomes Authorization: Bearer <token>
+  orgId?: string;  // becomes X-Org-Id
+  timeoutMs?: number; // default 30000
+  headers?: Record<string, string>;
+  fetch?: typeof globalThis.fetch;
+}
+// All requests go to https://api.lowco.ai
+```
+
+## Error model
+
+- Throws `WorkflowError`
+  - `status`: HTTP status code (`0` for transport/setup errors and for the deprecated webhook methods, which send no request)
+  - `payload`: parsed JSON payload when available
+
+## Response model
+
+- If server returns envelope object with `data`, SDK returns `data`
+- Otherwise SDK returns full parsed response payload
+
+## Resources and methods
+
+### workflows
+
+- `list(query?)` -> `GET /v1/wf/workflows`
+- `count(query?)` -> `GET /v1/wf/workflows/count`
+- `getById(id)` -> `GET /v1/wf/workflows/:id`
+- `create(payload)` -> `POST /v1/wf/workflows`
+- `update(id, payload)` -> `PUT /v1/wf/workflows/:id`
+- `delete(id)` -> `DELETE /v1/wf/workflows/:id`
+- `run(payload)` -> `POST /v1/wf/workflows/run`
+- `versions(id, query?)` -> `GET /v1/wf/workflows/:id/versions`
+- `publish(id, payload)` -> `POST /v1/wf/workflows/:id/publish`
+- `published(query?)` -> `GET /v1/wf/workflows/published`
+- `publishedCount(query?)` -> `GET /v1/wf/workflows/published/count`
+- `getPublishedById(id)` -> `GET /v1/wf/workflows/published/:id`
+- `updatePublished(id, payload)` -> `PUT /v1/wf/workflows/published/:id`
+- `deletePublished(id)` -> `DELETE /v1/wf/workflows/published/:id`
+- `webPublished(query?)` -> `GET /v1/wf/workflows/published/web`
+- `webPublishedById(id)` -> `GET /v1/wf/workflows/published/web/:id`
+- `searchPublishedTemplates({ q?, category?, limit? })` -> `GET /v1/wf/workflows/published/web/search`
+
+Run semantics:
+
+- Start execution: include `workflowId`
+- Resume execution: include `workflowId`, `executionId`, and `activityId`
+
+### environments
+
+- `list(query?)` -> `GET /v1/wf/environments`
+- `getById(id)` -> `GET /v1/wf/environments/:id`
+- `create(payload)` -> `POST /v1/wf/environments`
+- `update(id, payload)` -> `PUT /v1/wf/environments/:id`
+- `delete(id)` -> `DELETE /v1/wf/environments/:id`
+- `setDefault(id)` -> `PATCH /v1/wf/environments/:id/default`
+
+### functions
+
+- `list(query?)` -> `GET /v1/wf/functions`
+- `getById(id)` -> `GET /v1/wf/functions/:id`
+- `create(payload)` -> `POST /v1/wf/functions`
+- `update(id, payload)` -> `PUT /v1/wf/functions/:id`
+- `delete(id)` -> `DELETE /v1/wf/functions/:id`
+- `versions(id, query?)` -> `GET /v1/wf/functions/:id/versions`
+- `execute(id, params?)` -> `POST /v1/wf/functions/:id/execute`
+
+### executions
+
+- `list(query?)` -> `GET /v1/wf/executions`
+- `count(query?)` -> `GET /v1/wf/executions/count`
+- `getById(id)` -> `GET /v1/wf/executions/:id`
+- `logs(id)` -> `GET /v1/wf/executions/:id/logs`
+
+### activities
+
+- `list(query?)` -> `GET /v1/wf/activities`
+- `count(query?)` -> `GET /v1/wf/activities/count`
+- `getById(id)` -> `GET /v1/wf/activities/:id`
+- `logs(id)` -> `GET /v1/wf/activities/:id/logs`
+
+### humanTasks
+
+- `list(query?)` -> `GET /v1/wf/human-tasks`
+- `getById(id)` -> `GET /v1/wf/human-tasks/:id`
+- `complete(id, action)` -> `PATCH /v1/wf/human-tasks/:id/complete`
+
+### analytics
+
+- `default()` -> `GET /v1/wf/analytics`
+- `getById(id)` -> `GET /v1/wf/analytics/:id`
+
+### dryRun
+
+- `execute(payload)` -> `POST /v1/wf/dryrun`
+
+Payload:
+
+```ts
+{
+  executionId: string;
+  expression: string;
+  typeOfExpression: "object" | "string" | "statement" | "map";
+  activityId: string;
+}
+```
+
+### webhooks
+
+- `trigger(workflowId, payload?, query?)` -> `POST /v1/wf/webhook/:id`
+  - Runs the workflow with `payload` as its input
+  - Query: `env`, `triggeredBy`, `async`
+
+Deprecated, do not use. The workflow API serves only the trigger route, and webhook registration is handled by the integrations service. Each method below rejects with `WorkflowError` (`status: 0`, `payload: { code: "unsupported_operation", operation }`) and sends no request:
+
+- `listByWorkflow(workflowId)`
+- `create(workflowId, payload)`. It used to POST to the trigger route, so it ran the workflow with the webhook config as input.
+- `update(webhookId, payload)`
+- `delete(workflowId)`
+
+## Core exported types
+
+- `Workflow`, `WorkflowUpdateRequest`, `RunWorkflowRequest`
+- `Environment`, `Variable`
+- `FunctionEntity`, `FunctionVersionRequest`
+- `Execution`, `ActivityExecutionHistory`, `ActivityHistoryResponse`
+- `HumanTask`, `HumanTaskAction`
+- `WorkflowPublish`
+- `DryRunRequest`, `WebhookCreateRequest` (deprecated, used only by the deprecated webhook methods)
+- `PaginationQuery`, `RequestOptions`
+
+## Suggested deployment for LLM consumption
+
+- Host `README.md`, `llms.txt`, and `llms-full.txt` at stable URLs
+- Keep method names and endpoint routes unchanged between releases when possible
+- Include semantic version in docs and changelog

@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lowcoai-engage"
+version = "0.1.0"
+description = "Official server-side Python client for the lowco engage event-tracking service."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.25,<1",
+    "typing-extensions>=4.7",
+]
+keywords = ["engage", "analytics", "tracking", "events", "lowco", "sdk", "client"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+    "Framework :: AsyncIO",
+]
+
+[project.urls]
+Repository = "https://github.com/lowcoai/lowco-sdk"
+Source = "https://github.com/lowcoai/lowco-sdk/tree/main/python/engage"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "mypy>=1.10", "ruff>=0.5"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lowcoai"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+explicit_package_bases = true
+warn_return_any = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]

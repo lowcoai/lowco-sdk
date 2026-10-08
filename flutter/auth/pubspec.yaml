@@ -1,0 +1,26 @@
+name: lowcoai_auth
+description: Official Flutter SDK for lowco sign-in (OAuth 2.0 Authorization Code + PKCE) with secure token storage, silent refresh and route guards.
+version: 0.1.0
+repository: https://github.com/lowcoai/lowco-sdk/tree/main/flutter/auth
+topics:
+  - lowco
+  - auth
+  - oauth
+  - pkce
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  crypto: ^3.0.3
+  flutter:
+    sdk: flutter
+  flutter_secure_storage: ">=9.2.0 <12.0.0"
+  flutter_web_auth_2: ^5.0.0
+  http: ^1.5.0
+
+dev_dependencies:
+  flutter_lints: ">=5.0.0 <7.0.0"
+  flutter_test:
+    sdk: flutter

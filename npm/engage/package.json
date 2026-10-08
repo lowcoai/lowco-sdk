@@ -1,0 +1,74 @@
+{
+  "name": "@lowcoai/engage",
+  "version": "0.1.2",
+  "description": "Browser analytics SDK for the lowco engage service.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lowcoai/lowco-sdk.git",
+    "directory": "npm/engage"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "unpkg": "./dist/lowco-analytics.global.js",
+  "jsdelivr": "./dist/lowco-analytics.global.js",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./snippet": {
+      "import": {
+        "types": "./dist/snippet.d.ts",
+        "default": "./dist/snippet.js"
+      },
+      "require": {
+        "types": "./dist/snippet.d.cts",
+        "default": "./dist/snippet.cjs"
+      }
+    },
+    "./script": "./dist/lowco-analytics.global.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build:lib": "tsup src/index.ts src/snippet.ts --format cjs,esm --dts --clean --target es2020",
+    "build:browser": "tsup --entry.lowco-analytics src/browser.ts --format iife --global-name LowcoAnalytics --out-dir dist --target es2020 --minify --no-clean",
+    "build": "npm run build:lib && npm run build:browser",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "ua-parser-js": "^1.0.38"
+  },
+  "devDependencies": {
+    "@types/ua-parser-js": "^0.7.39",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  },
+  "keywords": [
+    "analytics",
+    "engage",
+    "lowco",
+    "sdk",
+    "browser",
+    "tracking"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
