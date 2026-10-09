@@ -2096,7 +2096,7 @@ export interface SettingsPatch {
   default_webhook_ids?: string[];
   /** docai/classify labels used when a call sends none; [] restores the standard labels */
   docai_labels?: string[];
-  /** Decimal string */
+  /** Decimal string. In live it may not exceed the plan's ceiling (each priced meter's hard cap times its price; 422 on monthly_credit_cap) */
   monthly_credit_cap?: string;
   retention_input_hours?: number;
   /** 0 is zero retention */

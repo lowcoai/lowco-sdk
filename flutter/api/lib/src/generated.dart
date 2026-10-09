@@ -7012,7 +7012,7 @@ class SettingsPatch {
   /// docai/classify labels used when a call sends none; \[] restores the standard labels
   final List<String>? docaiLabels;
 
-  /// Decimal string
+  /// Decimal string. In live it may not exceed the plan's ceiling (each priced meter's hard cap times its price; 422 on monthly_credit_cap)
   final String? monthlyCreditCap;
 
   final int? retentionInputHours;

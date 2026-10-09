@@ -2276,7 +2276,7 @@ type SettingsPatch struct {
 	DefaultWebhookIds     []string `json:"default_webhook_ids,omitempty"`
 	// docai/classify labels used when a call sends none; [] restores the standard labels
 	DocAILabels []string `json:"docai_labels,omitempty"`
-	// Decimal string
+	// Decimal string. In live it may not exceed the plan's ceiling (each priced meter's hard cap times its price; 422 on monthly_credit_cap)
 	MonthlyCreditCap    *string `json:"monthly_credit_cap,omitempty"`
 	RetentionInputHours *int    `json:"retention_input_hours,omitempty"`
 	// 0 is zero retention

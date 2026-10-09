@@ -1938,7 +1938,7 @@ class SettingsPatch(TypedDict):
     docai_labels: NotRequired[list[str]]
     """docai/classify labels used when a call sends none; [] restores the standard labels"""
     monthly_credit_cap: NotRequired[str]
-    """Decimal string"""
+    """Decimal string. In live it may not exceed the plan's ceiling (each priced meter's hard cap times its price; 422 on monthly_credit_cap)"""
     retention_input_hours: NotRequired[int]
     retention_output_hours: NotRequired[int]
     """0 is zero retention"""
