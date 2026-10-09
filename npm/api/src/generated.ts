@@ -162,6 +162,31 @@ export interface AuditListQuery {
   format?: "json" | "csv";
 }
 
+/** A page; pass next_cursor as cursor for the next one (null at the end). */
+export interface AuditListVerifyData {
+  items: VerifyAuditRow[];
+  next_cursor: string | null;
+}
+
+export interface AuditListVerifyQuery {
+  /** Only this operation */
+  operation?: "aadhaar-offline" | "bank-account" | "cin" | "driving-licence" | "email" | "fssai" | "gstin" | "iec" | "ifsc" | "mobile" | "pan" | "pan-aadhaar-link" | "passport" | "udyam" | "upi" | "vehicle-rc" | "voter-id";
+  result?: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged */
+  identifier?: string;
+  reference_id?: string;
+  /** A batch's rows */
+  job_id?: string;
+  created_after?: string;
+  created_before?: string;
+  /** Page size */
+  limit?: number;
+  /** next_cursor of the previous page. */
+  cursor?: string;
+  /** csv exports every matching row (up to 10,000; X-Lowco-Export-Truncated when more) */
+  format?: "json" | "csv";
+}
+
 /** PDF points from the top-left of the upright page */
 export interface BBox {
   h: number;
@@ -2444,6 +2469,1410 @@ export interface ValidationIssue {
   message: string;
 }
 
+/** The operation's options. */
+export interface VerifyAadhaarOfflineParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** An extra file input (xml_zip) */
+  xml_zip?: FileInput;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+  /** The secure QR's decimal payload */
+  secure_qr?: string;
+  /** The zip's 4-character share code */
+  share_code?: string;
+}
+
+/** The operation's options. */
+export interface VerifyAadhaarOfflineRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+  /** The secure QR's decimal payload */
+  secure_qr?: string;
+  /** The zip's 4-character share code */
+  share_code?: string;
+  /** An extra file input (xml_zip); in multipart, a part named xml_zip */
+  xml_zip?: FileRef;
+}
+
+/** The common verify response */
+export interface VerifyAadhaarOfflineResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: form, name, gender, date_of_birth, aadhaar_last4, mobile_last4, address, signature_valid, document_age_days, has_photo. */
+  details: VerifyAadhaarOfflineResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyAadhaarOfflineResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: form, name, gender, date_of_birth, aadhaar_last4, mobile_last4, address, signature_valid, document_age_days, has_photo. */
+export interface VerifyAadhaarOfflineResultDetails {
+  aadhaar_last4?: string;
+  address?: VerifyAadhaarOfflineResultDetailsAddress;
+  date_of_birth?: string;
+  document_age_days?: number;
+  form?: string;
+  gender?: string;
+  has_photo?: boolean;
+  mobile_last4?: string;
+  name?: string;
+  signature_valid?: boolean;
+}
+
+export interface VerifyAadhaarOfflineResultDetailsAddress {
+  care_of?: string;
+  country?: string;
+  district?: string;
+  house?: string;
+  locality?: string;
+  pincode?: string;
+  state?: string;
+  street?: string;
+  vtc?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyAadhaarOfflineResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** One lookup in verify_audit (append-only; kept until retain_until) */
+export interface VerifyAuditRow {
+  actor_id: string;
+  consent: boolean;
+  created_at: string;
+  environment: string;
+  id: string;
+  /** HMAC-SHA-256 fingerprint of the normalised identifier (an Aadhaar document's reference id) */
+  identifier_hash: string;
+  identifier_last4: string;
+  /** Set for a batch item or a promoted call */
+  job_id: string;
+  key_id: string;
+  operation: string;
+  purpose: string;
+  reference_id: string;
+  request_id: string;
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The org's verify_audit_retention_days after created_at */
+  retain_until: string;
+}
+
+/** The operation's options. */
+export interface VerifyBankAccountParams {
+  /** 9 to 18 digits */
+  account_number: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 11-character IFSC */
+  ifsc: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyBankAccountRequest {
+  /** 9 to 18 digits */
+  account_number: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 11-character IFSC */
+  ifsc: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyBankAccountResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: account_holder, account_status, bank, branch, method. */
+  details: VerifyBankAccountResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyBankAccountResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: account_holder, account_status, bank, branch, method. */
+export interface VerifyBankAccountResultDetails {
+  account_holder?: string;
+  account_status?: string;
+  bank?: string;
+  branch?: string;
+  method?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyBankAccountResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyBatchParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Up to 500 lookups, answered in this order */
+  items: Array<Record<string, unknown>>;
+  /** The verify operation every item runs */
+  operation: "gstin" | "pan" | "cin" | "udyam" | "fssai" | "iec" | "bank-account" | "ifsc" | "upi" | "vehicle-rc" | "driving-licence" | "voter-id" | "passport" | "pan-aadhaar-link" | "mobile" | "email";
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyBatchRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Up to 500 lookups, answered in this order */
+  items: Array<Record<string, unknown>>;
+  /** The verify operation every item runs */
+  operation: "gstin" | "pan" | "cin" | "udyam" | "fssai" | "iec" | "bank-account" | "ifsc" | "upi" | "vehicle-rc" | "driving-licence" | "voter-id" | "passport" | "pan-aadhaar-link" | "mobile" | "email";
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** A verify/batch job's result */
+export interface VerifyBatchResult {
+  /** Items */
+  count: number;
+  /** Items refused before any lookup */
+  failed: number;
+  /** In input order */
+  items: VerifyBatchResultItem[];
+  operation: string;
+  /** Items per result */
+  results: Record<string, number>;
+}
+
+/** One item: the common response, or error */
+export interface VerifyBatchResultItem {
+  checked_at?: string;
+  /** The operation's details */
+  details?: Record<string, unknown>;
+  /** Why the item was not looked up (free, not audited): the error its own call would have answered */
+  error?: VerifyBatchResultItemsItemError;
+  /** The item's place in the request */
+  index: number;
+  /** With name in the request and a name at the source */
+  name_match?: VerifyBatchResultItemsItemNameMatch | null;
+  /** Your reference_id */
+  reference_id?: string;
+  request_id?: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result?: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source?: string;
+  /** true only for result valid */
+  verified?: boolean;
+}
+
+/** Why the item was not looked up (free, not audited): the error its own call would have answered */
+export interface VerifyBatchResultItemsItemError {
+  message: string;
+  param?: string;
+  reason: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyBatchResultItemsItemNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyCinParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** 21-character CIN */
+  cin?: string;
+  /** Add directors[] */
+  include_directors?: boolean;
+  /** LLPIN, AAA-1234 */
+  llpin?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyCinRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** 21-character CIN */
+  cin?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Add directors[] */
+  include_directors?: boolean;
+  /** LLPIN, AAA-1234 */
+  llpin?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyCinResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: company_name, status, class, roc, incorporation_date, authorised_capital, paid_up_capital, registered_address, directors. */
+  details: VerifyCinResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyCinResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: company_name, status, class, roc, incorporation_date, authorised_capital, paid_up_capital, registered_address, directors. */
+export interface VerifyCinResultDetails {
+  authorised_capital?: number;
+  class?: string;
+  company_name?: string;
+  directors?: VerifyCinResultDetailsDirector[];
+  incorporation_date?: string;
+  paid_up_capital?: number;
+  registered_address?: string;
+  roc?: string;
+  status?: string;
+}
+
+export interface VerifyCinResultDetailsDirector {
+  appointed_on?: string;
+  designation?: string;
+  din?: string;
+  name?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyCinResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyDrivingLicenceParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** YYYY-MM-DD */
+  date_of_birth: string;
+  /** 15 characters, MH1220110012345 */
+  dl_number: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyDrivingLicenceRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** YYYY-MM-DD */
+  date_of_birth: string;
+  /** 15 characters, MH1220110012345 */
+  dl_number: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyDrivingLicenceResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: holder_name, status, valid_from, valid_upto, classes, rto. */
+  details: VerifyDrivingLicenceResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyDrivingLicenceResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: holder_name, status, valid_from, valid_upto, classes, rto. */
+export interface VerifyDrivingLicenceResultDetails {
+  classes?: string[];
+  holder_name?: string;
+  rto?: string;
+  status?: string;
+  valid_from?: string;
+  valid_upto?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyDrivingLicenceResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyEmailParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** name@domain */
+  email: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyEmailRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** name@domain */
+  email: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyEmailResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: syntax_valid, mx_found, disposable, role_address, deliverable, mailbox_status, suggestion. */
+  details: VerifyEmailResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyEmailResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: syntax_valid, mx_found, disposable, role_address, deliverable, mailbox_status, suggestion. */
+export interface VerifyEmailResultDetails {
+  deliverable?: boolean;
+  disposable?: boolean;
+  mailbox_status?: string;
+  mx_found?: boolean;
+  role_address?: boolean;
+  suggestion?: string | null;
+  syntax_valid?: boolean;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyEmailResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyFssaiParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 14-digit licence or registration number */
+  licence_number: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyFssaiRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 14-digit licence or registration number */
+  licence_number: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyFssaiResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: business_name, licence_type, status, valid_upto, premises_address. */
+  details: VerifyFssaiResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyFssaiResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: business_name, licence_type, status, valid_upto, premises_address. */
+export interface VerifyFssaiResultDetails {
+  business_name?: string;
+  licence_type?: string;
+  premises_address?: string;
+  status?: string;
+  valid_upto?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyFssaiResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyGstinParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 15-character GSTIN */
+  gstin: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Add filings[] */
+  include_filings?: boolean;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyGstinRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 15-character GSTIN */
+  gstin: string;
+  /** Add filings[] */
+  include_filings?: boolean;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyGstinResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: legal_name, trade_name, pan, status, registration_date, cancellation_date, constitution, taxpayer_type, principal_address, state_jurisdiction, nature_of_business, filings. */
+  details: VerifyGstinResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyGstinResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: legal_name, trade_name, pan, status, registration_date, cancellation_date, constitution, taxpayer_type, principal_address, state_jurisdiction, nature_of_business, filings. */
+export interface VerifyGstinResultDetails {
+  cancellation_date?: string;
+  constitution?: string;
+  filings?: VerifyGstinResultDetailsFiling[];
+  legal_name?: string;
+  nature_of_business?: string[];
+  pan?: string;
+  principal_address?: string;
+  registration_date?: string;
+  state_jurisdiction?: string;
+  status?: string;
+  taxpayer_type?: string;
+  trade_name?: string;
+}
+
+export interface VerifyGstinResultDetailsFiling {
+  filed_on?: string;
+  period?: string;
+  return_type?: string;
+  status?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyGstinResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyIecParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 10-character IEC */
+  iec: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyIecRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 10-character IEC */
+  iec: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyIecResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: firm_name, status, dgft_office, issue_date, branches. */
+  details: VerifyIecResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyIecResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: firm_name, status, dgft_office, issue_date, branches. */
+export interface VerifyIecResultDetails {
+  branches?: VerifyIecResultDetailsBranche[];
+  dgft_office?: string;
+  firm_name?: string;
+  issue_date?: string;
+  status?: string;
+}
+
+export interface VerifyIecResultDetailsBranche {
+  address?: string;
+  code?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyIecResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyIfscParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 11-character IFSC */
+  ifsc: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyIfscRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 11-character IFSC */
+  ifsc: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyIfscResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: bank, status, branch, address, city, state, channels. */
+  details: VerifyIfscResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyIfscResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: bank, status, branch, address, city, state, channels. */
+export interface VerifyIfscResultDetails {
+  address?: string;
+  bank?: string;
+  branch?: string;
+  channels?: VerifyIfscResultDetailsChannels;
+  city?: string;
+  state?: string;
+  status?: string;
+}
+
+export interface VerifyIfscResultDetailsChannels {
+  imps?: boolean;
+  neft?: boolean;
+  rtgs?: boolean;
+  upi?: boolean;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyIfscResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyMobileParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 10 digits, +91 allowed */
+  mobile: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyMobileRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 10 digits, +91 allowed */
+  mobile: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyMobileResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: subscriber_name, status, operator, circle, number_type, ported, dnd. */
+  details: VerifyMobileResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyMobileResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: subscriber_name, status, operator, circle, number_type, ported, dnd. */
+export interface VerifyMobileResultDetails {
+  circle?: string;
+  dnd?: boolean;
+  number_type?: string;
+  operator?: string;
+  ported?: boolean;
+  status?: string;
+  subscriber_name?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyMobileResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyPanAadhaarLinkParams {
+  /** The Aadhaar's last 4 digits */
+  aadhaar_last4: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 10-character PAN */
+  pan: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyPanAadhaarLinkRequest {
+  /** The Aadhaar's last 4 digits */
+  aadhaar_last4: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** 10-character PAN */
+  pan: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyPanAadhaarLinkResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: linked, pan_status, aadhaar_matches. */
+  details: VerifyPanAadhaarLinkResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyPanAadhaarLinkResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: linked, pan_status, aadhaar_matches. */
+export interface VerifyPanAadhaarLinkResultDetails {
+  aadhaar_matches?: boolean;
+  linked?: boolean;
+  pan_status?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyPanAadhaarLinkResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyPanParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** 10-character PAN */
+  pan: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** YYYY-MM-DD, checked when given */
+  date_of_birth?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyPanRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** YYYY-MM-DD, checked when given */
+  date_of_birth?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** 10-character PAN */
+  pan: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyPanResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: name, category, status, aadhaar_seeding, dob_match. */
+  details: VerifyPanResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyPanResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: name, category, status, aadhaar_seeding, dob_match. */
+export interface VerifyPanResultDetails {
+  aadhaar_seeding?: string;
+  category?: string;
+  dob_match?: boolean;
+  name?: string;
+  status?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyPanResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyPassportParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** YYYY-MM-DD, with file_number */
+  date_of_birth?: string;
+  /** Passport file number */
+  file_number?: string;
+  /** The two 44-character MRZ lines */
+  mrz?: string[];
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** A1234567, with mrz */
+  passport_number?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyPassportRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** YYYY-MM-DD, with file_number */
+  date_of_birth?: string;
+  /** Passport file number */
+  file_number?: string;
+  /** The two 44-character MRZ lines */
+  mrz?: string[];
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** A1234567, with mrz */
+  passport_number?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyPassportResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: status, name, application_type, date_of_application, nationality, issuing_country, date_of_birth, sex, expiry, mrz_valid. */
+  details: VerifyPassportResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyPassportResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: status, name, application_type, date_of_application, nationality, issuing_country, date_of_birth, sex, expiry, mrz_valid. */
+export interface VerifyPassportResultDetails {
+  application_type?: string;
+  date_of_application?: string;
+  date_of_birth?: string;
+  expiry?: string;
+  issuing_country?: string;
+  mrz_valid?: boolean;
+  name?: string;
+  nationality?: string;
+  sex?: string;
+  status?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyPassportResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyUdyamParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** UDYAM-XX-00-0000000 */
+  udyam_number: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyUdyamRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+  /** UDYAM-XX-00-0000000 */
+  udyam_number: string;
+}
+
+/** The common verify response */
+export interface VerifyUdyamResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: enterprise_name, status, enterprise_type, major_activity, incorporation_date, address, nic_codes. */
+  details: VerifyUdyamResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyUdyamResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: enterprise_name, status, enterprise_type, major_activity, incorporation_date, address, nic_codes. */
+export interface VerifyUdyamResultDetails {
+  address?: string;
+  enterprise_name?: string;
+  enterprise_type?: string;
+  incorporation_date?: string;
+  major_activity?: string;
+  nic_codes?: VerifyUdyamResultDetailsNicCode[];
+  status?: string;
+}
+
+export interface VerifyUdyamResultDetailsNicCode {
+  code?: string;
+  description?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyUdyamResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyUpiParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** name@handle */
+  vpa: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyUpiRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+  /** name@handle */
+  vpa: string;
+}
+
+/** The common verify response */
+export interface VerifyUpiResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: holder_name, active. */
+  details: VerifyUpiResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyUpiResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: holder_name, active. */
+export interface VerifyUpiResultDetails {
+  active?: boolean;
+  holder_name?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyUpiResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyVehicleRcParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** MH12AB1234 or 22BH1234AA */
+  registration_number: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The owner consented: return the full owner name */
+  consent_owner?: boolean;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyVehicleRcRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** The owner consented: return the full owner name */
+  consent_owner?: boolean;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+  /** MH12AB1234 or 22BH1234AA */
+  registration_number: string;
+}
+
+/** The common verify response */
+export interface VerifyVehicleRcResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: owner_name, status, vehicle_class, maker_model, fuel, registration_date, fitness_upto, insurance_upto, pucc_upto, rto. */
+  details: VerifyVehicleRcResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyVehicleRcResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: owner_name, status, vehicle_class, maker_model, fuel, registration_date, fitness_upto, insurance_upto, pucc_upto, rto. */
+export interface VerifyVehicleRcResultDetails {
+  fitness_upto?: string;
+  fuel?: string;
+  insurance_upto?: string;
+  maker_model?: string;
+  owner_name?: string;
+  pucc_upto?: string;
+  registration_date?: string;
+  rto?: string;
+  status?: string;
+  vehicle_class?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyVehicleRcResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyVoterIdParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** ABC1234567 */
+  epic_number: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyVoterIdRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** ABC1234567 */
+  epic_number: string;
+  /** The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch */
+  name?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyVoterIdResult {
+  checked_at: string;
+  /** What the source holds; empty for not_found and unavailable. Fields: holder_name, status, relation_name, constituency, state. */
+  details: VerifyVoterIdResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyVoterIdResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** What the source holds; empty for not_found and unavailable. Fields: holder_name, status, relation_name, constituency, state. */
+export interface VerifyVoterIdResultDetails {
+  constituency?: string;
+  holder_name?: string;
+  relation_name?: string;
+  state?: string;
+  status?: string;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyVoterIdResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
 export interface WebhookCreate {
   description?: string;
   /** Event types, * or <prefix>.* (job.succeeded, job.failed, job.*, …) */
@@ -2731,6 +4160,102 @@ export class RenderOperations {
 
 }
 
+/** /v1/verify operations. */
+export class VerifyOperations {
+  constructor(private readonly core: Core) {}
+
+  /** Aadhaar offline e-KYC: the XML zip with its share code, or the secure QR; UIDAI's signature checked. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_aadhaar_offline; scope api.verify.aadhaar_offline.execute. */
+  aadhaarOffline(params: VerifyAadhaarOfflineParams, options?: CallOptions): Promise<Answer<VerifyAadhaarOfflineResult>> {
+    return this.core.operation<VerifyAadhaarOfflineResult>("/v1/verify/aadhaar-offline", params as unknown as Record<string, unknown>, { input: "none", extra: ["xml_zip"] }, options);
+  }
+
+  /** A bank account: holder name at the bank, name match, bank and branch. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_bank_account; scope api.verify.bank_account.execute. */
+  bankAccount(params: VerifyBankAccountParams, options?: CallOptions): Promise<Answer<VerifyBankAccountResult>> {
+    return this.core.operation<VerifyBankAccountResult>("/v1/verify/bank-account", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** Up to 500 lookups of one verify operation as a job, results in input order. Always asynchronous: answers 202 with a job. Meter api_verify_<operation>; scope api.verify.batch.execute. */
+  batch(params: VerifyBatchParams, options?: CallOptions): Promise<Answer<VerifyBatchResult>> {
+    return this.core.operation<VerifyBatchResult>("/v1/verify/batch", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** A company (CIN) or LLP (LLPIN): name, status, class, ROC, capital, address, directors. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_cin; scope api.verify.cin.execute. */
+  cin(params: VerifyCinParams, options?: CallOptions): Promise<Answer<VerifyCinResult>> {
+    return this.core.operation<VerifyCinResult>("/v1/verify/cin", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** A driving licence: holder, validity, classes, issuing RTO. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_dl; scope api.verify.driving_licence.execute. */
+  drivingLicence(params: VerifyDrivingLicenceParams, options?: CallOptions): Promise<Answer<VerifyDrivingLicenceResult>> {
+    return this.core.operation<VerifyDrivingLicenceResult>("/v1/verify/driving-licence", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** An email address: syntax, MX, disposable, role address, deliverable, suggestion. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_email; scope api.verify.email.execute. */
+  email(params: VerifyEmailParams, options?: CallOptions): Promise<Answer<VerifyEmailResult>> {
+    return this.core.operation<VerifyEmailResult>("/v1/verify/email", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** An FSSAI licence: business, type, status, validity, premises. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_fssai; scope api.verify.fssai.execute. */
+  fssai(params: VerifyFssaiParams, options?: CallOptions): Promise<Answer<VerifyFssaiResult>> {
+    return this.core.operation<VerifyFssaiResult>("/v1/verify/fssai", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** A GSTIN's registration: legal and trade name, status, constitution, address, filings. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_gstin; scope api.verify.gstin.execute. */
+  gstin(params: VerifyGstinParams, options?: CallOptions): Promise<Answer<VerifyGstinResult>> {
+    return this.core.operation<VerifyGstinResult>("/v1/verify/gstin", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** An Importer-Exporter Code: firm, status, DGFT office, branches. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_iec; scope api.verify.iec.execute. */
+  iec(params: VerifyIecParams, options?: CallOptions): Promise<Answer<VerifyIecResult>> {
+    return this.core.operation<VerifyIecResult>("/v1/verify/iec", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** An IFSC: bank, branch, address and supported channels (free). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_ifsc; scope api.verify.ifsc.execute. */
+  ifsc(params: VerifyIfscParams, options?: CallOptions): Promise<Answer<VerifyIfscResult>> {
+    return this.core.operation<VerifyIfscResult>("/v1/verify/ifsc", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** A mobile number: validity, operator, circle, type, ported, DND. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_mobile; scope api.verify.mobile.execute. */
+  mobile(params: VerifyMobileParams, options?: CallOptions): Promise<Answer<VerifyMobileResult>> {
+    return this.core.operation<VerifyMobileResult>("/v1/verify/mobile", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** A PAN: name as registered, category, status and Aadhaar seeding. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_pan; scope api.verify.pan.execute. */
+  pan(params: VerifyPanParams, options?: CallOptions): Promise<Answer<VerifyPanResult>> {
+    return this.core.operation<VerifyPanResult>("/v1/verify/pan", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** Whether a PAN is linked to an Aadhaar. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_pan; scope api.verify.pan_aadhaar_link.execute. */
+  panAadhaarLink(params: VerifyPanAadhaarLinkParams, options?: CallOptions): Promise<Answer<VerifyPanAadhaarLinkResult>> {
+    return this.core.operation<VerifyPanAadhaarLinkResult>("/v1/verify/pan-aadhaar-link", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** A passport: application status by file number, or MRZ consistency. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_passport; scope api.verify.passport.execute. */
+  passport(params: VerifyPassportParams, options?: CallOptions): Promise<Answer<VerifyPassportResult>> {
+    return this.core.operation<VerifyPassportResult>("/v1/verify/passport", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** An Udyam registration: enterprise, type, activity, NIC codes. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_udyam; scope api.verify.udyam.execute. */
+  udyam(params: VerifyUdyamParams, options?: CallOptions): Promise<Answer<VerifyUdyamResult>> {
+    return this.core.operation<VerifyUdyamResult>("/v1/verify/udyam", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** A UPI address: holder name, name match, active. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_upi; scope api.verify.upi.execute. */
+  upi(params: VerifyUpiParams, options?: CallOptions): Promise<Answer<VerifyUpiResult>> {
+    return this.core.operation<VerifyUpiResult>("/v1/verify/upi", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** A vehicle registration: owner (masked without consent_owner), class, model, validity. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_rc; scope api.verify.vehicle_rc.execute. */
+  vehicleRc(params: VerifyVehicleRcParams, options?: CallOptions): Promise<Answer<VerifyVehicleRcResult>> {
+    return this.core.operation<VerifyVehicleRcResult>("/v1/verify/vehicle-rc", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** A voter ID (EPIC): holder, relation, constituency, state. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_voter_id; scope api.verify.voter_id.execute. */
+  voterId(params: VerifyVoterIdParams, options?: CallOptions): Promise<Answer<VerifyVoterIdResult>> {
+    return this.core.operation<VerifyVoterIdResult>("/v1/verify/voter-id", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+}
+
 /** Console audit log. */
 export class AuditResource {
   constructor(private readonly core: Core) {}
@@ -2743,6 +4268,16 @@ export class AuditResource {
   /** Every item of list, page after page (follows next_cursor). */
   listAll(query?: Omit<AuditListQuery, "cursor">, options?: RequestOptions): AsyncIterable<AuditEntry> {
     return this.core.paginate<AuditEntry>(`/v1/audit-logs`, query as unknown as Record<string, unknown> | undefined, options);
+  }
+
+  /** The Verify audit log of the calling environment, newest first: one row per lookup, the identifier only as its fingerprint and last 4. */
+  listVerify(query?: AuditListVerifyQuery, options?: RequestOptions): Promise<AuditListVerifyData> {
+    return this.core.call<AuditListVerifyData>("GET", `/v1/verify/audit`, { query: query as unknown as Record<string, unknown> | undefined, json: undefined }, options);
+  }
+
+  /** Every item of listVerify, page after page (follows next_cursor). */
+  listVerifyAll(query?: Omit<AuditListVerifyQuery, "cursor">, options?: RequestOptions): AsyncIterable<VerifyAuditRow> {
+    return this.core.paginate<VerifyAuditRow>(`/v1/verify/audit`, query as unknown as Record<string, unknown> | undefined, options);
   }
 
 }
@@ -3044,6 +4579,8 @@ export class GeneratedClient {
   readonly qr: QrOperations;
   /** /v1/render operations. */
   readonly render: RenderOperations;
+  /** /v1/verify operations. */
+  readonly verify: VerifyOperations;
   /** Console audit log. */
   readonly audit: AuditResource;
   /** Uploaded and produced files. */
@@ -3070,6 +4607,7 @@ export class GeneratedClient {
     this.pdf = new PdfOperations(core);
     this.qr = new QrOperations(core);
     this.render = new RenderOperations(core);
+    this.verify = new VerifyOperations(core);
     this.audit = new AuditResource(core);
     this.files = new FilesResource(core);
     this.jobs = new JobsResource(core);

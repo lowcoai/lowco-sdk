@@ -238,6 +238,33 @@ type AuditListQuery struct {
 	Format *string `json:"format,omitempty"`
 }
 
+// A page; pass next_cursor as cursor for the next one (null at the end).
+type AuditListVerifyData struct {
+	Items      []VerifyAuditRow `json:"items"`
+	NextCursor *string          `json:"next_cursor"`
+}
+
+// AuditListVerifyQuery is a Lowco API object.
+type AuditListVerifyQuery struct {
+	// Only this operation One of: aadhaar-offline, bank-account, cin, driving-licence, email, fssai, gstin, iec, ifsc, mobile, pan, pan-aadhaar-link, passport, udyam, upi, vehicle-rc, voter-id.
+	Operation *string `json:"operation,omitempty"`
+	// One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result *string `json:"result,omitempty"`
+	// Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged
+	Identifier  *string `json:"identifier,omitempty"`
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// A batch's rows
+	JobID         *string `json:"job_id,omitempty"`
+	CreatedAfter  *string `json:"created_after,omitempty"`
+	CreatedBefore *string `json:"created_before,omitempty"`
+	// Page size
+	Limit *int `json:"limit,omitempty"`
+	// next_cursor of the previous page.
+	Cursor *string `json:"cursor,omitempty"`
+	// csv exports every matching row (up to 10,000; X-Lowco-Export-Truncated when more) One of: json, csv.
+	Format *string `json:"format,omitempty"`
+}
+
 // PDF points from the top-left of the upright page
 type BBox struct {
 	H float64 `json:"h"`
@@ -2651,6 +2678,1417 @@ type ValidationIssue struct {
 	Message string `json:"message"`
 }
 
+// The operation's options.
+type VerifyAadhaarOfflineParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// An extra file input (xml_zip)
+	XmlZip FileInput `json:"-"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// The secure QR's decimal payload
+	SecureQR *string `json:"secure_qr,omitempty"`
+	// The zip's 4-character share code
+	ShareCode *string `json:"share_code,omitempty"`
+}
+
+// The operation's options.
+type VerifyAadhaarOfflineRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// The secure QR's decimal payload
+	SecureQR *string `json:"secure_qr,omitempty"`
+	// The zip's 4-character share code
+	ShareCode *string `json:"share_code,omitempty"`
+	// An extra file input (xml_zip); in multipart, a part named xml_zip
+	XmlZip *FileRef `json:"xml_zip,omitempty"`
+}
+
+// The common verify response
+type VerifyAadhaarOfflineResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: form, name, gender, date_of_birth, aadhaar_last4, mobile_last4, address, signature_valid, document_age_days, has_photo.
+	Details VerifyAadhaarOfflineResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyAadhaarOfflineResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: form, name, gender, date_of_birth, aadhaar_last4, mobile_last4, address, signature_valid, document_age_days, has_photo.
+type VerifyAadhaarOfflineResultDetails struct {
+	AadhaarLast4    *string                                   `json:"aadhaar_last4,omitempty"`
+	Address         *VerifyAadhaarOfflineResultDetailsAddress `json:"address,omitempty"`
+	DateOfBirth     *string                                   `json:"date_of_birth,omitempty"`
+	DocumentAgeDays *float64                                  `json:"document_age_days,omitempty"`
+	Form            *string                                   `json:"form,omitempty"`
+	Gender          *string                                   `json:"gender,omitempty"`
+	HasPhoto        *bool                                     `json:"has_photo,omitempty"`
+	MobileLast4     *string                                   `json:"mobile_last4,omitempty"`
+	Name            *string                                   `json:"name,omitempty"`
+	SignatureValid  *bool                                     `json:"signature_valid,omitempty"`
+}
+
+// VerifyAadhaarOfflineResultDetailsAddress is a Lowco API object.
+type VerifyAadhaarOfflineResultDetailsAddress struct {
+	CareOf   *string `json:"care_of,omitempty"`
+	Country  *string `json:"country,omitempty"`
+	District *string `json:"district,omitempty"`
+	House    *string `json:"house,omitempty"`
+	Locality *string `json:"locality,omitempty"`
+	Pincode  *string `json:"pincode,omitempty"`
+	State    *string `json:"state,omitempty"`
+	Street   *string `json:"street,omitempty"`
+	Vtc      *string `json:"vtc,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyAadhaarOfflineResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// One lookup in verify_audit (append-only; kept until retain_until)
+type VerifyAuditRow struct {
+	ActorID     string `json:"actor_id"`
+	Consent     bool   `json:"consent"`
+	CreatedAt   string `json:"created_at"`
+	Environment string `json:"environment"`
+	ID          string `json:"id"`
+	// HMAC-SHA-256 fingerprint of the normalised identifier (an Aadhaar document's reference id)
+	IdentifierHash  string `json:"identifier_hash"`
+	IdentifierLast4 string `json:"identifier_last4"`
+	// Set for a batch item or a promoted call
+	JobID       string `json:"job_id"`
+	KeyID       string `json:"key_id"`
+	Operation   string `json:"operation"`
+	Purpose     string `json:"purpose"`
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The org's verify_audit_retention_days after created_at
+	RetainUntil string `json:"retain_until"`
+}
+
+// The operation's options.
+type VerifyBankAccountParams struct {
+	// 9 to 18 digits
+	AccountNumber string `json:"account_number"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 11-character IFSC
+	IFSC string `json:"ifsc"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyBankAccountRequest struct {
+	// 9 to 18 digits
+	AccountNumber string `json:"account_number"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 11-character IFSC
+	IFSC string `json:"ifsc"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyBankAccountResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: account_holder, account_status, bank, branch, method.
+	Details VerifyBankAccountResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyBankAccountResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: account_holder, account_status, bank, branch, method.
+type VerifyBankAccountResultDetails struct {
+	AccountHolder *string `json:"account_holder,omitempty"`
+	AccountStatus *string `json:"account_status,omitempty"`
+	Bank          *string `json:"bank,omitempty"`
+	Branch        *string `json:"branch,omitempty"`
+	Method        *string `json:"method,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyBankAccountResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyBatchParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Up to 500 lookups, answered in this order
+	Items []map[string]any `json:"items"`
+	// The verify operation every item runs One of: gstin, pan, cin, udyam, fssai, iec, bank-account, ifsc, upi, vehicle-rc, driving-licence, voter-id, passport, pan-aadhaar-link, mobile, email.
+	Operation string `json:"operation"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyBatchRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Up to 500 lookups, answered in this order
+	Items []map[string]any `json:"items"`
+	// The verify operation every item runs One of: gstin, pan, cin, udyam, fssai, iec, bank-account, ifsc, upi, vehicle-rc, driving-licence, voter-id, passport, pan-aadhaar-link, mobile, email.
+	Operation string `json:"operation"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// A verify/batch job's result
+type VerifyBatchResult struct {
+	// Items
+	Count int `json:"count"`
+	// Items refused before any lookup
+	Failed int `json:"failed"`
+	// In input order
+	Items     []VerifyBatchResultItem `json:"items"`
+	Operation string                  `json:"operation"`
+	// Items per result
+	Results map[string]int `json:"results"`
+}
+
+// One item: the common response, or error
+type VerifyBatchResultItem struct {
+	CheckedAt *string `json:"checked_at,omitempty"`
+	// The operation's details
+	Details map[string]any `json:"details,omitempty"`
+	// Why the item was not looked up (free, not audited): the error its own call would have answered
+	Error *VerifyBatchResultItemsItemError `json:"error,omitempty"`
+	// The item's place in the request
+	Index int `json:"index"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyBatchResultItemsItemNameMatch `json:"name_match,omitempty"`
+	// Your reference_id
+	ReferenceID *string `json:"reference_id,omitempty"`
+	RequestID   *string `json:"request_id,omitempty"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result *string `json:"result,omitempty"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source *string `json:"source,omitempty"`
+	// true only for result valid
+	Verified *bool `json:"verified,omitempty"`
+}
+
+// Why the item was not looked up (free, not audited): the error its own call would have answered
+type VerifyBatchResultItemsItemError struct {
+	Message string  `json:"message"`
+	Param   *string `json:"param,omitempty"`
+	Reason  string  `json:"reason"`
+}
+
+// With name in the request and a name at the source
+type VerifyBatchResultItemsItemNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyCinParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// 21-character CIN
+	Cin *string `json:"cin,omitempty"`
+	// Add directors[]
+	IncludeDirectors *bool `json:"include_directors,omitempty"`
+	// LLPIN, AAA-1234
+	Llpin *string `json:"llpin,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyCinRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// 21-character CIN
+	Cin *string `json:"cin,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Add directors[]
+	IncludeDirectors *bool `json:"include_directors,omitempty"`
+	// LLPIN, AAA-1234
+	Llpin *string `json:"llpin,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyCinResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: company_name, status, class, roc, incorporation_date, authorised_capital, paid_up_capital, registered_address, directors.
+	Details VerifyCinResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyCinResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: company_name, status, class, roc, incorporation_date, authorised_capital, paid_up_capital, registered_address, directors.
+type VerifyCinResultDetails struct {
+	AuthorisedCapital *float64                         `json:"authorised_capital,omitempty"`
+	Class             *string                          `json:"class,omitempty"`
+	CompanyName       *string                          `json:"company_name,omitempty"`
+	Directors         []VerifyCinResultDetailsDirector `json:"directors,omitempty"`
+	IncorporationDate *string                          `json:"incorporation_date,omitempty"`
+	PaidUpCapital     *float64                         `json:"paid_up_capital,omitempty"`
+	RegisteredAddress *string                          `json:"registered_address,omitempty"`
+	Roc               *string                          `json:"roc,omitempty"`
+	Status            *string                          `json:"status,omitempty"`
+}
+
+// VerifyCinResultDetailsDirector is a Lowco API object.
+type VerifyCinResultDetailsDirector struct {
+	AppointedOn *string `json:"appointed_on,omitempty"`
+	Designation *string `json:"designation,omitempty"`
+	Din         *string `json:"din,omitempty"`
+	Name        *string `json:"name,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyCinResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyDrivingLicenceParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// YYYY-MM-DD
+	DateOfBirth string `json:"date_of_birth"`
+	// 15 characters, MH1220110012345
+	DlNumber string `json:"dl_number"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyDrivingLicenceRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// YYYY-MM-DD
+	DateOfBirth string `json:"date_of_birth"`
+	// 15 characters, MH1220110012345
+	DlNumber string `json:"dl_number"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyDrivingLicenceResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: holder_name, status, valid_from, valid_upto, classes, rto.
+	Details VerifyDrivingLicenceResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyDrivingLicenceResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: holder_name, status, valid_from, valid_upto, classes, rto.
+type VerifyDrivingLicenceResultDetails struct {
+	Classes    []string `json:"classes,omitempty"`
+	HolderName *string  `json:"holder_name,omitempty"`
+	Rto        *string  `json:"rto,omitempty"`
+	Status     *string  `json:"status,omitempty"`
+	ValidFrom  *string  `json:"valid_from,omitempty"`
+	ValidUpto  *string  `json:"valid_upto,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyDrivingLicenceResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyEmailParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// name@domain
+	Email string `json:"email"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyEmailRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// name@domain
+	Email string `json:"email"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyEmailResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: syntax_valid, mx_found, disposable, role_address, deliverable, mailbox_status, suggestion.
+	Details VerifyEmailResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyEmailResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: syntax_valid, mx_found, disposable, role_address, deliverable, mailbox_status, suggestion.
+type VerifyEmailResultDetails struct {
+	Deliverable   *bool   `json:"deliverable,omitempty"`
+	Disposable    *bool   `json:"disposable,omitempty"`
+	MailboxStatus *string `json:"mailbox_status,omitempty"`
+	MxFound       *bool   `json:"mx_found,omitempty"`
+	RoleAddress   *bool   `json:"role_address,omitempty"`
+	Suggestion    *string `json:"suggestion,omitempty"`
+	SyntaxValid   *bool   `json:"syntax_valid,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyEmailResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyFssaiParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 14-digit licence or registration number
+	LicenceNumber string `json:"licence_number"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyFssaiRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 14-digit licence or registration number
+	LicenceNumber string `json:"licence_number"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyFssaiResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: business_name, licence_type, status, valid_upto, premises_address.
+	Details VerifyFssaiResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyFssaiResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: business_name, licence_type, status, valid_upto, premises_address.
+type VerifyFssaiResultDetails struct {
+	BusinessName    *string `json:"business_name,omitempty"`
+	LicenceType     *string `json:"licence_type,omitempty"`
+	PremisesAddress *string `json:"premises_address,omitempty"`
+	Status          *string `json:"status,omitempty"`
+	ValidUpto       *string `json:"valid_upto,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyFssaiResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyGstinParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 15-character GSTIN
+	GSTIN string `json:"gstin"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Add filings[]
+	IncludeFilings *bool `json:"include_filings,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyGstinRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 15-character GSTIN
+	GSTIN string `json:"gstin"`
+	// Add filings[]
+	IncludeFilings *bool `json:"include_filings,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyGstinResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: legal_name, trade_name, pan, status, registration_date, cancellation_date, constitution, taxpayer_type, principal_address, state_jurisdiction, nature_of_business, filings.
+	Details VerifyGstinResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyGstinResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: legal_name, trade_name, pan, status, registration_date, cancellation_date, constitution, taxpayer_type, principal_address, state_jurisdiction, nature_of_business, filings.
+type VerifyGstinResultDetails struct {
+	CancellationDate  *string                          `json:"cancellation_date,omitempty"`
+	Constitution      *string                          `json:"constitution,omitempty"`
+	Filings           []VerifyGstinResultDetailsFiling `json:"filings,omitempty"`
+	LegalName         *string                          `json:"legal_name,omitempty"`
+	NatureOfBusiness  []string                         `json:"nature_of_business,omitempty"`
+	PAN               *string                          `json:"pan,omitempty"`
+	PrincipalAddress  *string                          `json:"principal_address,omitempty"`
+	RegistrationDate  *string                          `json:"registration_date,omitempty"`
+	StateJurisdiction *string                          `json:"state_jurisdiction,omitempty"`
+	Status            *string                          `json:"status,omitempty"`
+	TaxpayerType      *string                          `json:"taxpayer_type,omitempty"`
+	TradeName         *string                          `json:"trade_name,omitempty"`
+}
+
+// VerifyGstinResultDetailsFiling is a Lowco API object.
+type VerifyGstinResultDetailsFiling struct {
+	FiledOn    *string `json:"filed_on,omitempty"`
+	Period     *string `json:"period,omitempty"`
+	ReturnType *string `json:"return_type,omitempty"`
+	Status     *string `json:"status,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyGstinResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyIecParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 10-character IEC
+	Iec string `json:"iec"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyIecRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 10-character IEC
+	Iec string `json:"iec"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyIecResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: firm_name, status, dgft_office, issue_date, branches.
+	Details VerifyIecResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyIecResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: firm_name, status, dgft_office, issue_date, branches.
+type VerifyIecResultDetails struct {
+	Branches   []VerifyIecResultDetailsBranche `json:"branches,omitempty"`
+	DgftOffice *string                         `json:"dgft_office,omitempty"`
+	FirmName   *string                         `json:"firm_name,omitempty"`
+	IssueDate  *string                         `json:"issue_date,omitempty"`
+	Status     *string                         `json:"status,omitempty"`
+}
+
+// VerifyIecResultDetailsBranche is a Lowco API object.
+type VerifyIecResultDetailsBranche struct {
+	Address *string `json:"address,omitempty"`
+	Code    *string `json:"code,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyIecResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyIfscParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 11-character IFSC
+	IFSC string `json:"ifsc"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyIfscRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 11-character IFSC
+	IFSC string `json:"ifsc"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyIfscResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: bank, status, branch, address, city, state, channels.
+	Details VerifyIfscResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyIfscResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: bank, status, branch, address, city, state, channels.
+type VerifyIfscResultDetails struct {
+	Address  *string                          `json:"address,omitempty"`
+	Bank     *string                          `json:"bank,omitempty"`
+	Branch   *string                          `json:"branch,omitempty"`
+	Channels *VerifyIfscResultDetailsChannels `json:"channels,omitempty"`
+	City     *string                          `json:"city,omitempty"`
+	State    *string                          `json:"state,omitempty"`
+	Status   *string                          `json:"status,omitempty"`
+}
+
+// VerifyIfscResultDetailsChannels is a Lowco API object.
+type VerifyIfscResultDetailsChannels struct {
+	Imps *bool `json:"imps,omitempty"`
+	Neft *bool `json:"neft,omitempty"`
+	Rtgs *bool `json:"rtgs,omitempty"`
+	UPI  *bool `json:"upi,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyIfscResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyMobileParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 10 digits, +91 allowed
+	Mobile string `json:"mobile"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyMobileRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 10 digits, +91 allowed
+	Mobile string `json:"mobile"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyMobileResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: subscriber_name, status, operator, circle, number_type, ported, dnd.
+	Details VerifyMobileResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyMobileResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: subscriber_name, status, operator, circle, number_type, ported, dnd.
+type VerifyMobileResultDetails struct {
+	Circle         *string `json:"circle,omitempty"`
+	Dnd            *bool   `json:"dnd,omitempty"`
+	NumberType     *string `json:"number_type,omitempty"`
+	Operator       *string `json:"operator,omitempty"`
+	Ported         *bool   `json:"ported,omitempty"`
+	Status         *string `json:"status,omitempty"`
+	SubscriberName *string `json:"subscriber_name,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyMobileResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyPanAadhaarLinkParams struct {
+	// The Aadhaar's last 4 digits
+	AadhaarLast4 string `json:"aadhaar_last4"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 10-character PAN
+	PAN string `json:"pan"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyPanAadhaarLinkRequest struct {
+	// The Aadhaar's last 4 digits
+	AadhaarLast4 string `json:"aadhaar_last4"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// 10-character PAN
+	PAN string `json:"pan"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyPanAadhaarLinkResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: linked, pan_status, aadhaar_matches.
+	Details VerifyPanAadhaarLinkResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyPanAadhaarLinkResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: linked, pan_status, aadhaar_matches.
+type VerifyPanAadhaarLinkResultDetails struct {
+	AadhaarMatches *bool   `json:"aadhaar_matches,omitempty"`
+	Linked         *bool   `json:"linked,omitempty"`
+	PANStatus      *string `json:"pan_status,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyPanAadhaarLinkResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyPanParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// 10-character PAN
+	PAN string `json:"pan"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// YYYY-MM-DD, checked when given
+	DateOfBirth *string `json:"date_of_birth,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyPanRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// YYYY-MM-DD, checked when given
+	DateOfBirth *string `json:"date_of_birth,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// 10-character PAN
+	PAN string `json:"pan"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyPanResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: name, category, status, aadhaar_seeding, dob_match.
+	Details VerifyPanResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyPanResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: name, category, status, aadhaar_seeding, dob_match.
+type VerifyPanResultDetails struct {
+	AadhaarSeeding *string `json:"aadhaar_seeding,omitempty"`
+	Category       *string `json:"category,omitempty"`
+	DobMatch       *bool   `json:"dob_match,omitempty"`
+	Name           *string `json:"name,omitempty"`
+	Status         *string `json:"status,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyPanResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyPassportParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// YYYY-MM-DD, with file_number
+	DateOfBirth *string `json:"date_of_birth,omitempty"`
+	// Passport file number
+	FileNumber *string `json:"file_number,omitempty"`
+	// The two 44-character MRZ lines
+	Mrz []string `json:"mrz,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// A1234567, with mrz
+	PassportNumber *string `json:"passport_number,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyPassportRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// YYYY-MM-DD, with file_number
+	DateOfBirth *string `json:"date_of_birth,omitempty"`
+	// Passport file number
+	FileNumber *string `json:"file_number,omitempty"`
+	// The two 44-character MRZ lines
+	Mrz []string `json:"mrz,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// A1234567, with mrz
+	PassportNumber *string `json:"passport_number,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyPassportResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: status, name, application_type, date_of_application, nationality, issuing_country, date_of_birth, sex, expiry, mrz_valid.
+	Details VerifyPassportResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyPassportResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: status, name, application_type, date_of_application, nationality, issuing_country, date_of_birth, sex, expiry, mrz_valid.
+type VerifyPassportResultDetails struct {
+	ApplicationType   *string `json:"application_type,omitempty"`
+	DateOfApplication *string `json:"date_of_application,omitempty"`
+	DateOfBirth       *string `json:"date_of_birth,omitempty"`
+	Expiry            *string `json:"expiry,omitempty"`
+	IssuingCountry    *string `json:"issuing_country,omitempty"`
+	MrzValid          *bool   `json:"mrz_valid,omitempty"`
+	Name              *string `json:"name,omitempty"`
+	Nationality       *string `json:"nationality,omitempty"`
+	Sex               *string `json:"sex,omitempty"`
+	Status            *string `json:"status,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyPassportResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyUdyamParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// UDYAM-XX-00-0000000
+	UdyamNumber string `json:"udyam_number"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyUdyamRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// UDYAM-XX-00-0000000
+	UdyamNumber string `json:"udyam_number"`
+}
+
+// The common verify response
+type VerifyUdyamResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: enterprise_name, status, enterprise_type, major_activity, incorporation_date, address, nic_codes.
+	Details VerifyUdyamResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyUdyamResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: enterprise_name, status, enterprise_type, major_activity, incorporation_date, address, nic_codes.
+type VerifyUdyamResultDetails struct {
+	Address           *string                           `json:"address,omitempty"`
+	EnterpriseName    *string                           `json:"enterprise_name,omitempty"`
+	EnterpriseType    *string                           `json:"enterprise_type,omitempty"`
+	IncorporationDate *string                           `json:"incorporation_date,omitempty"`
+	MajorActivity     *string                           `json:"major_activity,omitempty"`
+	NicCodes          []VerifyUdyamResultDetailsNicCode `json:"nic_codes,omitempty"`
+	Status            *string                           `json:"status,omitempty"`
+}
+
+// VerifyUdyamResultDetailsNicCode is a Lowco API object.
+type VerifyUdyamResultDetailsNicCode struct {
+	Code        *string `json:"code,omitempty"`
+	Description *string `json:"description,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyUdyamResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyUpiParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// name@handle
+	Vpa string `json:"vpa"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyUpiRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// name@handle
+	Vpa string `json:"vpa"`
+}
+
+// The common verify response
+type VerifyUpiResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: holder_name, active.
+	Details VerifyUpiResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyUpiResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: holder_name, active.
+type VerifyUpiResultDetails struct {
+	Active     *bool   `json:"active,omitempty"`
+	HolderName *string `json:"holder_name,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyUpiResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyVehicleRcParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// MH12AB1234 or 22BH1234AA
+	RegistrationNumber string `json:"registration_number"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The owner consented: return the full owner name
+	ConsentOwner *bool `json:"consent_owner,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyVehicleRcRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// The owner consented: return the full owner name
+	ConsentOwner *bool `json:"consent_owner,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// MH12AB1234 or 22BH1234AA
+	RegistrationNumber string `json:"registration_number"`
+}
+
+// The common verify response
+type VerifyVehicleRcResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: owner_name, status, vehicle_class, maker_model, fuel, registration_date, fitness_upto, insurance_upto, pucc_upto, rto.
+	Details VerifyVehicleRcResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyVehicleRcResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: owner_name, status, vehicle_class, maker_model, fuel, registration_date, fitness_upto, insurance_upto, pucc_upto, rto.
+type VerifyVehicleRcResultDetails struct {
+	FitnessUpto      *string `json:"fitness_upto,omitempty"`
+	Fuel             *string `json:"fuel,omitempty"`
+	InsuranceUpto    *string `json:"insurance_upto,omitempty"`
+	MakerModel       *string `json:"maker_model,omitempty"`
+	OwnerName        *string `json:"owner_name,omitempty"`
+	PuccUpto         *string `json:"pucc_upto,omitempty"`
+	RegistrationDate *string `json:"registration_date,omitempty"`
+	Rto              *string `json:"rto,omitempty"`
+	Status           *string `json:"status,omitempty"`
+	VehicleClass     *string `json:"vehicle_class,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyVehicleRcResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyVoterIdParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// ABC1234567
+	EpicNumber string `json:"epic_number"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyVoterIdRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// ABC1234567
+	EpicNumber string `json:"epic_number"`
+	// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+	Name *string `json:"name,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyVoterIdResult struct {
+	CheckedAt string `json:"checked_at"`
+	// What the source holds; empty for not_found and unavailable. Fields: holder_name, status, relation_name, constituency, state.
+	Details VerifyVoterIdResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyVoterIdResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// What the source holds; empty for not_found and unavailable. Fields: holder_name, status, relation_name, constituency, state.
+type VerifyVoterIdResultDetails struct {
+	Constituency *string `json:"constituency,omitempty"`
+	HolderName   *string `json:"holder_name,omitempty"`
+	RelationName *string `json:"relation_name,omitempty"`
+	State        *string `json:"state,omitempty"`
+	Status       *string `json:"status,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyVoterIdResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
 // WebhookCreate is a Lowco API object.
 type WebhookCreate struct {
 	Description *string `json:"description,omitempty"`
@@ -3068,6 +4506,189 @@ func (s *RenderService) Template(ctx context.Context, p RenderTemplateParams, op
 	return out.decode(s.c)
 }
 
+// VerifyService calls the /v1/verify operations.
+type VerifyService struct{ c *core }
+
+// AadhaarOffline: Aadhaar offline e-KYC: the XML zip with its share code, or the secure QR; UIDAI's signature checked. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_aadhaar_offline; scope api.verify.aadhaar_offline.execute.
+func (s *VerifyService) AadhaarOffline(ctx context.Context, p VerifyAadhaarOfflineParams, opts ...CallOption) (*Answer[VerifyAadhaarOfflineResult], error) {
+	var out Answer[VerifyAadhaarOfflineResult]
+	err := s.c.operation(ctx, "/v1/verify/aadhaar-offline", "none", nil, nil, map[string]FileInput{"xml_zip": p.XmlZip}, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// BankAccount: A bank account: holder name at the bank, name match, bank and branch. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_bank_account; scope api.verify.bank_account.execute.
+func (s *VerifyService) BankAccount(ctx context.Context, p VerifyBankAccountParams, opts ...CallOption) (*Answer[VerifyBankAccountResult], error) {
+	var out Answer[VerifyBankAccountResult]
+	err := s.c.operation(ctx, "/v1/verify/bank-account", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// Batch: Up to 500 lookups of one verify operation as a job, results in input order. Always asynchronous: answers 202 with a job. Meter api_verify_<operation>; scope api.verify.batch.execute.
+func (s *VerifyService) Batch(ctx context.Context, p VerifyBatchParams, opts ...CallOption) (*Answer[VerifyBatchResult], error) {
+	var out Answer[VerifyBatchResult]
+	err := s.c.operation(ctx, "/v1/verify/batch", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// Cin: A company (CIN) or LLP (LLPIN): name, status, class, ROC, capital, address, directors. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_cin; scope api.verify.cin.execute.
+func (s *VerifyService) Cin(ctx context.Context, p VerifyCinParams, opts ...CallOption) (*Answer[VerifyCinResult], error) {
+	var out Answer[VerifyCinResult]
+	err := s.c.operation(ctx, "/v1/verify/cin", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// DrivingLicence: A driving licence: holder, validity, classes, issuing RTO. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_dl; scope api.verify.driving_licence.execute.
+func (s *VerifyService) DrivingLicence(ctx context.Context, p VerifyDrivingLicenceParams, opts ...CallOption) (*Answer[VerifyDrivingLicenceResult], error) {
+	var out Answer[VerifyDrivingLicenceResult]
+	err := s.c.operation(ctx, "/v1/verify/driving-licence", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// Email: An email address: syntax, MX, disposable, role address, deliverable, suggestion. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_email; scope api.verify.email.execute.
+func (s *VerifyService) Email(ctx context.Context, p VerifyEmailParams, opts ...CallOption) (*Answer[VerifyEmailResult], error) {
+	var out Answer[VerifyEmailResult]
+	err := s.c.operation(ctx, "/v1/verify/email", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// Fssai: An FSSAI licence: business, type, status, validity, premises. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_fssai; scope api.verify.fssai.execute.
+func (s *VerifyService) Fssai(ctx context.Context, p VerifyFssaiParams, opts ...CallOption) (*Answer[VerifyFssaiResult], error) {
+	var out Answer[VerifyFssaiResult]
+	err := s.c.operation(ctx, "/v1/verify/fssai", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// GSTIN: A GSTIN's registration: legal and trade name, status, constitution, address, filings. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_gstin; scope api.verify.gstin.execute.
+func (s *VerifyService) GSTIN(ctx context.Context, p VerifyGstinParams, opts ...CallOption) (*Answer[VerifyGstinResult], error) {
+	var out Answer[VerifyGstinResult]
+	err := s.c.operation(ctx, "/v1/verify/gstin", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// Iec: An Importer-Exporter Code: firm, status, DGFT office, branches. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_iec; scope api.verify.iec.execute.
+func (s *VerifyService) Iec(ctx context.Context, p VerifyIecParams, opts ...CallOption) (*Answer[VerifyIecResult], error) {
+	var out Answer[VerifyIecResult]
+	err := s.c.operation(ctx, "/v1/verify/iec", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// IFSC: An IFSC: bank, branch, address and supported channels (free). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_ifsc; scope api.verify.ifsc.execute.
+func (s *VerifyService) IFSC(ctx context.Context, p VerifyIfscParams, opts ...CallOption) (*Answer[VerifyIfscResult], error) {
+	var out Answer[VerifyIfscResult]
+	err := s.c.operation(ctx, "/v1/verify/ifsc", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// Mobile: A mobile number: validity, operator, circle, type, ported, DND. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_mobile; scope api.verify.mobile.execute.
+func (s *VerifyService) Mobile(ctx context.Context, p VerifyMobileParams, opts ...CallOption) (*Answer[VerifyMobileResult], error) {
+	var out Answer[VerifyMobileResult]
+	err := s.c.operation(ctx, "/v1/verify/mobile", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// PAN: A PAN: name as registered, category, status and Aadhaar seeding. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_pan; scope api.verify.pan.execute.
+func (s *VerifyService) PAN(ctx context.Context, p VerifyPanParams, opts ...CallOption) (*Answer[VerifyPanResult], error) {
+	var out Answer[VerifyPanResult]
+	err := s.c.operation(ctx, "/v1/verify/pan", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// PANAadhaarLink: Whether a PAN is linked to an Aadhaar. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_pan; scope api.verify.pan_aadhaar_link.execute.
+func (s *VerifyService) PANAadhaarLink(ctx context.Context, p VerifyPanAadhaarLinkParams, opts ...CallOption) (*Answer[VerifyPanAadhaarLinkResult], error) {
+	var out Answer[VerifyPanAadhaarLinkResult]
+	err := s.c.operation(ctx, "/v1/verify/pan-aadhaar-link", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// Passport: A passport: application status by file number, or MRZ consistency. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_passport; scope api.verify.passport.execute.
+func (s *VerifyService) Passport(ctx context.Context, p VerifyPassportParams, opts ...CallOption) (*Answer[VerifyPassportResult], error) {
+	var out Answer[VerifyPassportResult]
+	err := s.c.operation(ctx, "/v1/verify/passport", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// Udyam: An Udyam registration: enterprise, type, activity, NIC codes. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_udyam; scope api.verify.udyam.execute.
+func (s *VerifyService) Udyam(ctx context.Context, p VerifyUdyamParams, opts ...CallOption) (*Answer[VerifyUdyamResult], error) {
+	var out Answer[VerifyUdyamResult]
+	err := s.c.operation(ctx, "/v1/verify/udyam", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// UPI: A UPI address: holder name, name match, active. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_upi; scope api.verify.upi.execute.
+func (s *VerifyService) UPI(ctx context.Context, p VerifyUpiParams, opts ...CallOption) (*Answer[VerifyUpiResult], error) {
+	var out Answer[VerifyUpiResult]
+	err := s.c.operation(ctx, "/v1/verify/upi", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// VehicleRc: A vehicle registration: owner (masked without consent_owner), class, model, validity. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_rc; scope api.verify.vehicle_rc.execute.
+func (s *VerifyService) VehicleRc(ctx context.Context, p VerifyVehicleRcParams, opts ...CallOption) (*Answer[VerifyVehicleRcResult], error) {
+	var out Answer[VerifyVehicleRcResult]
+	err := s.c.operation(ctx, "/v1/verify/vehicle-rc", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// VoterID: A voter ID (EPIC): holder, relation, constituency, state. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_voter_id; scope api.verify.voter_id.execute.
+func (s *VerifyService) VoterID(ctx context.Context, p VerifyVoterIdParams, opts ...CallOption) (*Answer[VerifyVoterIdResult], error) {
+	var out Answer[VerifyVoterIdResult]
+	err := s.c.operation(ctx, "/v1/verify/voter-id", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
 // AuditResource: Console audit log.
 type AuditResource struct{ c *core }
 
@@ -3083,6 +4704,20 @@ func (r *AuditResource) List(ctx context.Context, query *AuditListQuery, opts ..
 // ListAll pages through List, following next_cursor.
 func (r *AuditResource) ListAll(ctx context.Context, query *AuditListQuery, opts ...RequestOption) *Pager[AuditEntry] {
 	return newPager[AuditEntry](r.c, "/v1/audit-logs", toQuery(query), opts)
+}
+
+// ListVerify: The Verify audit log of the calling environment, newest first: one row per lookup, the identifier only as its fingerprint and last 4.
+func (r *AuditResource) ListVerify(ctx context.Context, query *AuditListVerifyQuery, opts ...RequestOption) (*AuditListVerifyData, error) {
+	var out AuditListVerifyData
+	if err := r.c.call(ctx, http.MethodGet, "/v1/verify/audit", toQuery(query), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListVerifyAll pages through ListVerify, following next_cursor.
+func (r *AuditResource) ListVerifyAll(ctx context.Context, query *AuditListVerifyQuery, opts ...RequestOption) *Pager[VerifyAuditRow] {
+	return newPager[VerifyAuditRow](r.c, "/v1/verify/audit", toQuery(query), opts)
 }
 
 // FilesResource: Uploaded and produced files.
@@ -3499,6 +5134,8 @@ type services struct {
 	QR *QRService
 	// Render calls the /v1/render operations.
 	Render *RenderService
+	// Verify calls the /v1/verify operations.
+	Verify *VerifyService
 	// Audit: Console audit log.
 	Audit *AuditResource
 	// Files: Uploaded and produced files.
@@ -3527,6 +5164,7 @@ func newServices(c *core) services {
 		PDF:       &PDFService{c},
 		QR:        &QRService{c},
 		Render:    &RenderService{c},
+		Verify:    &VerifyService{c},
 		Audit:     &AuditResource{c},
 		Files:     &FilesResource{c},
 		Jobs:      &JobsResource{c},

@@ -111,8 +111,8 @@ var resourceNames = map[string][2]string{
 	"render_templates_pin": {"templates", "pin"}, "render_templates_unpin": {"templates", "unpin"},
 	"settings_get": {"settings", "get"}, "settings_update": {"settings", "update"}, "settings_purge": {"settings", "purge"}, "data_handling": {"settings", "dataHandling"},
 	"usage_get": {"usage", "get"}, "usage_alerts": {"usage", "alerts"}, "overview": {"usage", "overview"},
-	"audit_list": {"audit", "list"},
-	"keys_list":  {"keys", "list"}, "keys_validate": {"keys", "validate"}, "keys_sync": {"keys", "sync"},
+	"audit_list": {"audit", "list"}, "verify_audit_list": {"audit", "listVerify"},
+	"keys_list": {"keys", "list"}, "keys_validate": {"keys", "validate"}, "keys_sync": {"keys", "sync"},
 }
 
 // skipped operationIds: the signed download is a plain URL (Client.download).

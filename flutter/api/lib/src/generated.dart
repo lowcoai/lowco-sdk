@@ -339,6 +339,97 @@ class AuditListQuery {
       };
 }
 
+/// A page; pass next_cursor as cursor for the next one (null at the end).
+class AuditListVerifyData {
+  const AuditListVerifyData({
+    this.items,
+    this.nextCursor,
+  });
+
+  factory AuditListVerifyData.fromJson(Map<String, dynamic> json) => AuditListVerifyData(
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : VerifyAuditRow.fromJson(e as Map<String, dynamic>))!).toList().cast<VerifyAuditRow>(),
+        nextCursor: json['next_cursor'] as String?,
+      );
+
+  final List<VerifyAuditRow>? items;
+
+  final String? nextCursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+        if (nextCursor != null) 'next_cursor': nextCursor!,
+      };
+}
+
+class AuditListVerifyQuery {
+  const AuditListVerifyQuery({
+    this.operation,
+    this.result,
+    this.identifier,
+    this.referenceId,
+    this.jobId,
+    this.createdAfter,
+    this.createdBefore,
+    this.limit,
+    this.cursor,
+    this.format,
+  });
+
+  factory AuditListVerifyQuery.fromJson(Map<String, dynamic> json) => AuditListVerifyQuery(
+        operation: json['operation'] as String?,
+        result: json['result'] as String?,
+        identifier: json['identifier'] as String?,
+        referenceId: json['reference_id'] as String?,
+        jobId: json['job_id'] as String?,
+        createdAfter: json['created_after'] as String?,
+        createdBefore: json['created_before'] as String?,
+        limit: (json['limit'] as num?)?.toInt(),
+        cursor: json['cursor'] as String?,
+        format: json['format'] as String?,
+      );
+
+  /// Only this operation
+  final String? operation;
+
+  final String? result;
+
+  /// Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged
+  final String? identifier;
+
+  final String? referenceId;
+
+  /// A batch's rows
+  final String? jobId;
+
+  final String? createdAfter;
+
+  final String? createdBefore;
+
+  /// Page size
+  final int? limit;
+
+  /// next_cursor of the previous page.
+  final String? cursor;
+
+  /// csv exports every matching row (up to 10,000; X-Lowco-Export-Truncated when more)
+  final String? format;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (operation != null) 'operation': operation!,
+        if (result != null) 'result': result!,
+        if (identifier != null) 'identifier': identifier!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (jobId != null) 'job_id': jobId!,
+        if (createdAfter != null) 'created_after': createdAfter!,
+        if (createdBefore != null) 'created_before': createdBefore!,
+        if (limit != null) 'limit': limit!,
+        if (cursor != null) 'cursor': cursor!,
+        if (format != null) 'format': format!,
+      };
+}
+
 /// PDF points from the top-left of the upright page
 class BBox {
   const BBox({
@@ -8319,6 +8410,4542 @@ class ValidationIssue {
       };
 }
 
+/// The operation's options.
+class VerifyAadhaarOfflineParams {
+  const VerifyAadhaarOfflineParams({
+    this.consent,
+    this.purpose,
+    this.xmlZip,
+    this.callbackUrl,
+    this.name,
+    this.referenceId,
+    this.secureQr,
+    this.shareCode,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// An extra file input (xml_zip)
+  final FileInput? xmlZip;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The secure QR's decimal payload
+  final String? secureQr;
+
+  /// The zip's 4-character share code
+  final String? shareCode;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (secureQr != null) 'secure_qr': secureQr!,
+        if (shareCode != null) 'share_code': shareCode!,
+      };
+
+  /// The named file inputs.
+  Map<String, FileInput?> get fileInputs => {'xml_zip': xmlZip};
+
+  /// The files, in order.
+  List<FileInput>? get manyFiles => null;
+}
+
+/// The operation's options.
+class VerifyAadhaarOfflineRequest {
+  const VerifyAadhaarOfflineRequest({
+    this.callbackUrl,
+    this.consent,
+    this.name,
+    this.purpose,
+    this.referenceId,
+    this.secureQr,
+    this.shareCode,
+    this.xmlZip,
+  });
+
+  factory VerifyAadhaarOfflineRequest.fromJson(Map<String, dynamic> json) => VerifyAadhaarOfflineRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+        secureQr: json['secure_qr'] as String?,
+        shareCode: json['share_code'] as String?,
+        xmlZip: json['xml_zip'] == null ? null : FileRef.fromJson(json['xml_zip'] as Map<String, dynamic>),
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The secure QR's decimal payload
+  final String? secureQr;
+
+  /// The zip's 4-character share code
+  final String? shareCode;
+
+  /// An extra file input (xml_zip); in multipart, a part named xml_zip
+  final FileRef? xmlZip;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (secureQr != null) 'secure_qr': secureQr!,
+        if (shareCode != null) 'share_code': shareCode!,
+        if (xmlZip != null) 'xml_zip': xmlZip!.toJson(),
+      };
+}
+
+/// The common verify response
+class VerifyAadhaarOfflineResult {
+  const VerifyAadhaarOfflineResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyAadhaarOfflineResult.fromJson(Map<String, dynamic> json) => VerifyAadhaarOfflineResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyAadhaarOfflineResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyAadhaarOfflineResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: form, name, gender, date_of_birth, aadhaar_last4, mobile_last4, address, signature_valid, document_age_days, has_photo.
+  final VerifyAadhaarOfflineResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyAadhaarOfflineResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: form, name, gender, date_of_birth, aadhaar_last4, mobile_last4, address, signature_valid, document_age_days, has_photo.
+class VerifyAadhaarOfflineResultDetails {
+  const VerifyAadhaarOfflineResultDetails({
+    this.aadhaarLast4,
+    this.address,
+    this.dateOfBirth,
+    this.documentAgeDays,
+    this.form,
+    this.gender,
+    this.hasPhoto,
+    this.mobileLast4,
+    this.name,
+    this.signatureValid,
+  });
+
+  factory VerifyAadhaarOfflineResultDetails.fromJson(Map<String, dynamic> json) => VerifyAadhaarOfflineResultDetails(
+        aadhaarLast4: json['aadhaar_last4'] as String?,
+        address: json['address'] == null ? null : VerifyAadhaarOfflineResultDetailsAddress.fromJson(json['address'] as Map<String, dynamic>),
+        dateOfBirth: json['date_of_birth'] as String?,
+        documentAgeDays: json['document_age_days'] as num?,
+        form: json['form'] as String?,
+        gender: json['gender'] as String?,
+        hasPhoto: json['has_photo'] as bool?,
+        mobileLast4: json['mobile_last4'] as String?,
+        name: json['name'] as String?,
+        signatureValid: json['signature_valid'] as bool?,
+      );
+
+  final String? aadhaarLast4;
+
+  final VerifyAadhaarOfflineResultDetailsAddress? address;
+
+  final String? dateOfBirth;
+
+  final num? documentAgeDays;
+
+  final String? form;
+
+  final String? gender;
+
+  final bool? hasPhoto;
+
+  final String? mobileLast4;
+
+  final String? name;
+
+  final bool? signatureValid;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (aadhaarLast4 != null) 'aadhaar_last4': aadhaarLast4!,
+        if (address != null) 'address': address!.toJson(),
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!,
+        if (documentAgeDays != null) 'document_age_days': documentAgeDays!,
+        if (form != null) 'form': form!,
+        if (gender != null) 'gender': gender!,
+        if (hasPhoto != null) 'has_photo': hasPhoto!,
+        if (mobileLast4 != null) 'mobile_last4': mobileLast4!,
+        if (name != null) 'name': name!,
+        if (signatureValid != null) 'signature_valid': signatureValid!,
+      };
+}
+
+class VerifyAadhaarOfflineResultDetailsAddress {
+  const VerifyAadhaarOfflineResultDetailsAddress({
+    this.careOf,
+    this.country,
+    this.district,
+    this.house,
+    this.locality,
+    this.pincode,
+    this.state,
+    this.street,
+    this.vtc,
+  });
+
+  factory VerifyAadhaarOfflineResultDetailsAddress.fromJson(Map<String, dynamic> json) => VerifyAadhaarOfflineResultDetailsAddress(
+        careOf: json['care_of'] as String?,
+        country: json['country'] as String?,
+        district: json['district'] as String?,
+        house: json['house'] as String?,
+        locality: json['locality'] as String?,
+        pincode: json['pincode'] as String?,
+        state: json['state'] as String?,
+        street: json['street'] as String?,
+        vtc: json['vtc'] as String?,
+      );
+
+  final String? careOf;
+
+  final String? country;
+
+  final String? district;
+
+  final String? house;
+
+  final String? locality;
+
+  final String? pincode;
+
+  final String? state;
+
+  final String? street;
+
+  final String? vtc;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (careOf != null) 'care_of': careOf!,
+        if (country != null) 'country': country!,
+        if (district != null) 'district': district!,
+        if (house != null) 'house': house!,
+        if (locality != null) 'locality': locality!,
+        if (pincode != null) 'pincode': pincode!,
+        if (state != null) 'state': state!,
+        if (street != null) 'street': street!,
+        if (vtc != null) 'vtc': vtc!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyAadhaarOfflineResultNameMatch {
+  const VerifyAadhaarOfflineResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyAadhaarOfflineResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyAadhaarOfflineResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// One lookup in verify_audit (append-only; kept until retain_until)
+class VerifyAuditRow {
+  const VerifyAuditRow({
+    this.actorId,
+    this.consent,
+    this.createdAt,
+    this.environment,
+    this.id,
+    this.identifierHash,
+    this.identifierLast4,
+    this.jobId,
+    this.keyId,
+    this.operation,
+    this.purpose,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.retainUntil,
+  });
+
+  factory VerifyAuditRow.fromJson(Map<String, dynamic> json) => VerifyAuditRow(
+        actorId: json['actor_id'] as String?,
+        consent: json['consent'] as bool?,
+        createdAt: json['created_at'] as String?,
+        environment: json['environment'] as String?,
+        id: json['id'] as String?,
+        identifierHash: json['identifier_hash'] as String?,
+        identifierLast4: json['identifier_last4'] as String?,
+        jobId: json['job_id'] as String?,
+        keyId: json['key_id'] as String?,
+        operation: json['operation'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        retainUntil: json['retain_until'] as String?,
+      );
+
+  final String? actorId;
+
+  final bool? consent;
+
+  final String? createdAt;
+
+  final String? environment;
+
+  final String? id;
+
+  /// HMAC-SHA-256 fingerprint of the normalised identifier (an Aadhaar document's reference id)
+  final String? identifierHash;
+
+  final String? identifierLast4;
+
+  /// Set for a batch item or a promoted call
+  final String? jobId;
+
+  final String? keyId;
+
+  final String? operation;
+
+  final String? purpose;
+
+  final String? referenceId;
+
+  final String? requestId;
+
+  final String? result;
+
+  /// The org's verify_audit_retention_days after created_at
+  final String? retainUntil;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (actorId != null) 'actor_id': actorId!,
+        if (consent != null) 'consent': consent!,
+        if (createdAt != null) 'created_at': createdAt!,
+        if (environment != null) 'environment': environment!,
+        if (id != null) 'id': id!,
+        if (identifierHash != null) 'identifier_hash': identifierHash!,
+        if (identifierLast4 != null) 'identifier_last4': identifierLast4!,
+        if (jobId != null) 'job_id': jobId!,
+        if (keyId != null) 'key_id': keyId!,
+        if (operation != null) 'operation': operation!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (retainUntil != null) 'retain_until': retainUntil!,
+      };
+}
+
+/// The operation's options.
+class VerifyBankAccountParams {
+  const VerifyBankAccountParams({
+    this.accountNumber,
+    this.consent,
+    this.ifsc,
+    this.purpose,
+    this.callbackUrl,
+    this.name,
+    this.referenceId,
+  });
+
+  /// 9 to 18 digits
+  final String? accountNumber;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 11-character IFSC
+  final String? ifsc;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (accountNumber != null) 'account_number': accountNumber!,
+        if (consent != null) 'consent': consent!,
+        if (ifsc != null) 'ifsc': ifsc!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyBankAccountRequest {
+  const VerifyBankAccountRequest({
+    this.accountNumber,
+    this.callbackUrl,
+    this.consent,
+    this.ifsc,
+    this.name,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyBankAccountRequest.fromJson(Map<String, dynamic> json) => VerifyBankAccountRequest(
+        accountNumber: json['account_number'] as String?,
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        ifsc: json['ifsc'] as String?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// 9 to 18 digits
+  final String? accountNumber;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 11-character IFSC
+  final String? ifsc;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (accountNumber != null) 'account_number': accountNumber!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (ifsc != null) 'ifsc': ifsc!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyBankAccountResult {
+  const VerifyBankAccountResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyBankAccountResult.fromJson(Map<String, dynamic> json) => VerifyBankAccountResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyBankAccountResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyBankAccountResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: account_holder, account_status, bank, branch, method.
+  final VerifyBankAccountResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyBankAccountResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: account_holder, account_status, bank, branch, method.
+class VerifyBankAccountResultDetails {
+  const VerifyBankAccountResultDetails({
+    this.accountHolder,
+    this.accountStatus,
+    this.bank,
+    this.branch,
+    this.method,
+  });
+
+  factory VerifyBankAccountResultDetails.fromJson(Map<String, dynamic> json) => VerifyBankAccountResultDetails(
+        accountHolder: json['account_holder'] as String?,
+        accountStatus: json['account_status'] as String?,
+        bank: json['bank'] as String?,
+        branch: json['branch'] as String?,
+        method: json['method'] as String?,
+      );
+
+  final String? accountHolder;
+
+  final String? accountStatus;
+
+  final String? bank;
+
+  final String? branch;
+
+  final String? method;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (accountHolder != null) 'account_holder': accountHolder!,
+        if (accountStatus != null) 'account_status': accountStatus!,
+        if (bank != null) 'bank': bank!,
+        if (branch != null) 'branch': branch!,
+        if (method != null) 'method': method!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyBankAccountResultNameMatch {
+  const VerifyBankAccountResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyBankAccountResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyBankAccountResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyBatchParams {
+  const VerifyBatchParams({
+    this.consent,
+    this.items,
+    this.operation,
+    this.purpose,
+    this.callbackUrl,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Up to 500 lookups, answered in this order
+  final List<Map<String, Object>>? items;
+
+  /// The verify operation every item runs
+  final String? operation;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (items != null) 'items': items!,
+        if (operation != null) 'operation': operation!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyBatchRequest {
+  const VerifyBatchRequest({
+    this.callbackUrl,
+    this.consent,
+    this.items,
+    this.operation,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyBatchRequest.fromJson(Map<String, dynamic> json) => VerifyBatchRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        items: (json['items'] as List?)?.map((e) => ((e as Map?)?.map((k, e) => MapEntry(k as String, (e)!)).cast<String, Object>())!).toList().cast<Map<String, Object>>(),
+        operation: json['operation'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Up to 500 lookups, answered in this order
+  final List<Map<String, Object>>? items;
+
+  /// The verify operation every item runs
+  final String? operation;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (items != null) 'items': items!,
+        if (operation != null) 'operation': operation!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// A verify/batch job's result
+class VerifyBatchResult {
+  const VerifyBatchResult({
+    this.count,
+    this.failed,
+    this.items,
+    this.operation,
+    this.results,
+  });
+
+  factory VerifyBatchResult.fromJson(Map<String, dynamic> json) => VerifyBatchResult(
+        count: (json['count'] as num?)?.toInt(),
+        failed: (json['failed'] as num?)?.toInt(),
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : VerifyBatchResultItem.fromJson(e as Map<String, dynamic>))!).toList().cast<VerifyBatchResultItem>(),
+        operation: json['operation'] as String?,
+        results: (json['results'] as Map?)?.map((k, e) => MapEntry(k as String, ((e as num?)?.toInt())!)).cast<String, int>(),
+      );
+
+  /// Items
+  final int? count;
+
+  /// Items refused before any lookup
+  final int? failed;
+
+  /// In input order
+  final List<VerifyBatchResultItem>? items;
+
+  final String? operation;
+
+  /// Items per result
+  final Map<String, int>? results;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (count != null) 'count': count!,
+        if (failed != null) 'failed': failed!,
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+        if (operation != null) 'operation': operation!,
+        if (results != null) 'results': results!,
+      };
+}
+
+/// One item: the common response, or error
+class VerifyBatchResultItem {
+  const VerifyBatchResultItem({
+    this.checkedAt,
+    this.details,
+    this.error,
+    this.index,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyBatchResultItem.fromJson(Map<String, dynamic> json) => VerifyBatchResultItem(
+        checkedAt: json['checked_at'] as String?,
+        details: (json['details'] as Map?)?.map((k, e) => MapEntry(k as String, (e)!)).cast<String, Object>(),
+        error: json['error'] == null ? null : VerifyBatchResultItemsItemError.fromJson(json['error'] as Map<String, dynamic>),
+        index: (json['index'] as num?)?.toInt(),
+        nameMatch: json['name_match'] == null ? null : VerifyBatchResultItemsItemNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// The operation's details
+  final Map<String, Object>? details;
+
+  /// Why the item was not looked up (free, not audited): the error its own call would have answered
+  final VerifyBatchResultItemsItemError? error;
+
+  /// The item's place in the request
+  final int? index;
+
+  /// With name in the request and a name at the source
+  final VerifyBatchResultItemsItemNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!,
+        if (error != null) 'error': error!.toJson(),
+        if (index != null) 'index': index!,
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// Why the item was not looked up (free, not audited): the error its own call would have answered
+class VerifyBatchResultItemsItemError {
+  const VerifyBatchResultItemsItemError({
+    this.message,
+    this.param,
+    this.reason,
+  });
+
+  factory VerifyBatchResultItemsItemError.fromJson(Map<String, dynamic> json) => VerifyBatchResultItemsItemError(
+        message: json['message'] as String?,
+        param: json['param'] as String?,
+        reason: json['reason'] as String?,
+      );
+
+  final String? message;
+
+  final String? param;
+
+  final String? reason;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (message != null) 'message': message!,
+        if (param != null) 'param': param!,
+        if (reason != null) 'reason': reason!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyBatchResultItemsItemNameMatch {
+  const VerifyBatchResultItemsItemNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyBatchResultItemsItemNameMatch.fromJson(Map<String, dynamic> json) => VerifyBatchResultItemsItemNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyCinParams {
+  const VerifyCinParams({
+    this.consent,
+    this.purpose,
+    this.callbackUrl,
+    this.cin,
+    this.includeDirectors,
+    this.llpin,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// 21-character CIN
+  final String? cin;
+
+  /// Add directors\[]
+  final bool? includeDirectors;
+
+  /// LLPIN, AAA-1234
+  final String? llpin;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (cin != null) 'cin': cin!,
+        if (includeDirectors != null) 'include_directors': includeDirectors!,
+        if (llpin != null) 'llpin': llpin!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyCinRequest {
+  const VerifyCinRequest({
+    this.callbackUrl,
+    this.cin,
+    this.consent,
+    this.includeDirectors,
+    this.llpin,
+    this.name,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyCinRequest.fromJson(Map<String, dynamic> json) => VerifyCinRequest(
+        callbackUrl: json['callback_url'] as String?,
+        cin: json['cin'] as String?,
+        consent: json['consent'] as bool?,
+        includeDirectors: json['include_directors'] as bool?,
+        llpin: json['llpin'] as String?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// 21-character CIN
+  final String? cin;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Add directors\[]
+  final bool? includeDirectors;
+
+  /// LLPIN, AAA-1234
+  final String? llpin;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (cin != null) 'cin': cin!,
+        if (consent != null) 'consent': consent!,
+        if (includeDirectors != null) 'include_directors': includeDirectors!,
+        if (llpin != null) 'llpin': llpin!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyCinResult {
+  const VerifyCinResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyCinResult.fromJson(Map<String, dynamic> json) => VerifyCinResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyCinResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyCinResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: company_name, status, class, roc, incorporation_date, authorised_capital, paid_up_capital, registered_address, directors.
+  final VerifyCinResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyCinResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: company_name, status, class, roc, incorporation_date, authorised_capital, paid_up_capital, registered_address, directors.
+class VerifyCinResultDetails {
+  const VerifyCinResultDetails({
+    this.authorisedCapital,
+    this.classValue,
+    this.companyName,
+    this.directors,
+    this.incorporationDate,
+    this.paidUpCapital,
+    this.registeredAddress,
+    this.roc,
+    this.status,
+  });
+
+  factory VerifyCinResultDetails.fromJson(Map<String, dynamic> json) => VerifyCinResultDetails(
+        authorisedCapital: json['authorised_capital'] as num?,
+        classValue: json['class'] as String?,
+        companyName: json['company_name'] as String?,
+        directors: (json['directors'] as List?)?.map((e) => (e == null ? null : VerifyCinResultDetailsDirector.fromJson(e as Map<String, dynamic>))!).toList().cast<VerifyCinResultDetailsDirector>(),
+        incorporationDate: json['incorporation_date'] as String?,
+        paidUpCapital: json['paid_up_capital'] as num?,
+        registeredAddress: json['registered_address'] as String?,
+        roc: json['roc'] as String?,
+        status: json['status'] as String?,
+      );
+
+  final num? authorisedCapital;
+
+  final String? classValue;
+
+  final String? companyName;
+
+  final List<VerifyCinResultDetailsDirector>? directors;
+
+  final String? incorporationDate;
+
+  final num? paidUpCapital;
+
+  final String? registeredAddress;
+
+  final String? roc;
+
+  final String? status;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (authorisedCapital != null) 'authorised_capital': authorisedCapital!,
+        if (classValue != null) 'class': classValue!,
+        if (companyName != null) 'company_name': companyName!,
+        if (directors != null) 'directors': directors!.map((e) => e.toJson()).toList(),
+        if (incorporationDate != null) 'incorporation_date': incorporationDate!,
+        if (paidUpCapital != null) 'paid_up_capital': paidUpCapital!,
+        if (registeredAddress != null) 'registered_address': registeredAddress!,
+        if (roc != null) 'roc': roc!,
+        if (status != null) 'status': status!,
+      };
+}
+
+class VerifyCinResultDetailsDirector {
+  const VerifyCinResultDetailsDirector({
+    this.appointedOn,
+    this.designation,
+    this.din,
+    this.name,
+  });
+
+  factory VerifyCinResultDetailsDirector.fromJson(Map<String, dynamic> json) => VerifyCinResultDetailsDirector(
+        appointedOn: json['appointed_on'] as String?,
+        designation: json['designation'] as String?,
+        din: json['din'] as String?,
+        name: json['name'] as String?,
+      );
+
+  final String? appointedOn;
+
+  final String? designation;
+
+  final String? din;
+
+  final String? name;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (appointedOn != null) 'appointed_on': appointedOn!,
+        if (designation != null) 'designation': designation!,
+        if (din != null) 'din': din!,
+        if (name != null) 'name': name!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyCinResultNameMatch {
+  const VerifyCinResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyCinResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyCinResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyDrivingLicenceParams {
+  const VerifyDrivingLicenceParams({
+    this.consent,
+    this.dateOfBirth,
+    this.dlNumber,
+    this.purpose,
+    this.callbackUrl,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// YYYY-MM-DD
+  final String? dateOfBirth;
+
+  /// 15 characters, MH1220110012345
+  final String? dlNumber;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!,
+        if (dlNumber != null) 'dl_number': dlNumber!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyDrivingLicenceRequest {
+  const VerifyDrivingLicenceRequest({
+    this.callbackUrl,
+    this.consent,
+    this.dateOfBirth,
+    this.dlNumber,
+    this.name,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyDrivingLicenceRequest.fromJson(Map<String, dynamic> json) => VerifyDrivingLicenceRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        dateOfBirth: json['date_of_birth'] as String?,
+        dlNumber: json['dl_number'] as String?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// YYYY-MM-DD
+  final String? dateOfBirth;
+
+  /// 15 characters, MH1220110012345
+  final String? dlNumber;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!,
+        if (dlNumber != null) 'dl_number': dlNumber!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyDrivingLicenceResult {
+  const VerifyDrivingLicenceResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyDrivingLicenceResult.fromJson(Map<String, dynamic> json) => VerifyDrivingLicenceResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyDrivingLicenceResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyDrivingLicenceResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: holder_name, status, valid_from, valid_upto, classes, rto.
+  final VerifyDrivingLicenceResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyDrivingLicenceResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: holder_name, status, valid_from, valid_upto, classes, rto.
+class VerifyDrivingLicenceResultDetails {
+  const VerifyDrivingLicenceResultDetails({
+    this.classes,
+    this.holderName,
+    this.rto,
+    this.status,
+    this.validFrom,
+    this.validUpto,
+  });
+
+  factory VerifyDrivingLicenceResultDetails.fromJson(Map<String, dynamic> json) => VerifyDrivingLicenceResultDetails(
+        classes: (json['classes'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        holderName: json['holder_name'] as String?,
+        rto: json['rto'] as String?,
+        status: json['status'] as String?,
+        validFrom: json['valid_from'] as String?,
+        validUpto: json['valid_upto'] as String?,
+      );
+
+  final List<String>? classes;
+
+  final String? holderName;
+
+  final String? rto;
+
+  final String? status;
+
+  final String? validFrom;
+
+  final String? validUpto;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (classes != null) 'classes': classes!,
+        if (holderName != null) 'holder_name': holderName!,
+        if (rto != null) 'rto': rto!,
+        if (status != null) 'status': status!,
+        if (validFrom != null) 'valid_from': validFrom!,
+        if (validUpto != null) 'valid_upto': validUpto!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyDrivingLicenceResultNameMatch {
+  const VerifyDrivingLicenceResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyDrivingLicenceResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyDrivingLicenceResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyEmailParams {
+  const VerifyEmailParams({
+    this.consent,
+    this.email,
+    this.purpose,
+    this.callbackUrl,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// name@domain
+  final String? email;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (email != null) 'email': email!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyEmailRequest {
+  const VerifyEmailRequest({
+    this.callbackUrl,
+    this.consent,
+    this.email,
+    this.name,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyEmailRequest.fromJson(Map<String, dynamic> json) => VerifyEmailRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        email: json['email'] as String?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// name@domain
+  final String? email;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (email != null) 'email': email!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyEmailResult {
+  const VerifyEmailResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyEmailResult.fromJson(Map<String, dynamic> json) => VerifyEmailResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyEmailResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyEmailResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: syntax_valid, mx_found, disposable, role_address, deliverable, mailbox_status, suggestion.
+  final VerifyEmailResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyEmailResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: syntax_valid, mx_found, disposable, role_address, deliverable, mailbox_status, suggestion.
+class VerifyEmailResultDetails {
+  const VerifyEmailResultDetails({
+    this.deliverable,
+    this.disposable,
+    this.mailboxStatus,
+    this.mxFound,
+    this.roleAddress,
+    this.suggestion,
+    this.syntaxValid,
+  });
+
+  factory VerifyEmailResultDetails.fromJson(Map<String, dynamic> json) => VerifyEmailResultDetails(
+        deliverable: json['deliverable'] as bool?,
+        disposable: json['disposable'] as bool?,
+        mailboxStatus: json['mailbox_status'] as String?,
+        mxFound: json['mx_found'] as bool?,
+        roleAddress: json['role_address'] as bool?,
+        suggestion: json['suggestion'] as String?,
+        syntaxValid: json['syntax_valid'] as bool?,
+      );
+
+  final bool? deliverable;
+
+  final bool? disposable;
+
+  final String? mailboxStatus;
+
+  final bool? mxFound;
+
+  final bool? roleAddress;
+
+  final String? suggestion;
+
+  final bool? syntaxValid;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (deliverable != null) 'deliverable': deliverable!,
+        if (disposable != null) 'disposable': disposable!,
+        if (mailboxStatus != null) 'mailbox_status': mailboxStatus!,
+        if (mxFound != null) 'mx_found': mxFound!,
+        if (roleAddress != null) 'role_address': roleAddress!,
+        if (suggestion != null) 'suggestion': suggestion!,
+        if (syntaxValid != null) 'syntax_valid': syntaxValid!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyEmailResultNameMatch {
+  const VerifyEmailResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyEmailResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyEmailResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyFssaiParams {
+  const VerifyFssaiParams({
+    this.consent,
+    this.licenceNumber,
+    this.purpose,
+    this.callbackUrl,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 14-digit licence or registration number
+  final String? licenceNumber;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (licenceNumber != null) 'licence_number': licenceNumber!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyFssaiRequest {
+  const VerifyFssaiRequest({
+    this.callbackUrl,
+    this.consent,
+    this.licenceNumber,
+    this.name,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyFssaiRequest.fromJson(Map<String, dynamic> json) => VerifyFssaiRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        licenceNumber: json['licence_number'] as String?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 14-digit licence or registration number
+  final String? licenceNumber;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (licenceNumber != null) 'licence_number': licenceNumber!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyFssaiResult {
+  const VerifyFssaiResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyFssaiResult.fromJson(Map<String, dynamic> json) => VerifyFssaiResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyFssaiResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyFssaiResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: business_name, licence_type, status, valid_upto, premises_address.
+  final VerifyFssaiResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyFssaiResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: business_name, licence_type, status, valid_upto, premises_address.
+class VerifyFssaiResultDetails {
+  const VerifyFssaiResultDetails({
+    this.businessName,
+    this.licenceType,
+    this.premisesAddress,
+    this.status,
+    this.validUpto,
+  });
+
+  factory VerifyFssaiResultDetails.fromJson(Map<String, dynamic> json) => VerifyFssaiResultDetails(
+        businessName: json['business_name'] as String?,
+        licenceType: json['licence_type'] as String?,
+        premisesAddress: json['premises_address'] as String?,
+        status: json['status'] as String?,
+        validUpto: json['valid_upto'] as String?,
+      );
+
+  final String? businessName;
+
+  final String? licenceType;
+
+  final String? premisesAddress;
+
+  final String? status;
+
+  final String? validUpto;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (businessName != null) 'business_name': businessName!,
+        if (licenceType != null) 'licence_type': licenceType!,
+        if (premisesAddress != null) 'premises_address': premisesAddress!,
+        if (status != null) 'status': status!,
+        if (validUpto != null) 'valid_upto': validUpto!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyFssaiResultNameMatch {
+  const VerifyFssaiResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyFssaiResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyFssaiResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyGstinParams {
+  const VerifyGstinParams({
+    this.consent,
+    this.gstin,
+    this.purpose,
+    this.callbackUrl,
+    this.includeFilings,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 15-character GSTIN
+  final String? gstin;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Add filings\[]
+  final bool? includeFilings;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (gstin != null) 'gstin': gstin!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (includeFilings != null) 'include_filings': includeFilings!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyGstinRequest {
+  const VerifyGstinRequest({
+    this.callbackUrl,
+    this.consent,
+    this.gstin,
+    this.includeFilings,
+    this.name,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyGstinRequest.fromJson(Map<String, dynamic> json) => VerifyGstinRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        gstin: json['gstin'] as String?,
+        includeFilings: json['include_filings'] as bool?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 15-character GSTIN
+  final String? gstin;
+
+  /// Add filings\[]
+  final bool? includeFilings;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (gstin != null) 'gstin': gstin!,
+        if (includeFilings != null) 'include_filings': includeFilings!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyGstinResult {
+  const VerifyGstinResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyGstinResult.fromJson(Map<String, dynamic> json) => VerifyGstinResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyGstinResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyGstinResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: legal_name, trade_name, pan, status, registration_date, cancellation_date, constitution, taxpayer_type, principal_address, state_jurisdiction, nature_of_business, filings.
+  final VerifyGstinResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyGstinResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: legal_name, trade_name, pan, status, registration_date, cancellation_date, constitution, taxpayer_type, principal_address, state_jurisdiction, nature_of_business, filings.
+class VerifyGstinResultDetails {
+  const VerifyGstinResultDetails({
+    this.cancellationDate,
+    this.constitution,
+    this.filings,
+    this.legalName,
+    this.natureOfBusiness,
+    this.pan,
+    this.principalAddress,
+    this.registrationDate,
+    this.stateJurisdiction,
+    this.status,
+    this.taxpayerType,
+    this.tradeName,
+  });
+
+  factory VerifyGstinResultDetails.fromJson(Map<String, dynamic> json) => VerifyGstinResultDetails(
+        cancellationDate: json['cancellation_date'] as String?,
+        constitution: json['constitution'] as String?,
+        filings: (json['filings'] as List?)?.map((e) => (e == null ? null : VerifyGstinResultDetailsFiling.fromJson(e as Map<String, dynamic>))!).toList().cast<VerifyGstinResultDetailsFiling>(),
+        legalName: json['legal_name'] as String?,
+        natureOfBusiness: (json['nature_of_business'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        pan: json['pan'] as String?,
+        principalAddress: json['principal_address'] as String?,
+        registrationDate: json['registration_date'] as String?,
+        stateJurisdiction: json['state_jurisdiction'] as String?,
+        status: json['status'] as String?,
+        taxpayerType: json['taxpayer_type'] as String?,
+        tradeName: json['trade_name'] as String?,
+      );
+
+  final String? cancellationDate;
+
+  final String? constitution;
+
+  final List<VerifyGstinResultDetailsFiling>? filings;
+
+  final String? legalName;
+
+  final List<String>? natureOfBusiness;
+
+  final String? pan;
+
+  final String? principalAddress;
+
+  final String? registrationDate;
+
+  final String? stateJurisdiction;
+
+  final String? status;
+
+  final String? taxpayerType;
+
+  final String? tradeName;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (cancellationDate != null) 'cancellation_date': cancellationDate!,
+        if (constitution != null) 'constitution': constitution!,
+        if (filings != null) 'filings': filings!.map((e) => e.toJson()).toList(),
+        if (legalName != null) 'legal_name': legalName!,
+        if (natureOfBusiness != null) 'nature_of_business': natureOfBusiness!,
+        if (pan != null) 'pan': pan!,
+        if (principalAddress != null) 'principal_address': principalAddress!,
+        if (registrationDate != null) 'registration_date': registrationDate!,
+        if (stateJurisdiction != null) 'state_jurisdiction': stateJurisdiction!,
+        if (status != null) 'status': status!,
+        if (taxpayerType != null) 'taxpayer_type': taxpayerType!,
+        if (tradeName != null) 'trade_name': tradeName!,
+      };
+}
+
+class VerifyGstinResultDetailsFiling {
+  const VerifyGstinResultDetailsFiling({
+    this.filedOn,
+    this.period,
+    this.returnType,
+    this.status,
+  });
+
+  factory VerifyGstinResultDetailsFiling.fromJson(Map<String, dynamic> json) => VerifyGstinResultDetailsFiling(
+        filedOn: json['filed_on'] as String?,
+        period: json['period'] as String?,
+        returnType: json['return_type'] as String?,
+        status: json['status'] as String?,
+      );
+
+  final String? filedOn;
+
+  final String? period;
+
+  final String? returnType;
+
+  final String? status;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (filedOn != null) 'filed_on': filedOn!,
+        if (period != null) 'period': period!,
+        if (returnType != null) 'return_type': returnType!,
+        if (status != null) 'status': status!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyGstinResultNameMatch {
+  const VerifyGstinResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyGstinResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyGstinResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyIecParams {
+  const VerifyIecParams({
+    this.consent,
+    this.iec,
+    this.purpose,
+    this.callbackUrl,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 10-character IEC
+  final String? iec;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (iec != null) 'iec': iec!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyIecRequest {
+  const VerifyIecRequest({
+    this.callbackUrl,
+    this.consent,
+    this.iec,
+    this.name,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyIecRequest.fromJson(Map<String, dynamic> json) => VerifyIecRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        iec: json['iec'] as String?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 10-character IEC
+  final String? iec;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (iec != null) 'iec': iec!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyIecResult {
+  const VerifyIecResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyIecResult.fromJson(Map<String, dynamic> json) => VerifyIecResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyIecResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyIecResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: firm_name, status, dgft_office, issue_date, branches.
+  final VerifyIecResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyIecResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: firm_name, status, dgft_office, issue_date, branches.
+class VerifyIecResultDetails {
+  const VerifyIecResultDetails({
+    this.branches,
+    this.dgftOffice,
+    this.firmName,
+    this.issueDate,
+    this.status,
+  });
+
+  factory VerifyIecResultDetails.fromJson(Map<String, dynamic> json) => VerifyIecResultDetails(
+        branches: (json['branches'] as List?)?.map((e) => (e == null ? null : VerifyIecResultDetailsBranche.fromJson(e as Map<String, dynamic>))!).toList().cast<VerifyIecResultDetailsBranche>(),
+        dgftOffice: json['dgft_office'] as String?,
+        firmName: json['firm_name'] as String?,
+        issueDate: json['issue_date'] as String?,
+        status: json['status'] as String?,
+      );
+
+  final List<VerifyIecResultDetailsBranche>? branches;
+
+  final String? dgftOffice;
+
+  final String? firmName;
+
+  final String? issueDate;
+
+  final String? status;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (branches != null) 'branches': branches!.map((e) => e.toJson()).toList(),
+        if (dgftOffice != null) 'dgft_office': dgftOffice!,
+        if (firmName != null) 'firm_name': firmName!,
+        if (issueDate != null) 'issue_date': issueDate!,
+        if (status != null) 'status': status!,
+      };
+}
+
+class VerifyIecResultDetailsBranche {
+  const VerifyIecResultDetailsBranche({
+    this.address,
+    this.code,
+  });
+
+  factory VerifyIecResultDetailsBranche.fromJson(Map<String, dynamic> json) => VerifyIecResultDetailsBranche(
+        address: json['address'] as String?,
+        code: json['code'] as String?,
+      );
+
+  final String? address;
+
+  final String? code;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (address != null) 'address': address!,
+        if (code != null) 'code': code!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyIecResultNameMatch {
+  const VerifyIecResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyIecResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyIecResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyIfscParams {
+  const VerifyIfscParams({
+    this.consent,
+    this.ifsc,
+    this.purpose,
+    this.callbackUrl,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 11-character IFSC
+  final String? ifsc;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (ifsc != null) 'ifsc': ifsc!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyIfscRequest {
+  const VerifyIfscRequest({
+    this.callbackUrl,
+    this.consent,
+    this.ifsc,
+    this.name,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyIfscRequest.fromJson(Map<String, dynamic> json) => VerifyIfscRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        ifsc: json['ifsc'] as String?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 11-character IFSC
+  final String? ifsc;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (ifsc != null) 'ifsc': ifsc!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyIfscResult {
+  const VerifyIfscResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyIfscResult.fromJson(Map<String, dynamic> json) => VerifyIfscResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyIfscResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyIfscResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: bank, status, branch, address, city, state, channels.
+  final VerifyIfscResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyIfscResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: bank, status, branch, address, city, state, channels.
+class VerifyIfscResultDetails {
+  const VerifyIfscResultDetails({
+    this.address,
+    this.bank,
+    this.branch,
+    this.channels,
+    this.city,
+    this.state,
+    this.status,
+  });
+
+  factory VerifyIfscResultDetails.fromJson(Map<String, dynamic> json) => VerifyIfscResultDetails(
+        address: json['address'] as String?,
+        bank: json['bank'] as String?,
+        branch: json['branch'] as String?,
+        channels: json['channels'] == null ? null : VerifyIfscResultDetailsChannels.fromJson(json['channels'] as Map<String, dynamic>),
+        city: json['city'] as String?,
+        state: json['state'] as String?,
+        status: json['status'] as String?,
+      );
+
+  final String? address;
+
+  final String? bank;
+
+  final String? branch;
+
+  final VerifyIfscResultDetailsChannels? channels;
+
+  final String? city;
+
+  final String? state;
+
+  final String? status;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (address != null) 'address': address!,
+        if (bank != null) 'bank': bank!,
+        if (branch != null) 'branch': branch!,
+        if (channels != null) 'channels': channels!.toJson(),
+        if (city != null) 'city': city!,
+        if (state != null) 'state': state!,
+        if (status != null) 'status': status!,
+      };
+}
+
+class VerifyIfscResultDetailsChannels {
+  const VerifyIfscResultDetailsChannels({
+    this.imps,
+    this.neft,
+    this.rtgs,
+    this.upi,
+  });
+
+  factory VerifyIfscResultDetailsChannels.fromJson(Map<String, dynamic> json) => VerifyIfscResultDetailsChannels(
+        imps: json['imps'] as bool?,
+        neft: json['neft'] as bool?,
+        rtgs: json['rtgs'] as bool?,
+        upi: json['upi'] as bool?,
+      );
+
+  final bool? imps;
+
+  final bool? neft;
+
+  final bool? rtgs;
+
+  final bool? upi;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (imps != null) 'imps': imps!,
+        if (neft != null) 'neft': neft!,
+        if (rtgs != null) 'rtgs': rtgs!,
+        if (upi != null) 'upi': upi!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyIfscResultNameMatch {
+  const VerifyIfscResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyIfscResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyIfscResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyMobileParams {
+  const VerifyMobileParams({
+    this.consent,
+    this.mobile,
+    this.purpose,
+    this.callbackUrl,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 10 digits, +91 allowed
+  final String? mobile;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (mobile != null) 'mobile': mobile!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyMobileRequest {
+  const VerifyMobileRequest({
+    this.callbackUrl,
+    this.consent,
+    this.mobile,
+    this.name,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyMobileRequest.fromJson(Map<String, dynamic> json) => VerifyMobileRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        mobile: json['mobile'] as String?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 10 digits, +91 allowed
+  final String? mobile;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (mobile != null) 'mobile': mobile!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyMobileResult {
+  const VerifyMobileResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyMobileResult.fromJson(Map<String, dynamic> json) => VerifyMobileResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyMobileResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyMobileResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: subscriber_name, status, operator, circle, number_type, ported, dnd.
+  final VerifyMobileResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyMobileResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: subscriber_name, status, operator, circle, number_type, ported, dnd.
+class VerifyMobileResultDetails {
+  const VerifyMobileResultDetails({
+    this.circle,
+    this.dnd,
+    this.numberType,
+    this.operator,
+    this.ported,
+    this.status,
+    this.subscriberName,
+  });
+
+  factory VerifyMobileResultDetails.fromJson(Map<String, dynamic> json) => VerifyMobileResultDetails(
+        circle: json['circle'] as String?,
+        dnd: json['dnd'] as bool?,
+        numberType: json['number_type'] as String?,
+        operator: json['operator'] as String?,
+        ported: json['ported'] as bool?,
+        status: json['status'] as String?,
+        subscriberName: json['subscriber_name'] as String?,
+      );
+
+  final String? circle;
+
+  final bool? dnd;
+
+  final String? numberType;
+
+  final String? operator;
+
+  final bool? ported;
+
+  final String? status;
+
+  final String? subscriberName;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (circle != null) 'circle': circle!,
+        if (dnd != null) 'dnd': dnd!,
+        if (numberType != null) 'number_type': numberType!,
+        if (operator != null) 'operator': operator!,
+        if (ported != null) 'ported': ported!,
+        if (status != null) 'status': status!,
+        if (subscriberName != null) 'subscriber_name': subscriberName!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyMobileResultNameMatch {
+  const VerifyMobileResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyMobileResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyMobileResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyPanAadhaarLinkParams {
+  const VerifyPanAadhaarLinkParams({
+    this.aadhaarLast4,
+    this.consent,
+    this.pan,
+    this.purpose,
+    this.callbackUrl,
+    this.name,
+    this.referenceId,
+  });
+
+  /// The Aadhaar's last 4 digits
+  final String? aadhaarLast4;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 10-character PAN
+  final String? pan;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (aadhaarLast4 != null) 'aadhaar_last4': aadhaarLast4!,
+        if (consent != null) 'consent': consent!,
+        if (pan != null) 'pan': pan!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyPanAadhaarLinkRequest {
+  const VerifyPanAadhaarLinkRequest({
+    this.aadhaarLast4,
+    this.callbackUrl,
+    this.consent,
+    this.name,
+    this.pan,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyPanAadhaarLinkRequest.fromJson(Map<String, dynamic> json) => VerifyPanAadhaarLinkRequest(
+        aadhaarLast4: json['aadhaar_last4'] as String?,
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        name: json['name'] as String?,
+        pan: json['pan'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// The Aadhaar's last 4 digits
+  final String? aadhaarLast4;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// 10-character PAN
+  final String? pan;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (aadhaarLast4 != null) 'aadhaar_last4': aadhaarLast4!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (name != null) 'name': name!,
+        if (pan != null) 'pan': pan!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyPanAadhaarLinkResult {
+  const VerifyPanAadhaarLinkResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyPanAadhaarLinkResult.fromJson(Map<String, dynamic> json) => VerifyPanAadhaarLinkResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyPanAadhaarLinkResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyPanAadhaarLinkResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: linked, pan_status, aadhaar_matches.
+  final VerifyPanAadhaarLinkResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyPanAadhaarLinkResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: linked, pan_status, aadhaar_matches.
+class VerifyPanAadhaarLinkResultDetails {
+  const VerifyPanAadhaarLinkResultDetails({
+    this.aadhaarMatches,
+    this.linked,
+    this.panStatus,
+  });
+
+  factory VerifyPanAadhaarLinkResultDetails.fromJson(Map<String, dynamic> json) => VerifyPanAadhaarLinkResultDetails(
+        aadhaarMatches: json['aadhaar_matches'] as bool?,
+        linked: json['linked'] as bool?,
+        panStatus: json['pan_status'] as String?,
+      );
+
+  final bool? aadhaarMatches;
+
+  final bool? linked;
+
+  final String? panStatus;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (aadhaarMatches != null) 'aadhaar_matches': aadhaarMatches!,
+        if (linked != null) 'linked': linked!,
+        if (panStatus != null) 'pan_status': panStatus!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyPanAadhaarLinkResultNameMatch {
+  const VerifyPanAadhaarLinkResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyPanAadhaarLinkResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyPanAadhaarLinkResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyPanParams {
+  const VerifyPanParams({
+    this.consent,
+    this.pan,
+    this.purpose,
+    this.callbackUrl,
+    this.dateOfBirth,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// 10-character PAN
+  final String? pan;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// YYYY-MM-DD, checked when given
+  final String? dateOfBirth;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (pan != null) 'pan': pan!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyPanRequest {
+  const VerifyPanRequest({
+    this.callbackUrl,
+    this.consent,
+    this.dateOfBirth,
+    this.name,
+    this.pan,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyPanRequest.fromJson(Map<String, dynamic> json) => VerifyPanRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        dateOfBirth: json['date_of_birth'] as String?,
+        name: json['name'] as String?,
+        pan: json['pan'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// YYYY-MM-DD, checked when given
+  final String? dateOfBirth;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// 10-character PAN
+  final String? pan;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!,
+        if (name != null) 'name': name!,
+        if (pan != null) 'pan': pan!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyPanResult {
+  const VerifyPanResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyPanResult.fromJson(Map<String, dynamic> json) => VerifyPanResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyPanResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyPanResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: name, category, status, aadhaar_seeding, dob_match.
+  final VerifyPanResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyPanResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: name, category, status, aadhaar_seeding, dob_match.
+class VerifyPanResultDetails {
+  const VerifyPanResultDetails({
+    this.aadhaarSeeding,
+    this.category,
+    this.dobMatch,
+    this.name,
+    this.status,
+  });
+
+  factory VerifyPanResultDetails.fromJson(Map<String, dynamic> json) => VerifyPanResultDetails(
+        aadhaarSeeding: json['aadhaar_seeding'] as String?,
+        category: json['category'] as String?,
+        dobMatch: json['dob_match'] as bool?,
+        name: json['name'] as String?,
+        status: json['status'] as String?,
+      );
+
+  final String? aadhaarSeeding;
+
+  final String? category;
+
+  final bool? dobMatch;
+
+  final String? name;
+
+  final String? status;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (aadhaarSeeding != null) 'aadhaar_seeding': aadhaarSeeding!,
+        if (category != null) 'category': category!,
+        if (dobMatch != null) 'dob_match': dobMatch!,
+        if (name != null) 'name': name!,
+        if (status != null) 'status': status!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyPanResultNameMatch {
+  const VerifyPanResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyPanResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyPanResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyPassportParams {
+  const VerifyPassportParams({
+    this.consent,
+    this.purpose,
+    this.callbackUrl,
+    this.dateOfBirth,
+    this.fileNumber,
+    this.mrz,
+    this.name,
+    this.passportNumber,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// YYYY-MM-DD, with file_number
+  final String? dateOfBirth;
+
+  /// Passport file number
+  final String? fileNumber;
+
+  /// The two 44-character MRZ lines
+  final List<String>? mrz;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// A1234567, with mrz
+  final String? passportNumber;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!,
+        if (fileNumber != null) 'file_number': fileNumber!,
+        if (mrz != null) 'mrz': mrz!,
+        if (name != null) 'name': name!,
+        if (passportNumber != null) 'passport_number': passportNumber!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyPassportRequest {
+  const VerifyPassportRequest({
+    this.callbackUrl,
+    this.consent,
+    this.dateOfBirth,
+    this.fileNumber,
+    this.mrz,
+    this.name,
+    this.passportNumber,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyPassportRequest.fromJson(Map<String, dynamic> json) => VerifyPassportRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        dateOfBirth: json['date_of_birth'] as String?,
+        fileNumber: json['file_number'] as String?,
+        mrz: (json['mrz'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        name: json['name'] as String?,
+        passportNumber: json['passport_number'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// YYYY-MM-DD, with file_number
+  final String? dateOfBirth;
+
+  /// Passport file number
+  final String? fileNumber;
+
+  /// The two 44-character MRZ lines
+  final List<String>? mrz;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// A1234567, with mrz
+  final String? passportNumber;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!,
+        if (fileNumber != null) 'file_number': fileNumber!,
+        if (mrz != null) 'mrz': mrz!,
+        if (name != null) 'name': name!,
+        if (passportNumber != null) 'passport_number': passportNumber!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyPassportResult {
+  const VerifyPassportResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyPassportResult.fromJson(Map<String, dynamic> json) => VerifyPassportResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyPassportResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyPassportResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: status, name, application_type, date_of_application, nationality, issuing_country, date_of_birth, sex, expiry, mrz_valid.
+  final VerifyPassportResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyPassportResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: status, name, application_type, date_of_application, nationality, issuing_country, date_of_birth, sex, expiry, mrz_valid.
+class VerifyPassportResultDetails {
+  const VerifyPassportResultDetails({
+    this.applicationType,
+    this.dateOfApplication,
+    this.dateOfBirth,
+    this.expiry,
+    this.issuingCountry,
+    this.mrzValid,
+    this.name,
+    this.nationality,
+    this.sex,
+    this.status,
+  });
+
+  factory VerifyPassportResultDetails.fromJson(Map<String, dynamic> json) => VerifyPassportResultDetails(
+        applicationType: json['application_type'] as String?,
+        dateOfApplication: json['date_of_application'] as String?,
+        dateOfBirth: json['date_of_birth'] as String?,
+        expiry: json['expiry'] as String?,
+        issuingCountry: json['issuing_country'] as String?,
+        mrzValid: json['mrz_valid'] as bool?,
+        name: json['name'] as String?,
+        nationality: json['nationality'] as String?,
+        sex: json['sex'] as String?,
+        status: json['status'] as String?,
+      );
+
+  final String? applicationType;
+
+  final String? dateOfApplication;
+
+  final String? dateOfBirth;
+
+  final String? expiry;
+
+  final String? issuingCountry;
+
+  final bool? mrzValid;
+
+  final String? name;
+
+  final String? nationality;
+
+  final String? sex;
+
+  final String? status;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (applicationType != null) 'application_type': applicationType!,
+        if (dateOfApplication != null) 'date_of_application': dateOfApplication!,
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!,
+        if (expiry != null) 'expiry': expiry!,
+        if (issuingCountry != null) 'issuing_country': issuingCountry!,
+        if (mrzValid != null) 'mrz_valid': mrzValid!,
+        if (name != null) 'name': name!,
+        if (nationality != null) 'nationality': nationality!,
+        if (sex != null) 'sex': sex!,
+        if (status != null) 'status': status!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyPassportResultNameMatch {
+  const VerifyPassportResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyPassportResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyPassportResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyUdyamParams {
+  const VerifyUdyamParams({
+    this.consent,
+    this.purpose,
+    this.udyamNumber,
+    this.callbackUrl,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// UDYAM-XX-00-0000000
+  final String? udyamNumber;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (purpose != null) 'purpose': purpose!,
+        if (udyamNumber != null) 'udyam_number': udyamNumber!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyUdyamRequest {
+  const VerifyUdyamRequest({
+    this.callbackUrl,
+    this.consent,
+    this.name,
+    this.purpose,
+    this.referenceId,
+    this.udyamNumber,
+  });
+
+  factory VerifyUdyamRequest.fromJson(Map<String, dynamic> json) => VerifyUdyamRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+        udyamNumber: json['udyam_number'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// UDYAM-XX-00-0000000
+  final String? udyamNumber;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (udyamNumber != null) 'udyam_number': udyamNumber!,
+      };
+}
+
+/// The common verify response
+class VerifyUdyamResult {
+  const VerifyUdyamResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyUdyamResult.fromJson(Map<String, dynamic> json) => VerifyUdyamResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyUdyamResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyUdyamResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: enterprise_name, status, enterprise_type, major_activity, incorporation_date, address, nic_codes.
+  final VerifyUdyamResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyUdyamResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: enterprise_name, status, enterprise_type, major_activity, incorporation_date, address, nic_codes.
+class VerifyUdyamResultDetails {
+  const VerifyUdyamResultDetails({
+    this.address,
+    this.enterpriseName,
+    this.enterpriseType,
+    this.incorporationDate,
+    this.majorActivity,
+    this.nicCodes,
+    this.status,
+  });
+
+  factory VerifyUdyamResultDetails.fromJson(Map<String, dynamic> json) => VerifyUdyamResultDetails(
+        address: json['address'] as String?,
+        enterpriseName: json['enterprise_name'] as String?,
+        enterpriseType: json['enterprise_type'] as String?,
+        incorporationDate: json['incorporation_date'] as String?,
+        majorActivity: json['major_activity'] as String?,
+        nicCodes: (json['nic_codes'] as List?)?.map((e) => (e == null ? null : VerifyUdyamResultDetailsNicCode.fromJson(e as Map<String, dynamic>))!).toList().cast<VerifyUdyamResultDetailsNicCode>(),
+        status: json['status'] as String?,
+      );
+
+  final String? address;
+
+  final String? enterpriseName;
+
+  final String? enterpriseType;
+
+  final String? incorporationDate;
+
+  final String? majorActivity;
+
+  final List<VerifyUdyamResultDetailsNicCode>? nicCodes;
+
+  final String? status;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (address != null) 'address': address!,
+        if (enterpriseName != null) 'enterprise_name': enterpriseName!,
+        if (enterpriseType != null) 'enterprise_type': enterpriseType!,
+        if (incorporationDate != null) 'incorporation_date': incorporationDate!,
+        if (majorActivity != null) 'major_activity': majorActivity!,
+        if (nicCodes != null) 'nic_codes': nicCodes!.map((e) => e.toJson()).toList(),
+        if (status != null) 'status': status!,
+      };
+}
+
+class VerifyUdyamResultDetailsNicCode {
+  const VerifyUdyamResultDetailsNicCode({
+    this.code,
+    this.description,
+  });
+
+  factory VerifyUdyamResultDetailsNicCode.fromJson(Map<String, dynamic> json) => VerifyUdyamResultDetailsNicCode(
+        code: json['code'] as String?,
+        description: json['description'] as String?,
+      );
+
+  final String? code;
+
+  final String? description;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (code != null) 'code': code!,
+        if (description != null) 'description': description!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyUdyamResultNameMatch {
+  const VerifyUdyamResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyUdyamResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyUdyamResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyUpiParams {
+  const VerifyUpiParams({
+    this.consent,
+    this.purpose,
+    this.vpa,
+    this.callbackUrl,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// name@handle
+  final String? vpa;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (purpose != null) 'purpose': purpose!,
+        if (vpa != null) 'vpa': vpa!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyUpiRequest {
+  const VerifyUpiRequest({
+    this.callbackUrl,
+    this.consent,
+    this.name,
+    this.purpose,
+    this.referenceId,
+    this.vpa,
+  });
+
+  factory VerifyUpiRequest.fromJson(Map<String, dynamic> json) => VerifyUpiRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+        vpa: json['vpa'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// name@handle
+  final String? vpa;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (vpa != null) 'vpa': vpa!,
+      };
+}
+
+/// The common verify response
+class VerifyUpiResult {
+  const VerifyUpiResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyUpiResult.fromJson(Map<String, dynamic> json) => VerifyUpiResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyUpiResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyUpiResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: holder_name, active.
+  final VerifyUpiResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyUpiResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: holder_name, active.
+class VerifyUpiResultDetails {
+  const VerifyUpiResultDetails({
+    this.active,
+    this.holderName,
+  });
+
+  factory VerifyUpiResultDetails.fromJson(Map<String, dynamic> json) => VerifyUpiResultDetails(
+        active: json['active'] as bool?,
+        holderName: json['holder_name'] as String?,
+      );
+
+  final bool? active;
+
+  final String? holderName;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (active != null) 'active': active!,
+        if (holderName != null) 'holder_name': holderName!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyUpiResultNameMatch {
+  const VerifyUpiResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyUpiResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyUpiResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyVehicleRcParams {
+  const VerifyVehicleRcParams({
+    this.consent,
+    this.purpose,
+    this.registrationNumber,
+    this.callbackUrl,
+    this.consentOwner,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// MH12AB1234 or 22BH1234AA
+  final String? registrationNumber;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The owner consented: return the full owner name
+  final bool? consentOwner;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (purpose != null) 'purpose': purpose!,
+        if (registrationNumber != null) 'registration_number': registrationNumber!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consentOwner != null) 'consent_owner': consentOwner!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyVehicleRcRequest {
+  const VerifyVehicleRcRequest({
+    this.callbackUrl,
+    this.consent,
+    this.consentOwner,
+    this.name,
+    this.purpose,
+    this.referenceId,
+    this.registrationNumber,
+  });
+
+  factory VerifyVehicleRcRequest.fromJson(Map<String, dynamic> json) => VerifyVehicleRcRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        consentOwner: json['consent_owner'] as bool?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+        registrationNumber: json['registration_number'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// The owner consented: return the full owner name
+  final bool? consentOwner;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// MH12AB1234 or 22BH1234AA
+  final String? registrationNumber;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (consentOwner != null) 'consent_owner': consentOwner!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (registrationNumber != null) 'registration_number': registrationNumber!,
+      };
+}
+
+/// The common verify response
+class VerifyVehicleRcResult {
+  const VerifyVehicleRcResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyVehicleRcResult.fromJson(Map<String, dynamic> json) => VerifyVehicleRcResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyVehicleRcResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyVehicleRcResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: owner_name, status, vehicle_class, maker_model, fuel, registration_date, fitness_upto, insurance_upto, pucc_upto, rto.
+  final VerifyVehicleRcResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyVehicleRcResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: owner_name, status, vehicle_class, maker_model, fuel, registration_date, fitness_upto, insurance_upto, pucc_upto, rto.
+class VerifyVehicleRcResultDetails {
+  const VerifyVehicleRcResultDetails({
+    this.fitnessUpto,
+    this.fuel,
+    this.insuranceUpto,
+    this.makerModel,
+    this.ownerName,
+    this.puccUpto,
+    this.registrationDate,
+    this.rto,
+    this.status,
+    this.vehicleClass,
+  });
+
+  factory VerifyVehicleRcResultDetails.fromJson(Map<String, dynamic> json) => VerifyVehicleRcResultDetails(
+        fitnessUpto: json['fitness_upto'] as String?,
+        fuel: json['fuel'] as String?,
+        insuranceUpto: json['insurance_upto'] as String?,
+        makerModel: json['maker_model'] as String?,
+        ownerName: json['owner_name'] as String?,
+        puccUpto: json['pucc_upto'] as String?,
+        registrationDate: json['registration_date'] as String?,
+        rto: json['rto'] as String?,
+        status: json['status'] as String?,
+        vehicleClass: json['vehicle_class'] as String?,
+      );
+
+  final String? fitnessUpto;
+
+  final String? fuel;
+
+  final String? insuranceUpto;
+
+  final String? makerModel;
+
+  final String? ownerName;
+
+  final String? puccUpto;
+
+  final String? registrationDate;
+
+  final String? rto;
+
+  final String? status;
+
+  final String? vehicleClass;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (fitnessUpto != null) 'fitness_upto': fitnessUpto!,
+        if (fuel != null) 'fuel': fuel!,
+        if (insuranceUpto != null) 'insurance_upto': insuranceUpto!,
+        if (makerModel != null) 'maker_model': makerModel!,
+        if (ownerName != null) 'owner_name': ownerName!,
+        if (puccUpto != null) 'pucc_upto': puccUpto!,
+        if (registrationDate != null) 'registration_date': registrationDate!,
+        if (rto != null) 'rto': rto!,
+        if (status != null) 'status': status!,
+        if (vehicleClass != null) 'vehicle_class': vehicleClass!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyVehicleRcResultNameMatch {
+  const VerifyVehicleRcResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyVehicleRcResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyVehicleRcResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyVoterIdParams {
+  const VerifyVoterIdParams({
+    this.consent,
+    this.epicNumber,
+    this.purpose,
+    this.callbackUrl,
+    this.name,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// ABC1234567
+  final String? epicNumber;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (epicNumber != null) 'epic_number': epicNumber!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (name != null) 'name': name!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The operation's options.
+class VerifyVoterIdRequest {
+  const VerifyVoterIdRequest({
+    this.callbackUrl,
+    this.consent,
+    this.epicNumber,
+    this.name,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyVoterIdRequest.fromJson(Map<String, dynamic> json) => VerifyVoterIdRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        epicNumber: json['epic_number'] as String?,
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// ABC1234567
+  final String? epicNumber;
+
+  /// The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch
+  final String? name;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (epicNumber != null) 'epic_number': epicNumber!,
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyVoterIdResult {
+  const VerifyVoterIdResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyVoterIdResult.fromJson(Map<String, dynamic> json) => VerifyVoterIdResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyVoterIdResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyVoterIdResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// What the source holds; empty for not_found and unavailable. Fields: holder_name, status, relation_name, constituency, state.
+  final VerifyVoterIdResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyVoterIdResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// What the source holds; empty for not_found and unavailable. Fields: holder_name, status, relation_name, constituency, state.
+class VerifyVoterIdResultDetails {
+  const VerifyVoterIdResultDetails({
+    this.constituency,
+    this.holderName,
+    this.relationName,
+    this.state,
+    this.status,
+  });
+
+  factory VerifyVoterIdResultDetails.fromJson(Map<String, dynamic> json) => VerifyVoterIdResultDetails(
+        constituency: json['constituency'] as String?,
+        holderName: json['holder_name'] as String?,
+        relationName: json['relation_name'] as String?,
+        state: json['state'] as String?,
+        status: json['status'] as String?,
+      );
+
+  final String? constituency;
+
+  final String? holderName;
+
+  final String? relationName;
+
+  final String? state;
+
+  final String? status;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (constituency != null) 'constituency': constituency!,
+        if (holderName != null) 'holder_name': holderName!,
+        if (relationName != null) 'relation_name': relationName!,
+        if (state != null) 'state': state!,
+        if (status != null) 'status': status!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyVoterIdResultNameMatch {
+  const VerifyVoterIdResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyVoterIdResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyVoterIdResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
 class WebhookCreate {
   const WebhookCreate({
     this.description,
@@ -8887,6 +13514,67 @@ class RenderOperations {
 
 }
 
+/// /v1/verify operations.
+class VerifyOperations {
+  VerifyOperations(this._core);
+  final Core _core;
+
+  /// Aadhaar offline e-KYC: the XML zip with its share code, or the secure QR; UIDAI's signature checked. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_aadhaar_offline; scope api.verify.aadhaar_offline.execute.
+  Future<Answer<VerifyAadhaarOfflineResult>> aadhaarOffline(VerifyAadhaarOfflineParams params, [CallOptions? options]) => _core.operation('/v1/verify/aadhaar-offline', params.toJson(), params.fileInputs, null, VerifyAadhaarOfflineResult.fromJson, options);
+
+  /// A bank account: holder name at the bank, name match, bank and branch. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_bank_account; scope api.verify.bank_account.execute.
+  Future<Answer<VerifyBankAccountResult>> bankAccount(VerifyBankAccountParams params, [CallOptions? options]) => _core.operation('/v1/verify/bank-account', params.toJson(), const {}, null, VerifyBankAccountResult.fromJson, options);
+
+  /// Up to 500 lookups of one verify operation as a job, results in input order. Always asynchronous: answers 202 with a job. Meter api_verify_<operation>; scope api.verify.batch.execute.
+  Future<Answer<VerifyBatchResult>> batch(VerifyBatchParams params, [CallOptions? options]) => _core.operation('/v1/verify/batch', params.toJson(), const {}, null, VerifyBatchResult.fromJson, options);
+
+  /// A company (CIN) or LLP (LLPIN): name, status, class, ROC, capital, address, directors. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_cin; scope api.verify.cin.execute.
+  Future<Answer<VerifyCinResult>> cin(VerifyCinParams params, [CallOptions? options]) => _core.operation('/v1/verify/cin', params.toJson(), const {}, null, VerifyCinResult.fromJson, options);
+
+  /// A driving licence: holder, validity, classes, issuing RTO. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_dl; scope api.verify.driving_licence.execute.
+  Future<Answer<VerifyDrivingLicenceResult>> drivingLicence(VerifyDrivingLicenceParams params, [CallOptions? options]) => _core.operation('/v1/verify/driving-licence', params.toJson(), const {}, null, VerifyDrivingLicenceResult.fromJson, options);
+
+  /// An email address: syntax, MX, disposable, role address, deliverable, suggestion. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_email; scope api.verify.email.execute.
+  Future<Answer<VerifyEmailResult>> email(VerifyEmailParams params, [CallOptions? options]) => _core.operation('/v1/verify/email', params.toJson(), const {}, null, VerifyEmailResult.fromJson, options);
+
+  /// An FSSAI licence: business, type, status, validity, premises. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_fssai; scope api.verify.fssai.execute.
+  Future<Answer<VerifyFssaiResult>> fssai(VerifyFssaiParams params, [CallOptions? options]) => _core.operation('/v1/verify/fssai', params.toJson(), const {}, null, VerifyFssaiResult.fromJson, options);
+
+  /// A GSTIN's registration: legal and trade name, status, constitution, address, filings. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_gstin; scope api.verify.gstin.execute.
+  Future<Answer<VerifyGstinResult>> gstin(VerifyGstinParams params, [CallOptions? options]) => _core.operation('/v1/verify/gstin', params.toJson(), const {}, null, VerifyGstinResult.fromJson, options);
+
+  /// An Importer-Exporter Code: firm, status, DGFT office, branches. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_iec; scope api.verify.iec.execute.
+  Future<Answer<VerifyIecResult>> iec(VerifyIecParams params, [CallOptions? options]) => _core.operation('/v1/verify/iec', params.toJson(), const {}, null, VerifyIecResult.fromJson, options);
+
+  /// An IFSC: bank, branch, address and supported channels (free). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_ifsc; scope api.verify.ifsc.execute.
+  Future<Answer<VerifyIfscResult>> ifsc(VerifyIfscParams params, [CallOptions? options]) => _core.operation('/v1/verify/ifsc', params.toJson(), const {}, null, VerifyIfscResult.fromJson, options);
+
+  /// A mobile number: validity, operator, circle, type, ported, DND. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_mobile; scope api.verify.mobile.execute.
+  Future<Answer<VerifyMobileResult>> mobile(VerifyMobileParams params, [CallOptions? options]) => _core.operation('/v1/verify/mobile', params.toJson(), const {}, null, VerifyMobileResult.fromJson, options);
+
+  /// A PAN: name as registered, category, status and Aadhaar seeding. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_pan; scope api.verify.pan.execute.
+  Future<Answer<VerifyPanResult>> pan(VerifyPanParams params, [CallOptions? options]) => _core.operation('/v1/verify/pan', params.toJson(), const {}, null, VerifyPanResult.fromJson, options);
+
+  /// Whether a PAN is linked to an Aadhaar. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_pan; scope api.verify.pan_aadhaar_link.execute.
+  Future<Answer<VerifyPanAadhaarLinkResult>> panAadhaarLink(VerifyPanAadhaarLinkParams params, [CallOptions? options]) => _core.operation('/v1/verify/pan-aadhaar-link', params.toJson(), const {}, null, VerifyPanAadhaarLinkResult.fromJson, options);
+
+  /// A passport: application status by file number, or MRZ consistency. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_passport; scope api.verify.passport.execute.
+  Future<Answer<VerifyPassportResult>> passport(VerifyPassportParams params, [CallOptions? options]) => _core.operation('/v1/verify/passport', params.toJson(), const {}, null, VerifyPassportResult.fromJson, options);
+
+  /// An Udyam registration: enterprise, type, activity, NIC codes. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_udyam; scope api.verify.udyam.execute.
+  Future<Answer<VerifyUdyamResult>> udyam(VerifyUdyamParams params, [CallOptions? options]) => _core.operation('/v1/verify/udyam', params.toJson(), const {}, null, VerifyUdyamResult.fromJson, options);
+
+  /// A UPI address: holder name, name match, active. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_upi; scope api.verify.upi.execute.
+  Future<Answer<VerifyUpiResult>> upi(VerifyUpiParams params, [CallOptions? options]) => _core.operation('/v1/verify/upi', params.toJson(), const {}, null, VerifyUpiResult.fromJson, options);
+
+  /// A vehicle registration: owner (masked without consent_owner), class, model, validity. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_rc; scope api.verify.vehicle_rc.execute.
+  Future<Answer<VerifyVehicleRcResult>> vehicleRc(VerifyVehicleRcParams params, [CallOptions? options]) => _core.operation('/v1/verify/vehicle-rc', params.toJson(), const {}, null, VerifyVehicleRcResult.fromJson, options);
+
+  /// A voter ID (EPIC): holder, relation, constituency, state. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_voter_id; scope api.verify.voter_id.execute.
+  Future<Answer<VerifyVoterIdResult>> voterId(VerifyVoterIdParams params, [CallOptions? options]) => _core.operation('/v1/verify/voter-id', params.toJson(), const {}, null, VerifyVoterIdResult.fromJson, options);
+
+}
+
 /// Console audit log.
 class AuditResource {
   AuditResource(this._core);
@@ -8897,6 +13585,12 @@ class AuditResource {
 
   /// Every item of list, page after page (follows next_cursor).
   Stream<AuditEntry> listAll(AuditListQuery? query, [RequestOptions? options]) => _core.paginate('/v1/audit-logs', query?.toJson(), (j) => AuditEntry.fromJson(j as Map<String, dynamic>), options);
+
+  /// The Verify audit log of the calling environment, newest first: one row per lookup, the identifier only as its fingerprint and last 4.
+  Future<AuditListVerifyData> listVerify(AuditListVerifyQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/verify/audit', query: query?.toJson(), body: null, decode: (j) => AuditListVerifyData.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Every item of listVerify, page after page (follows next_cursor).
+  Stream<VerifyAuditRow> listVerifyAll(AuditListVerifyQuery? query, [RequestOptions? options]) => _core.paginate('/v1/verify/audit', query?.toJson(), (j) => VerifyAuditRow.fromJson(j as Map<String, dynamic>), options);
 
 }
 
@@ -9107,6 +13801,7 @@ class GeneratedClient {
         pdf = PdfOperations(core),
         qr = QrOperations(core),
         render = RenderOperations(core),
+        verify = VerifyOperations(core),
         audit = AuditResource(core),
         files = FilesResource(core),
         jobs = JobsResource(core),
@@ -9134,6 +13829,9 @@ class GeneratedClient {
 
   /// /v1/render operations.
   final RenderOperations render;
+
+  /// /v1/verify operations.
+  final VerifyOperations verify;
 
   /// Console audit log.
   final AuditResource audit;

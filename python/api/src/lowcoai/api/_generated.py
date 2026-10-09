@@ -174,6 +174,29 @@ class AuditListQuery(TypedDict):
     format: NotRequired[Literal["json", "csv"]]
     """csv exports every matching row (up to 10,000)"""
 
+class AuditListVerifyData(TypedDict):
+    """A page; pass next_cursor as cursor for the next one (null at the end)."""
+    items: list[VerifyAuditRow]
+    next_cursor: Optional[str]
+
+class AuditListVerifyQuery(TypedDict):
+    operation: NotRequired[Literal["aadhaar-offline", "bank-account", "cin", "driving-licence", "email", "fssai", "gstin", "iec", "ifsc", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]]
+    """Only this operation"""
+    result: NotRequired[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]]
+    identifier: NotRequired[str]
+    """Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged"""
+    reference_id: NotRequired[str]
+    job_id: NotRequired[str]
+    """A batch's rows"""
+    created_after: NotRequired[str]
+    created_before: NotRequired[str]
+    limit: NotRequired[int]
+    """Page size"""
+    cursor: NotRequired[str]
+    """next_cursor of the previous page."""
+    format: NotRequired[Literal["json", "csv"]]
+    """csv exports every matching row (up to 10,000; X-Lowco-Export-Truncated when more)"""
+
 class BBox(TypedDict):
     """PDF points from the top-left of the upright page"""
     h: float
@@ -2214,6 +2237,1303 @@ class ValidationIssue(TypedDict):
     """JSON Pointer of the value at fault"""
     message: str
 
+class VerifyAadhaarOfflineParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    xml_zip: NotRequired[FileInput]
+    """An extra file input (xml_zip)"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+    secure_qr: NotRequired[str]
+    """The secure QR's decimal payload"""
+    share_code: NotRequired[str]
+    """The zip's 4-character share code"""
+
+class VerifyAadhaarOfflineRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+    secure_qr: NotRequired[str]
+    """The secure QR's decimal payload"""
+    share_code: NotRequired[str]
+    """The zip's 4-character share code"""
+    xml_zip: NotRequired[FileRef]
+    """An extra file input (xml_zip); in multipart, a part named xml_zip"""
+
+class VerifyAadhaarOfflineResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyAadhaarOfflineResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: form, name, gender, date_of_birth, aadhaar_last4, mobile_last4, address, signature_valid, document_age_days, has_photo."""
+    name_match: Optional[VerifyAadhaarOfflineResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyAadhaarOfflineResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: form, name, gender, date_of_birth, aadhaar_last4, mobile_last4, address, signature_valid, document_age_days, has_photo."""
+    aadhaar_last4: NotRequired[str]
+    address: NotRequired[VerifyAadhaarOfflineResultDetailsAddress]
+    date_of_birth: NotRequired[str]
+    document_age_days: NotRequired[float]
+    form: NotRequired[str]
+    gender: NotRequired[str]
+    has_photo: NotRequired[bool]
+    mobile_last4: NotRequired[str]
+    name: NotRequired[str]
+    signature_valid: NotRequired[bool]
+
+class VerifyAadhaarOfflineResultDetailsAddress(TypedDict):
+    care_of: NotRequired[str]
+    country: NotRequired[str]
+    district: NotRequired[str]
+    house: NotRequired[str]
+    locality: NotRequired[str]
+    pincode: NotRequired[str]
+    state: NotRequired[str]
+    street: NotRequired[str]
+    vtc: NotRequired[str]
+
+class VerifyAadhaarOfflineResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyAuditRow(TypedDict):
+    """One lookup in verify_audit (append-only; kept until retain_until)"""
+    actor_id: str
+    consent: bool
+    created_at: str
+    environment: str
+    id: str
+    identifier_hash: str
+    """HMAC-SHA-256 fingerprint of the normalised identifier (an Aadhaar document's reference id)"""
+    identifier_last4: str
+    job_id: str
+    """Set for a batch item or a promoted call"""
+    key_id: str
+    operation: str
+    purpose: str
+    reference_id: str
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    retain_until: str
+    """The org's verify_audit_retention_days after created_at"""
+
+class VerifyBankAccountParams(TypedDict):
+    """The operation's options."""
+    account_number: str
+    """9 to 18 digits"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    ifsc: str
+    """11-character IFSC"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyBankAccountRequest(TypedDict):
+    """The operation's options."""
+    account_number: str
+    """9 to 18 digits"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    ifsc: str
+    """11-character IFSC"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyBankAccountResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyBankAccountResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: account_holder, account_status, bank, branch, method."""
+    name_match: Optional[VerifyBankAccountResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyBankAccountResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: account_holder, account_status, bank, branch, method."""
+    account_holder: NotRequired[str]
+    account_status: NotRequired[str]
+    bank: NotRequired[str]
+    branch: NotRequired[str]
+    method: NotRequired[str]
+
+class VerifyBankAccountResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyBatchParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    items: list[dict[str, Any]]
+    """Up to 500 lookups, answered in this order"""
+    operation: Literal["gstin", "pan", "cin", "udyam", "fssai", "iec", "bank-account", "ifsc", "upi", "vehicle-rc", "driving-licence", "voter-id", "passport", "pan-aadhaar-link", "mobile", "email"]
+    """The verify operation every item runs"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyBatchRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    items: list[dict[str, Any]]
+    """Up to 500 lookups, answered in this order"""
+    operation: Literal["gstin", "pan", "cin", "udyam", "fssai", "iec", "bank-account", "ifsc", "upi", "vehicle-rc", "driving-licence", "voter-id", "passport", "pan-aadhaar-link", "mobile", "email"]
+    """The verify operation every item runs"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyBatchResult(TypedDict):
+    """A verify/batch job's result"""
+    count: int
+    """Items"""
+    failed: int
+    """Items refused before any lookup"""
+    items: list[VerifyBatchResultItem]
+    """In input order"""
+    operation: str
+    results: dict[str, int]
+    """Items per result"""
+
+class VerifyBatchResultItem(TypedDict):
+    """One item: the common response, or error"""
+    checked_at: NotRequired[str]
+    details: NotRequired[dict[str, Any]]
+    """The operation's details"""
+    error: NotRequired[VerifyBatchResultItemsItemError]
+    """Why the item was not looked up (free, not audited): the error its own call would have answered"""
+    index: int
+    """The item's place in the request"""
+    name_match: NotRequired[Optional[VerifyBatchResultItemsItemNameMatch]]
+    """With name in the request and a name at the source"""
+    reference_id: NotRequired[str]
+    """Your reference_id"""
+    request_id: NotRequired[str]
+    result: NotRequired[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: NotRequired[str]
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: NotRequired[bool]
+    """true only for result valid"""
+
+class VerifyBatchResultItemsItemError(TypedDict):
+    """Why the item was not looked up (free, not audited): the error its own call would have answered"""
+    message: str
+    param: NotRequired[str]
+    reason: str
+
+class VerifyBatchResultItemsItemNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyCinParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    cin: NotRequired[str]
+    """21-character CIN"""
+    include_directors: NotRequired[bool]
+    """Add directors[]"""
+    llpin: NotRequired[str]
+    """LLPIN, AAA-1234"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyCinRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    cin: NotRequired[str]
+    """21-character CIN"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    include_directors: NotRequired[bool]
+    """Add directors[]"""
+    llpin: NotRequired[str]
+    """LLPIN, AAA-1234"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyCinResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyCinResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: company_name, status, class, roc, incorporation_date, authorised_capital, paid_up_capital, registered_address, directors."""
+    name_match: Optional[VerifyCinResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+VerifyCinResultDetails = TypedDict("VerifyCinResultDetails", {"authorised_capital": "NotRequired[float]", "class": "NotRequired[str]", "company_name": "NotRequired[str]", "directors": "NotRequired[list[VerifyCinResultDetailsDirector]]", "incorporation_date": "NotRequired[str]", "paid_up_capital": "NotRequired[float]", "registered_address": "NotRequired[str]", "roc": "NotRequired[str]", "status": "NotRequired[str]"})
+"""What the source holds; empty for not_found and unavailable. Fields: company_name, status, class, roc, incorporation_date, authorised_capital, paid_up_capital, registered_address, directors."""
+
+class VerifyCinResultDetailsDirector(TypedDict):
+    appointed_on: NotRequired[str]
+    designation: NotRequired[str]
+    din: NotRequired[str]
+    name: NotRequired[str]
+
+class VerifyCinResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyDrivingLicenceParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    date_of_birth: str
+    """YYYY-MM-DD"""
+    dl_number: str
+    """15 characters, MH1220110012345"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyDrivingLicenceRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    date_of_birth: str
+    """YYYY-MM-DD"""
+    dl_number: str
+    """15 characters, MH1220110012345"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyDrivingLicenceResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyDrivingLicenceResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: holder_name, status, valid_from, valid_upto, classes, rto."""
+    name_match: Optional[VerifyDrivingLicenceResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyDrivingLicenceResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: holder_name, status, valid_from, valid_upto, classes, rto."""
+    classes: NotRequired[list[str]]
+    holder_name: NotRequired[str]
+    rto: NotRequired[str]
+    status: NotRequired[str]
+    valid_from: NotRequired[str]
+    valid_upto: NotRequired[str]
+
+class VerifyDrivingLicenceResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyEmailParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    email: str
+    """name@domain"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyEmailRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    email: str
+    """name@domain"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyEmailResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyEmailResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: syntax_valid, mx_found, disposable, role_address, deliverable, mailbox_status, suggestion."""
+    name_match: Optional[VerifyEmailResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyEmailResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: syntax_valid, mx_found, disposable, role_address, deliverable, mailbox_status, suggestion."""
+    deliverable: NotRequired[bool]
+    disposable: NotRequired[bool]
+    mailbox_status: NotRequired[str]
+    mx_found: NotRequired[bool]
+    role_address: NotRequired[bool]
+    suggestion: NotRequired[Optional[str]]
+    syntax_valid: NotRequired[bool]
+
+class VerifyEmailResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyFssaiParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    licence_number: str
+    """14-digit licence or registration number"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyFssaiRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    licence_number: str
+    """14-digit licence or registration number"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyFssaiResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyFssaiResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: business_name, licence_type, status, valid_upto, premises_address."""
+    name_match: Optional[VerifyFssaiResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyFssaiResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: business_name, licence_type, status, valid_upto, premises_address."""
+    business_name: NotRequired[str]
+    licence_type: NotRequired[str]
+    premises_address: NotRequired[str]
+    status: NotRequired[str]
+    valid_upto: NotRequired[str]
+
+class VerifyFssaiResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyGstinParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    gstin: str
+    """15-character GSTIN"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    include_filings: NotRequired[bool]
+    """Add filings[]"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyGstinRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    gstin: str
+    """15-character GSTIN"""
+    include_filings: NotRequired[bool]
+    """Add filings[]"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyGstinResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyGstinResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: legal_name, trade_name, pan, status, registration_date, cancellation_date, constitution, taxpayer_type, principal_address, state_jurisdiction, nature_of_business, filings."""
+    name_match: Optional[VerifyGstinResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyGstinResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: legal_name, trade_name, pan, status, registration_date, cancellation_date, constitution, taxpayer_type, principal_address, state_jurisdiction, nature_of_business, filings."""
+    cancellation_date: NotRequired[str]
+    constitution: NotRequired[str]
+    filings: NotRequired[list[VerifyGstinResultDetailsFiling]]
+    legal_name: NotRequired[str]
+    nature_of_business: NotRequired[list[str]]
+    pan: NotRequired[str]
+    principal_address: NotRequired[str]
+    registration_date: NotRequired[str]
+    state_jurisdiction: NotRequired[str]
+    status: NotRequired[str]
+    taxpayer_type: NotRequired[str]
+    trade_name: NotRequired[str]
+
+class VerifyGstinResultDetailsFiling(TypedDict):
+    filed_on: NotRequired[str]
+    period: NotRequired[str]
+    return_type: NotRequired[str]
+    status: NotRequired[str]
+
+class VerifyGstinResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyIecParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    iec: str
+    """10-character IEC"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyIecRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    iec: str
+    """10-character IEC"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyIecResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyIecResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: firm_name, status, dgft_office, issue_date, branches."""
+    name_match: Optional[VerifyIecResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyIecResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: firm_name, status, dgft_office, issue_date, branches."""
+    branches: NotRequired[list[VerifyIecResultDetailsBranche]]
+    dgft_office: NotRequired[str]
+    firm_name: NotRequired[str]
+    issue_date: NotRequired[str]
+    status: NotRequired[str]
+
+class VerifyIecResultDetailsBranche(TypedDict):
+    address: NotRequired[str]
+    code: NotRequired[str]
+
+class VerifyIecResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyIfscParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    ifsc: str
+    """11-character IFSC"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyIfscRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    ifsc: str
+    """11-character IFSC"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyIfscResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyIfscResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: bank, status, branch, address, city, state, channels."""
+    name_match: Optional[VerifyIfscResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyIfscResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: bank, status, branch, address, city, state, channels."""
+    address: NotRequired[str]
+    bank: NotRequired[str]
+    branch: NotRequired[str]
+    channels: NotRequired[VerifyIfscResultDetailsChannels]
+    city: NotRequired[str]
+    state: NotRequired[str]
+    status: NotRequired[str]
+
+class VerifyIfscResultDetailsChannels(TypedDict):
+    imps: NotRequired[bool]
+    neft: NotRequired[bool]
+    rtgs: NotRequired[bool]
+    upi: NotRequired[bool]
+
+class VerifyIfscResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyMobileParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    mobile: str
+    """10 digits, +91 allowed"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyMobileRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    mobile: str
+    """10 digits, +91 allowed"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyMobileResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyMobileResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: subscriber_name, status, operator, circle, number_type, ported, dnd."""
+    name_match: Optional[VerifyMobileResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyMobileResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: subscriber_name, status, operator, circle, number_type, ported, dnd."""
+    circle: NotRequired[str]
+    dnd: NotRequired[bool]
+    number_type: NotRequired[str]
+    operator: NotRequired[str]
+    ported: NotRequired[bool]
+    status: NotRequired[str]
+    subscriber_name: NotRequired[str]
+
+class VerifyMobileResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyPanAadhaarLinkParams(TypedDict):
+    """The operation's options."""
+    aadhaar_last4: str
+    """The Aadhaar's last 4 digits"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    pan: str
+    """10-character PAN"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyPanAadhaarLinkRequest(TypedDict):
+    """The operation's options."""
+    aadhaar_last4: str
+    """The Aadhaar's last 4 digits"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    pan: str
+    """10-character PAN"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyPanAadhaarLinkResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyPanAadhaarLinkResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: linked, pan_status, aadhaar_matches."""
+    name_match: Optional[VerifyPanAadhaarLinkResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyPanAadhaarLinkResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: linked, pan_status, aadhaar_matches."""
+    aadhaar_matches: NotRequired[bool]
+    linked: NotRequired[bool]
+    pan_status: NotRequired[str]
+
+class VerifyPanAadhaarLinkResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyPanParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    pan: str
+    """10-character PAN"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    date_of_birth: NotRequired[str]
+    """YYYY-MM-DD, checked when given"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyPanRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    date_of_birth: NotRequired[str]
+    """YYYY-MM-DD, checked when given"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    pan: str
+    """10-character PAN"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyPanResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyPanResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: name, category, status, aadhaar_seeding, dob_match."""
+    name_match: Optional[VerifyPanResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyPanResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: name, category, status, aadhaar_seeding, dob_match."""
+    aadhaar_seeding: NotRequired[str]
+    category: NotRequired[str]
+    dob_match: NotRequired[bool]
+    name: NotRequired[str]
+    status: NotRequired[str]
+
+class VerifyPanResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyPassportParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    date_of_birth: NotRequired[str]
+    """YYYY-MM-DD, with file_number"""
+    file_number: NotRequired[str]
+    """Passport file number"""
+    mrz: NotRequired[list[str]]
+    """The two 44-character MRZ lines"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    passport_number: NotRequired[str]
+    """A1234567, with mrz"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyPassportRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    date_of_birth: NotRequired[str]
+    """YYYY-MM-DD, with file_number"""
+    file_number: NotRequired[str]
+    """Passport file number"""
+    mrz: NotRequired[list[str]]
+    """The two 44-character MRZ lines"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    passport_number: NotRequired[str]
+    """A1234567, with mrz"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyPassportResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyPassportResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: status, name, application_type, date_of_application, nationality, issuing_country, date_of_birth, sex, expiry, mrz_valid."""
+    name_match: Optional[VerifyPassportResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyPassportResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: status, name, application_type, date_of_application, nationality, issuing_country, date_of_birth, sex, expiry, mrz_valid."""
+    application_type: NotRequired[str]
+    date_of_application: NotRequired[str]
+    date_of_birth: NotRequired[str]
+    expiry: NotRequired[str]
+    issuing_country: NotRequired[str]
+    mrz_valid: NotRequired[bool]
+    name: NotRequired[str]
+    nationality: NotRequired[str]
+    sex: NotRequired[str]
+    status: NotRequired[str]
+
+class VerifyPassportResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyUdyamParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    udyam_number: str
+    """UDYAM-XX-00-0000000"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyUdyamRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+    udyam_number: str
+    """UDYAM-XX-00-0000000"""
+
+class VerifyUdyamResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyUdyamResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: enterprise_name, status, enterprise_type, major_activity, incorporation_date, address, nic_codes."""
+    name_match: Optional[VerifyUdyamResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyUdyamResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: enterprise_name, status, enterprise_type, major_activity, incorporation_date, address, nic_codes."""
+    address: NotRequired[str]
+    enterprise_name: NotRequired[str]
+    enterprise_type: NotRequired[str]
+    incorporation_date: NotRequired[str]
+    major_activity: NotRequired[str]
+    nic_codes: NotRequired[list[VerifyUdyamResultDetailsNicCode]]
+    status: NotRequired[str]
+
+class VerifyUdyamResultDetailsNicCode(TypedDict):
+    code: NotRequired[str]
+    description: NotRequired[str]
+
+class VerifyUdyamResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyUpiParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    vpa: str
+    """name@handle"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyUpiRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+    vpa: str
+    """name@handle"""
+
+class VerifyUpiResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyUpiResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: holder_name, active."""
+    name_match: Optional[VerifyUpiResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyUpiResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: holder_name, active."""
+    active: NotRequired[bool]
+    holder_name: NotRequired[str]
+
+class VerifyUpiResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyVehicleRcParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    registration_number: str
+    """MH12AB1234 or 22BH1234AA"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent_owner: NotRequired[bool]
+    """The owner consented: return the full owner name"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyVehicleRcRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    consent_owner: NotRequired[bool]
+    """The owner consented: return the full owner name"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+    registration_number: str
+    """MH12AB1234 or 22BH1234AA"""
+
+class VerifyVehicleRcResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyVehicleRcResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: owner_name, status, vehicle_class, maker_model, fuel, registration_date, fitness_upto, insurance_upto, pucc_upto, rto."""
+    name_match: Optional[VerifyVehicleRcResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyVehicleRcResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: owner_name, status, vehicle_class, maker_model, fuel, registration_date, fitness_upto, insurance_upto, pucc_upto, rto."""
+    fitness_upto: NotRequired[str]
+    fuel: NotRequired[str]
+    insurance_upto: NotRequired[str]
+    maker_model: NotRequired[str]
+    owner_name: NotRequired[str]
+    pucc_upto: NotRequired[str]
+    registration_date: NotRequired[str]
+    rto: NotRequired[str]
+    status: NotRequired[str]
+    vehicle_class: NotRequired[str]
+
+class VerifyVehicleRcResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyVoterIdParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    epic_number: str
+    """ABC1234567"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyVoterIdRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    epic_number: str
+    """ABC1234567"""
+    name: NotRequired[str]
+    """The name you hold: compared with the name at the source (name_match); a valid record under another name is mismatch"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyVoterIdResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyVoterIdResultDetails
+    """What the source holds; empty for not_found and unavailable. Fields: holder_name, status, relation_name, constituency, state."""
+    name_match: Optional[VerifyVoterIdResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyVoterIdResultDetails(TypedDict):
+    """What the source holds; empty for not_found and unavailable. Fields: holder_name, status, relation_name, constituency, state."""
+    constituency: NotRequired[str]
+    holder_name: NotRequired[str]
+    relation_name: NotRequired[str]
+    state: NotRequired[str]
+    status: NotRequired[str]
+
+class VerifyVoterIdResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
 class WebhookCreate(TypedDict):
     description: NotRequired[str]
     events: list[str]
@@ -2903,6 +4223,368 @@ class RenderOperations:
         return self._core.operation("/v1/render/template", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
 
 
+class VerifyOperations:
+    """/v1/verify operations."""
+
+    def __init__(self, core: Core) -> None:
+        self._core = core
+
+    def aadhaar_offline(
+        self,
+        *,
+        consent: bool,
+        purpose: str,
+        xml_zip: Optional[FileInput] = None,
+        callback_url: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        secure_qr: Optional[str] = None,
+        share_code: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyAadhaarOfflineResult]:
+        """Aadhaar offline e-KYC: the XML zip with its share code, or the secure QR; UIDAI's signature checked. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_aadhaar_offline; scope api.verify.aadhaar_offline.execute."""
+        params = {"consent": consent, "purpose": purpose, "xml_zip": xml_zip, "callback_url": callback_url, "name": name, "reference_id": reference_id, "secure_qr": secure_qr, "share_code": share_code}
+        return self._core.operation("/v1/verify/aadhaar-offline", params, input_kind="none", extra=["xml_zip"], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def bank_account(
+        self,
+        *,
+        account_number: str,
+        consent: bool,
+        ifsc: str,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyBankAccountResult]:
+        """A bank account: holder name at the bank, name match, bank and branch. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_bank_account; scope api.verify.bank_account.execute."""
+        params = {"account_number": account_number, "consent": consent, "ifsc": ifsc, "purpose": purpose, "callback_url": callback_url, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/bank-account", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def batch(
+        self,
+        *,
+        consent: bool,
+        items: list[dict[str, Any]],
+        operation: Literal["gstin", "pan", "cin", "udyam", "fssai", "iec", "bank-account", "ifsc", "upi", "vehicle-rc", "driving-licence", "voter-id", "passport", "pan-aadhaar-link", "mobile", "email"],
+        purpose: str,
+        callback_url: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyBatchResult]:
+        """Up to 500 lookups of one verify operation as a job, results in input order. Always asynchronous: answers 202 with a job. Meter api_verify_<operation>; scope api.verify.batch.execute."""
+        params = {"consent": consent, "items": items, "operation": operation, "purpose": purpose, "callback_url": callback_url, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/batch", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def cin(
+        self,
+        *,
+        consent: bool,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        cin: Optional[str] = None,
+        include_directors: Optional[bool] = None,
+        llpin: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyCinResult]:
+        """A company (CIN) or LLP (LLPIN): name, status, class, ROC, capital, address, directors. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_cin; scope api.verify.cin.execute."""
+        params = {"consent": consent, "purpose": purpose, "callback_url": callback_url, "cin": cin, "include_directors": include_directors, "llpin": llpin, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/cin", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def driving_licence(
+        self,
+        *,
+        consent: bool,
+        date_of_birth: str,
+        dl_number: str,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyDrivingLicenceResult]:
+        """A driving licence: holder, validity, classes, issuing RTO. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_dl; scope api.verify.driving_licence.execute."""
+        params = {"consent": consent, "date_of_birth": date_of_birth, "dl_number": dl_number, "purpose": purpose, "callback_url": callback_url, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/driving-licence", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def email(
+        self,
+        *,
+        consent: bool,
+        email: str,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyEmailResult]:
+        """An email address: syntax, MX, disposable, role address, deliverable, suggestion. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_email; scope api.verify.email.execute."""
+        params = {"consent": consent, "email": email, "purpose": purpose, "callback_url": callback_url, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/email", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def fssai(
+        self,
+        *,
+        consent: bool,
+        licence_number: str,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyFssaiResult]:
+        """An FSSAI licence: business, type, status, validity, premises. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_fssai; scope api.verify.fssai.execute."""
+        params = {"consent": consent, "licence_number": licence_number, "purpose": purpose, "callback_url": callback_url, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/fssai", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def gstin(
+        self,
+        *,
+        consent: bool,
+        gstin: str,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        include_filings: Optional[bool] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyGstinResult]:
+        """A GSTIN's registration: legal and trade name, status, constitution, address, filings. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_gstin; scope api.verify.gstin.execute."""
+        params = {"consent": consent, "gstin": gstin, "purpose": purpose, "callback_url": callback_url, "include_filings": include_filings, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/gstin", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def iec(
+        self,
+        *,
+        consent: bool,
+        iec: str,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyIecResult]:
+        """An Importer-Exporter Code: firm, status, DGFT office, branches. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_iec; scope api.verify.iec.execute."""
+        params = {"consent": consent, "iec": iec, "purpose": purpose, "callback_url": callback_url, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/iec", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def ifsc(
+        self,
+        *,
+        consent: bool,
+        ifsc: str,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyIfscResult]:
+        """An IFSC: bank, branch, address and supported channels (free). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_ifsc; scope api.verify.ifsc.execute."""
+        params = {"consent": consent, "ifsc": ifsc, "purpose": purpose, "callback_url": callback_url, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/ifsc", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def mobile(
+        self,
+        *,
+        consent: bool,
+        mobile: str,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyMobileResult]:
+        """A mobile number: validity, operator, circle, type, ported, DND. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_mobile; scope api.verify.mobile.execute."""
+        params = {"consent": consent, "mobile": mobile, "purpose": purpose, "callback_url": callback_url, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/mobile", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def pan(
+        self,
+        *,
+        consent: bool,
+        pan: str,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        date_of_birth: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyPanResult]:
+        """A PAN: name as registered, category, status and Aadhaar seeding. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_pan; scope api.verify.pan.execute."""
+        params = {"consent": consent, "pan": pan, "purpose": purpose, "callback_url": callback_url, "date_of_birth": date_of_birth, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/pan", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def pan_aadhaar_link(
+        self,
+        *,
+        aadhaar_last4: str,
+        consent: bool,
+        pan: str,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyPanAadhaarLinkResult]:
+        """Whether a PAN is linked to an Aadhaar. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_pan; scope api.verify.pan_aadhaar_link.execute."""
+        params = {"aadhaar_last4": aadhaar_last4, "consent": consent, "pan": pan, "purpose": purpose, "callback_url": callback_url, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/pan-aadhaar-link", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def passport(
+        self,
+        *,
+        consent: bool,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        date_of_birth: Optional[str] = None,
+        file_number: Optional[str] = None,
+        mrz: Optional[list[str]] = None,
+        name: Optional[str] = None,
+        passport_number: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyPassportResult]:
+        """A passport: application status by file number, or MRZ consistency. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_passport; scope api.verify.passport.execute."""
+        params = {"consent": consent, "purpose": purpose, "callback_url": callback_url, "date_of_birth": date_of_birth, "file_number": file_number, "mrz": mrz, "name": name, "passport_number": passport_number, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/passport", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def udyam(
+        self,
+        *,
+        consent: bool,
+        purpose: str,
+        udyam_number: str,
+        callback_url: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyUdyamResult]:
+        """An Udyam registration: enterprise, type, activity, NIC codes. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_udyam; scope api.verify.udyam.execute."""
+        params = {"consent": consent, "purpose": purpose, "udyam_number": udyam_number, "callback_url": callback_url, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/udyam", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def upi(
+        self,
+        *,
+        consent: bool,
+        purpose: str,
+        vpa: str,
+        callback_url: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyUpiResult]:
+        """A UPI address: holder name, name match, active. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_upi; scope api.verify.upi.execute."""
+        params = {"consent": consent, "purpose": purpose, "vpa": vpa, "callback_url": callback_url, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/upi", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def vehicle_rc(
+        self,
+        *,
+        consent: bool,
+        purpose: str,
+        registration_number: str,
+        callback_url: Optional[str] = None,
+        consent_owner: Optional[bool] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyVehicleRcResult]:
+        """A vehicle registration: owner (masked without consent_owner), class, model, validity. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_rc; scope api.verify.vehicle_rc.execute."""
+        params = {"consent": consent, "purpose": purpose, "registration_number": registration_number, "callback_url": callback_url, "consent_owner": consent_owner, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/vehicle-rc", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def voter_id(
+        self,
+        *,
+        consent: bool,
+        epic_number: str,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        name: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyVoterIdResult]:
+        """A voter ID (EPIC): holder, relation, constituency, state. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_voter_id; scope api.verify.voter_id.execute."""
+        params = {"consent": consent, "epic_number": epic_number, "purpose": purpose, "callback_url": callback_url, "name": name, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/voter-id", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+
 class AuditResource:
     """Console audit log."""
 
@@ -2916,6 +4598,14 @@ class AuditResource:
     def list_all(self, *, action: Optional[str] = None, actor_id: Optional[str] = None, object_type: Optional[str] = None, object_id: Optional[str] = None, created_after: Optional[str] = None, created_before: Optional[str] = None, limit: Optional[int] = None, format: Optional[Literal["json", "csv"]] = None, request_id: Optional[str] = None) -> Iterator[AuditEntry]:
         """Every item of list, page after page (follows next_cursor)."""
         return self._core.paginate(f"/v1/audit-logs", {"action": action, "actor_id": actor_id, "object_type": object_type, "object_id": object_id, "created_after": created_after, "created_before": created_before, "limit": limit, "format": format}, request_id=request_id)
+
+    def list_verify(self, *, created_after: Optional[str] = None, created_before: Optional[str] = None, cursor: Optional[str] = None, format: Optional[Literal["json", "csv"]] = None, identifier: Optional[str] = None, job_id: Optional[str] = None, limit: Optional[int] = None, operation: Optional[Literal["aadhaar-offline", "bank-account", "cin", "driving-licence", "email", "fssai", "gstin", "iec", "ifsc", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]] = None, reference_id: Optional[str] = None, result: Optional[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> AuditListVerifyData:
+        """The Verify audit log of the calling environment, newest first: one row per lookup, the identifier only as its fingerprint and last 4."""
+        return self._core.call("GET", f"/v1/verify/audit", query={"operation": operation, "result": result, "identifier": identifier, "reference_id": reference_id, "job_id": job_id, "created_after": created_after, "created_before": created_before, "limit": limit, "cursor": cursor, "format": format}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list_verify_all(self, *, operation: Optional[Literal["aadhaar-offline", "bank-account", "cin", "driving-licence", "email", "fssai", "gstin", "iec", "ifsc", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]] = None, result: Optional[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]] = None, identifier: Optional[str] = None, reference_id: Optional[str] = None, job_id: Optional[str] = None, created_after: Optional[str] = None, created_before: Optional[str] = None, limit: Optional[int] = None, format: Optional[Literal["json", "csv"]] = None, request_id: Optional[str] = None) -> Iterator[VerifyAuditRow]:
+        """Every item of list_verify, page after page (follows next_cursor)."""
+        return self._core.paginate(f"/v1/verify/audit", {"operation": operation, "result": result, "identifier": identifier, "reference_id": reference_id, "job_id": job_id, "created_after": created_after, "created_before": created_before, "limit": limit, "format": format}, request_id=request_id)
 
 
 class FilesResource:
@@ -3189,6 +4879,8 @@ class GeneratedClient:
         """/v1/qr operations."""
         self.render = RenderOperations(core)
         """/v1/render operations."""
+        self.verify = VerifyOperations(core)
+        """/v1/verify operations."""
         self.audit = AuditResource(core)
         """Console audit log."""
         self.files = FilesResource(core)
