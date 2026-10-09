@@ -782,18 +782,23 @@ type Job struct {
 	ExpiresAt  string  `json:"expires_at"`
 	FinishedAt *string `json:"finished_at"`
 	// A public summary of the inputs: file ids and pages, never bytes or URLs
-	Input     JobInput     `json:"input"`
-	JobID     string       `json:"job_id"`
+	Input JobInput `json:"input"`
+	JobID string   `json:"job_id"`
+	// The key that created the job (empty for console calls)
+	KeyID     *string      `json:"key_id,omitempty"`
 	Links     JobLinks     `json:"links"`
 	Operation string       `json:"operation"`
 	Progress  *JobProgress `json:"progress"`
+	// The request that created the job
+	RequestID *string `json:"request_id,omitempty"`
 	// Set when succeeded: the operation's data, with output files as file objects and fresh signed links
 	Result    map[string]any `json:"result"`
 	Service   string         `json:"service"`
 	StartedAt *string        `json:"started_at"`
 	// One of: queued, processing, succeeded, failed, cancelled.
-	Status string    `json:"status"`
-	Usage  *JobUsage `json:"usage"`
+	Status  string    `json:"status"`
+	TraceID *string   `json:"trace_id,omitempty"`
+	Usage   *JobUsage `json:"usage"`
 }
 
 // Why the job failed.
@@ -806,6 +811,16 @@ type JobError struct {
 	// One of: already_sent, concurrency_exceeded, consent_required, delivery_not_found, document_not_recognised, environment_mismatch, file_corrupt, file_not_found, file_rejected, file_too_large, file_url_forbidden, file_url_unreachable, idempotency_in_progress, idempotency_key_reused, insufficient_credits, internal_error, invalid_identifier, invalid_json, invalid_key, invalid_param, invalid_password, invalid_state, ip_not_allowed, job_not_found, key_expired, key_not_found, key_revoked, message_not_found, method_not_allowed, missing_key, missing_param, operation_retired, org_suspended, password_required, payment_method_required, provider_error, provider_unavailable, quota_exceeded, rate_limited, request_not_found, route_not_found, schema_invalid, scope_missing, sender_not_verified, service_unavailable, suppressed, template_not_approved, template_not_found, timeout, token_expired, too_many_files, too_many_pages, unsupported_media_type, unsupported_option, validation_failed, webhook_not_found.
 	Reason    string `json:"reason"`
 	Retryable *bool  `json:"retryable,omitempty"`
+}
+
+// JobEvent is a Lowco API object.
+type JobEvent struct {
+	At string `json:"at"`
+	// What happened (an attempt's error reason, a cancel request)
+	Detail map[string]any `json:"detail,omitempty"`
+	// queued, processing, succeeded, failed, cancelled, or a retry step
+	Status string  `json:"status"`
+	TaskID *string `json:"task_id,omitempty"`
 }
 
 // A public summary of the inputs: file ids and pages, never bytes or URLs
@@ -838,6 +853,12 @@ type JobUsage struct {
 }
 
 // A page; pass next_cursor as cursor for the next one (null at the end).
+type JobsEventsData struct {
+	Items      []JobEvent `json:"items"`
+	NextCursor *string    `json:"next_cursor"`
+}
+
+// A page; pass next_cursor as cursor for the next one (null at the end).
 type JobsListData struct {
 	Items      []Job   `json:"items"`
 	NextCursor *string `json:"next_cursor"`
@@ -848,8 +869,10 @@ type JobsListQuery struct {
 	// One of: queued, processing, succeeded, failed, cancelled.
 	Status *string `json:"status,omitempty"`
 	// pdf, render, ocr, docai, qr, barcode
-	Service       *string `json:"service,omitempty"`
-	Operation     *string `json:"operation,omitempty"`
+	Service   *string `json:"service,omitempty"`
+	Operation *string `json:"operation,omitempty"`
+	// Only jobs this key created
+	KeyID         *string `json:"key_id,omitempty"`
 	CreatedAfter  *string `json:"created_after,omitempty"`
 	CreatedBefore *string `json:"created_before,omitempty"`
 	// Page size
@@ -2185,6 +2208,45 @@ type RenderTemplateResultBlockedRequest struct {
 	URL    string `json:"url"`
 }
 
+// RequestRecord is a Lowco API object.
+type RequestRecord struct {
+	At string `json:"at"`
+	// The calling Lowco app
+	Client *string `json:"client,omitempty"`
+	// Decimal
+	Credits string `json:"credits"`
+	// The job the request created, if any
+	JobID *string `json:"job_id,omitempty"`
+	KeyID *string `json:"key_id,omitempty"`
+	// request: the HTTP call; job: its job's end One of: request, job.
+	Kind      string  `json:"kind"`
+	LatencyMs int     `json:"latency_ms"`
+	Meter     *string `json:"meter,omitempty"`
+	// sync or async
+	Mode          *string                     `json:"mode,omitempty"`
+	Operation     string                      `json:"operation"`
+	ProviderCalls []RequestRecordProviderCall `json:"provider_calls"`
+	Quantity      int                         `json:"quantity"`
+	// error.reason when it failed
+	Reason    *string `json:"reason,omitempty"`
+	RequestID string  `json:"request_id"`
+	Service   string  `json:"service"`
+	// HTTP status (a job's end: 200, 4xx or 5xx)
+	Status  int    `json:"status"`
+	TraceID string `json:"trace_id"`
+}
+
+// RequestRecordProviderCall is a Lowco API object.
+type RequestRecordProviderCall struct {
+	At           string  `json:"at"`
+	Capability   string  `json:"capability"`
+	LatencyMs    int     `json:"latency_ms"`
+	Provider     string  `json:"provider"`
+	ProviderCode *string `json:"provider_code,omitempty"`
+	// ok or error
+	Status string `json:"status"`
+}
+
 // Settings is a Lowco API object.
 type Settings struct {
 	AlertEmails       []string `json:"alert_emails"`
@@ -2882,6 +2944,20 @@ func (r *JobsResource) Cancel(ctx context.Context, id string, opts ...RequestOpt
 	return &out, nil
 }
 
+// Events: A job's timeline, oldest first (queued, processing, the end, with task ids).
+func (r *JobsResource) Events(ctx context.Context, id string, opts ...RequestOption) (*JobsEventsData, error) {
+	var out JobsEventsData
+	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/jobs/%s/events", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// EventsAll pages through Events, following next_cursor.
+func (r *JobsResource) EventsAll(ctx context.Context, id string, opts ...RequestOption) *Pager[JobEvent] {
+	return newPager[JobEvent](r.c, sprintf("/v1/jobs/%s/events", url.PathEscape(id)), toQuery(nil), opts)
+}
+
 // Get: Read a job; result has the shape the sync call would have returned.
 func (r *JobsResource) Get(ctx context.Context, id string, opts ...RequestOption) (*Job, error) {
 	var out Job
@@ -2940,6 +3016,18 @@ func (r *KeysResource) Sync(ctx context.Context, keyId string, opts ...RequestOp
 func (r *KeysResource) Validate(ctx context.Context, body KeyValidate, opts ...RequestOption) (*KeyValidated, error) {
 	var out KeyValidated
 	if err := r.c.call(ctx, http.MethodPost, "/v1/keys/validate", toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// RequestsResource: .
+type RequestsResource struct{ c *core }
+
+// Get: What the request log recorded for one request, and its provider path.
+func (r *RequestsResource) Get(ctx context.Context, requestId string, opts ...RequestOption) (*RequestRecord, error) {
+	var out RequestRecord
+	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/requests/%s", url.PathEscape(requestId)), toQuery(nil), nil, &out, opts); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -3179,6 +3267,8 @@ type services struct {
 	Jobs *JobsResource
 	// Keys: .
 	Keys *KeysResource
+	// Requests: .
+	Requests *RequestsResource
 	// Settings: Environment settings.
 	Settings *SettingsResource
 	// Templates: Stored render templates.
@@ -3201,6 +3291,7 @@ func newServices(c *core) services {
 		Files:     &FilesResource{c},
 		Jobs:      &JobsResource{c},
 		Keys:      &KeysResource{c},
+		Requests:  &RequestsResource{c},
 		Settings:  &SettingsResource{c},
 		Templates: &TemplatesResource{c},
 		Usage:     &UsageResource{c},

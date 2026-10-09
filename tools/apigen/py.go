@@ -7,6 +7,20 @@ import (
 
 var pyKeywords = map[string]bool{"from": true, "in": true, "is": true, "not": true, "and": true, "or": true, "class": true, "def": true, "return": true, "import": true, "global": true, "lambda": true, "pass": true, "with": true, "yield": true, "async": true, "await": true, "None": true, "True": true, "False": true, "del": true, "try": true, "except": true, "raise": true, "finally": true, "while": true, "for": true, "if": true, "else": true, "elif": true, "break": true, "continue": true, "assert": true, "as": true, "nonlocal": true}
 
+// pyCallOptions are the keyword-only arguments every generated method may
+// take; a path parameter with one of these names would be a duplicate
+// argument (GET /v1/requests/{request_id}), so it gets a trailing underscore.
+var pyCallOptions = map[string]bool{"request_id": true, "idempotency_key": true, "mode": true, "accept": true, "timeout": true}
+
+// pyPathName is a path parameter's Python name.
+func pyPathName(wire string) string {
+	n := pyName(wire)
+	if pyCallOptions[n] {
+		n += "_"
+	}
+	return n
+}
+
 func pyName(wire string) string {
 	n := strings.NewReplacer("[", "_", "]", "", "-", "_", ".", "_").Replace(wire)
 	if pyKeywords[n] {
@@ -185,8 +199,8 @@ func emitPython(m *Model) []byte {
 			pathExpr := e.Path
 			var pos []string
 			for _, p := range e.PathParams {
-				pos = append(pos, pyName(p)+": str")
-				pathExpr = strings.Replace(pathExpr, "{"+p+"}", "{_seg("+pyName(p)+")}", 1)
+				pos = append(pos, pyPathName(p)+": str")
+				pathExpr = strings.Replace(pathExpr, "{"+p+"}", "{_seg("+pyPathName(p)+")}", 1)
 			}
 			pathExpr = "f\"" + pathExpr + "\""
 			result := "Any"

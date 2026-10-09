@@ -640,14 +640,19 @@ class Job(TypedDict):
     input: JobInput
     """A public summary of the inputs: file ids and pages, never bytes or URLs"""
     job_id: str
+    key_id: NotRequired[str]
+    """The key that created the job (empty for console calls)"""
     links: JobLinks
     operation: str
     progress: Optional[JobProgress]
+    request_id: NotRequired[str]
+    """The request that created the job"""
     result: Optional[dict[str, Any]]
     """Set when succeeded: the operation's data, with output files as file objects and fresh signed links"""
     service: str
     started_at: Optional[str]
     status: Literal["queued", "processing", "succeeded", "failed", "cancelled"]
+    trace_id: NotRequired[str]
     usage: Optional[JobUsage]
 
 class JobError(TypedDict):
@@ -659,6 +664,14 @@ class JobError(TypedDict):
     param: NotRequired[str]
     reason: Literal["already_sent", "concurrency_exceeded", "consent_required", "delivery_not_found", "document_not_recognised", "environment_mismatch", "file_corrupt", "file_not_found", "file_rejected", "file_too_large", "file_url_forbidden", "file_url_unreachable", "idempotency_in_progress", "idempotency_key_reused", "insufficient_credits", "internal_error", "invalid_identifier", "invalid_json", "invalid_key", "invalid_param", "invalid_password", "invalid_state", "ip_not_allowed", "job_not_found", "key_expired", "key_not_found", "key_revoked", "message_not_found", "method_not_allowed", "missing_key", "missing_param", "operation_retired", "org_suspended", "password_required", "payment_method_required", "provider_error", "provider_unavailable", "quota_exceeded", "rate_limited", "request_not_found", "route_not_found", "schema_invalid", "scope_missing", "sender_not_verified", "service_unavailable", "suppressed", "template_not_approved", "template_not_found", "timeout", "token_expired", "too_many_files", "too_many_pages", "unsupported_media_type", "unsupported_option", "validation_failed", "webhook_not_found"]
     retryable: NotRequired[bool]
+
+class JobEvent(TypedDict):
+    at: str
+    detail: NotRequired[Optional[dict[str, Any]]]
+    """What happened (an attempt's error reason, a cancel request)"""
+    status: str
+    """queued, processing, succeeded, failed, cancelled, or a retry step"""
+    task_id: NotRequired[str]
 
 class JobInput(TypedDict):
     """A public summary of the inputs: file ids and pages, never bytes or URLs"""
@@ -682,6 +695,11 @@ class JobUsage(TypedDict):
     meter: str
     quantity: int
 
+class JobsEventsData(TypedDict):
+    """A page; pass next_cursor as cursor for the next one (null at the end)."""
+    items: list[JobEvent]
+    next_cursor: Optional[str]
+
 class JobsListData(TypedDict):
     """A page; pass next_cursor as cursor for the next one (null at the end)."""
     items: list[Job]
@@ -692,6 +710,8 @@ class JobsListQuery(TypedDict):
     service: NotRequired[str]
     """pdf, render, ocr, docai, qr, barcode"""
     operation: NotRequired[str]
+    key_id: NotRequired[str]
+    """Only jobs this key created"""
     created_after: NotRequired[str]
     created_before: NotRequired[str]
     limit: NotRequired[int]
@@ -1857,6 +1877,41 @@ class RenderTemplateResultBlockedRequest(TypedDict):
     reason: str
     url: str
 
+class RequestRecord(TypedDict):
+    at: str
+    client: NotRequired[str]
+    """The calling Lowco app"""
+    credits: str
+    """Decimal"""
+    job_id: NotRequired[str]
+    """The job the request created, if any"""
+    key_id: NotRequired[str]
+    kind: Literal["request", "job"]
+    """request: the HTTP call; job: its job's end"""
+    latency_ms: int
+    meter: NotRequired[str]
+    mode: NotRequired[str]
+    """sync or async"""
+    operation: str
+    provider_calls: list[RequestRecordProviderCall]
+    quantity: int
+    reason: NotRequired[str]
+    """error.reason when it failed"""
+    request_id: str
+    service: str
+    status: int
+    """HTTP status (a job's end: 200, 4xx or 5xx)"""
+    trace_id: str
+
+class RequestRecordProviderCall(TypedDict):
+    at: str
+    capability: str
+    latency_ms: int
+    provider: str
+    provider_code: NotRequired[str]
+    status: str
+    """ok or error"""
+
 class Settings(TypedDict):
     alert_emails: Optional[list[str]]
     allowed_origins: Optional[list[str]]
@@ -2746,17 +2801,25 @@ class JobsResource:
         """Cancel a queued job, or a running one at its next checkpoint."""
         return self._core.call("POST", f"/v1/jobs/{_seg(id)}/cancel", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
+    def events(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> JobsEventsData:
+        """A job's timeline, oldest first (queued, processing, the end, with task ids)."""
+        return self._core.call("GET", f"/v1/jobs/{_seg(id)}/events", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def events_all(self, id: str, *, request_id: Optional[str] = None) -> Iterator[JobEvent]:
+        """Every item of events, page after page (follows next_cursor)."""
+        return self._core.paginate(f"/v1/jobs/{_seg(id)}/events", {}, request_id=request_id)
+
     def get(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Job:
         """Read a job; result has the shape the sync call would have returned."""
         return self._core.call("GET", f"/v1/jobs/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
-    def list(self, *, created_after: Optional[str] = None, created_before: Optional[str] = None, cursor: Optional[str] = None, limit: Optional[int] = None, operation: Optional[str] = None, service: Optional[str] = None, status: Optional[Literal["queued", "processing", "succeeded", "failed", "cancelled"]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> JobsListData:
+    def list(self, *, created_after: Optional[str] = None, created_before: Optional[str] = None, cursor: Optional[str] = None, key_id: Optional[str] = None, limit: Optional[int] = None, operation: Optional[str] = None, service: Optional[str] = None, status: Optional[Literal["queued", "processing", "succeeded", "failed", "cancelled"]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> JobsListData:
         """List jobs, newest first."""
-        return self._core.call("GET", f"/v1/jobs", query={"status": status, "service": service, "operation": operation, "created_after": created_after, "created_before": created_before, "limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+        return self._core.call("GET", f"/v1/jobs", query={"status": status, "service": service, "operation": operation, "key_id": key_id, "created_after": created_after, "created_before": created_before, "limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
-    def list_all(self, *, status: Optional[Literal["queued", "processing", "succeeded", "failed", "cancelled"]] = None, service: Optional[str] = None, operation: Optional[str] = None, created_after: Optional[str] = None, created_before: Optional[str] = None, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[Job]:
+    def list_all(self, *, status: Optional[Literal["queued", "processing", "succeeded", "failed", "cancelled"]] = None, service: Optional[str] = None, operation: Optional[str] = None, key_id: Optional[str] = None, created_after: Optional[str] = None, created_before: Optional[str] = None, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[Job]:
         """Every item of list, page after page (follows next_cursor)."""
-        return self._core.paginate(f"/v1/jobs", {"status": status, "service": service, "operation": operation, "created_after": created_after, "created_before": created_before, "limit": limit}, request_id=request_id)
+        return self._core.paginate(f"/v1/jobs", {"status": status, "service": service, "operation": operation, "key_id": key_id, "created_after": created_after, "created_before": created_before, "limit": limit}, request_id=request_id)
 
     def wait(self, job_id: str, *, timeout: float = 300.0, max_interval: float = 10.0) -> Job:
         """Waits until the job is succeeded, failed or cancelled, polling with the Retry-After the API sends; raises LowcoJobError when it failed or was cancelled, LowcoTimeoutError at the timeout."""
@@ -2784,6 +2847,17 @@ class KeysResource:
     def validate(self, *, label: str, allowed_ips: Optional[list[str]] = None, environment: Optional[Literal["live", "test"]] = None, expires_at: Optional[str] = None, scopes: Optional[list[str]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> KeyValidated:
         """Check a key's label, scopes, allowed IPs and expiry before minting it."""
         return self._core.call("POST", f"/v1/keys/validate", query=None, json=_drop_none({"allowed_ips": allowed_ips, "environment": environment, "expires_at": expires_at, "label": label, "scopes": scopes}), idempotency_key=idempotency_key, request_id=request_id)
+
+
+class RequestsResource:
+    """."""
+
+    def __init__(self, core: Core) -> None:
+        self._core = core
+
+    def get(self, request_id_: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> RequestRecord:
+        """What the request log recorded for one request, and its provider path."""
+        return self._core.call("GET", f"/v1/requests/{_seg(request_id_)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
 
 class SettingsResource:
@@ -2944,6 +3018,8 @@ class GeneratedClient:
         self.jobs = JobsResource(core)
         """Asynchronous jobs."""
         self.keys = KeysResource(core)
+        """."""
+        self.requests = RequestsResource(core)
         """."""
         self.settings = SettingsResource(core)
         """Environment settings."""

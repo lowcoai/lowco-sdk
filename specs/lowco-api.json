@@ -2348,6 +2348,10 @@
           "job_id": {
             "type": "string"
           },
+          "key_id": {
+            "description": "The key that created the job (empty for console calls)",
+            "type": "string"
+          },
           "links": {
             "additionalProperties": false,
             "properties": {
@@ -2389,6 +2393,10 @@
             ],
             "type": "object"
           },
+          "request_id": {
+            "description": "The request that created the job",
+            "type": "string"
+          },
           "result": {
             "description": "Set when succeeded: the operation's data, with output files as file objects and fresh signed links",
             "nullable": true,
@@ -2410,6 +2418,9 @@
               "failed",
               "cancelled"
             ],
+            "type": "string"
+          },
+          "trace_id": {
             "type": "string"
           },
           "usage": {
@@ -2547,6 +2558,32 @@
           "doc_url",
           "message",
           "reason"
+        ],
+        "type": "object"
+      },
+      "JobEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "detail": {
+            "description": "What happened (an attempt's error reason, a cancel request)",
+            "nullable": true,
+            "type": "object"
+          },
+          "status": {
+            "description": "queued, processing, succeeded, failed, cancelled, or a retry step",
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "status"
         ],
         "type": "object"
       },
@@ -5655,6 +5692,121 @@
           "file",
           "missing_glyphs",
           "pages"
+        ],
+        "type": "object"
+      },
+      "RequestRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "client": {
+            "description": "The calling Lowco app",
+            "type": "string"
+          },
+          "credits": {
+            "description": "Decimal",
+            "type": "string"
+          },
+          "job_id": {
+            "description": "The job the request created, if any",
+            "type": "string"
+          },
+          "key_id": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "request: the HTTP call; job: its job's end",
+            "enum": [
+              "request",
+              "job"
+            ],
+            "type": "string"
+          },
+          "latency_ms": {
+            "type": "integer"
+          },
+          "meter": {
+            "type": "string"
+          },
+          "mode": {
+            "description": "sync or async",
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "provider_calls": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "capability": {
+                  "type": "string"
+                },
+                "latency_ms": {
+                  "type": "integer"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "provider_code": {
+                  "type": "string"
+                },
+                "status": {
+                  "description": "ok or error",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "at",
+                "capability",
+                "latency_ms",
+                "provider",
+                "status"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "reason": {
+            "description": "error.reason when it failed",
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "status": {
+            "description": "HTTP status (a job's end: 200, 4xx or 5xx)",
+            "type": "integer"
+          },
+          "trace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "credits",
+          "kind",
+          "latency_ms",
+          "operation",
+          "provider_calls",
+          "quantity",
+          "request_id",
+          "service",
+          "status",
+          "trace_id"
         ],
         "type": "object"
       },
@@ -10294,6 +10446,14 @@
             }
           },
           {
+            "description": "Only jobs this key created",
+            "in": "query",
+            "name": "key_id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "",
             "in": "query",
             "name": "created_after",
@@ -10806,6 +10966,174 @@
           "jobs"
         ],
         "x-lowco-scope": "api.platform.jobs.write"
+      }
+    },
+    "/v1/jobs/{id}/events": {
+      "get": {
+        "operationId": "jobs_events",
+        "parameters": [
+          {
+            "description": "job_…",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "timeline": {
+                    "summary": "A job that failed once and then succeeded",
+                    "value": {
+                      "data": {
+                        "items": [
+                          {
+                            "at": "2026-10-09T08:00:00Z",
+                            "status": "queued"
+                          },
+                          {
+                            "at": "2026-10-09T08:00:01Z",
+                            "status": "processing",
+                            "task_id": "tsk_01JA9D7Q2T5W8Y1A4C7E0G3J6M"
+                          },
+                          {
+                            "at": "2026-10-09T08:00:04Z",
+                            "detail": {
+                              "reason": "provider_unavailable"
+                            },
+                            "status": "retrying",
+                            "task_id": "tsk_01JA9D7Q2T5W8Y1A4C7E0G3J6M"
+                          },
+                          {
+                            "at": "2026-10-09T08:00:34Z",
+                            "status": "processing",
+                            "task_id": "tsk_01JA9D7S4V7X0Z3B6D9F2H5K8M"
+                          },
+                          {
+                            "at": "2026-10-09T08:00:39Z",
+                            "status": "succeeded",
+                            "task_id": "tsk_01JA9D7S4V7X0Z3B6D9F2H5K8M"
+                          }
+                        ],
+                        "next_cursor": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "description": "A page; pass next_cursor as cursor for the next one (null at the end).",
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "$ref": "#/components/schemas/JobEvent"
+                          },
+                          "type": "array"
+                        },
+                        "next_cursor": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "next_cursor"
+                      ],
+                      "type": "object"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The timeline as one page",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "unknown": {
+                    "summary": "No such job in this environment",
+                    "value": {
+                      "error": {
+                        "code": 404,
+                        "doc_url": "https://docs.lowco.ai/api/errors#job_not_found",
+                        "message": "No job job_x.",
+                        "param": "job_id",
+                        "reason": "job_not_found",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: delivery_not_found, file_not_found, job_not_found, key_not_found, message_not_found, request_not_found, route_not_found, template_not_found, webhook_not_found.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "A job's timeline, oldest first (queued, processing, the end, with task ids)",
+        "tags": [
+          "jobs"
+        ],
+        "x-lowco-scope": "api.platform.jobs.read"
       }
     },
     "/v1/keys": {
@@ -19190,6 +19518,168 @@
           "render"
         ],
         "x-lowco-scope": "api.platform.templates.read"
+      }
+    },
+    "/v1/requests/{request_id}": {
+      "get": {
+        "description": "The support path: status, latency, credits, trace id, the job it created, and each provider call (capability, provider, latency, status). Kept 13 months; never document content.",
+        "operationId": "requests_get",
+        "parameters": [
+          {
+            "description": "The X-Request-Id of a response (req_…)",
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "docai": {
+                    "summary": "An invoice extraction whose first LLM provider failed over",
+                    "value": {
+                      "data": {
+                        "at": "2026-10-09T08:00:39Z",
+                        "credits": "4.0000",
+                        "job_id": "job_01JA9D7M8R1T4W7Y0A3C6E9G2J",
+                        "key_id": "6f1d2c3b-5a4e-4f00-8a11-2b3c4d5e6f70",
+                        "kind": "job",
+                        "latency_ms": 1840,
+                        "meter": "api_docai_pages",
+                        "mode": "async",
+                        "operation": "invoice",
+                        "provider_calls": [
+                          {
+                            "at": "2026-10-09T08:00:35Z",
+                            "capability": "ocr.accurate",
+                            "latency_ms": 620,
+                            "provider": "vision-a",
+                            "status": "ok"
+                          },
+                          {
+                            "at": "2026-10-09T08:00:36Z",
+                            "capability": "llm.extract",
+                            "latency_ms": 1100,
+                            "provider": "llm-a",
+                            "provider_code": "503",
+                            "status": "error"
+                          },
+                          {
+                            "at": "2026-10-09T08:00:37Z",
+                            "capability": "llm.extract",
+                            "latency_ms": 990,
+                            "provider": "llm-b",
+                            "status": "ok"
+                          }
+                        ],
+                        "quantity": 2,
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C",
+                        "service": "docai",
+                        "status": 200,
+                        "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RequestRecord"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The request",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "unknown": {
+                    "summary": "No such request in this environment",
+                    "value": {
+                      "error": {
+                        "code": 404,
+                        "doc_url": "https://docs.lowco.ai/api/errors#request_not_found",
+                        "message": "No request req_x in this environment in the last 13 months.",
+                        "param": "request_id",
+                        "reason": "request_not_found",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: delivery_not_found, file_not_found, job_not_found, key_not_found, message_not_found, request_not_found, route_not_found, template_not_found, webhook_not_found.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "What the request log recorded for one request, and its provider path",
+        "tags": [
+          "jobs"
+        ],
+        "x-lowco-scope": "api.platform.jobs.read"
       }
     },
     "/v1/settings": {

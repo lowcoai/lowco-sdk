@@ -681,14 +681,19 @@ export interface Job {
   /** A public summary of the inputs: file ids and pages, never bytes or URLs */
   input: JobInput;
   job_id: string;
+  /** The key that created the job (empty for console calls) */
+  key_id?: string;
   links: JobLinks;
   operation: string;
   progress: JobProgress | null;
+  /** The request that created the job */
+  request_id?: string;
   /** Set when succeeded: the operation's data, with output files as file objects and fresh signed links */
   result: Record<string, unknown> | null;
   service: string;
   started_at: string | null;
   status: "queued" | "processing" | "succeeded" | "failed" | "cancelled";
+  trace_id?: string;
   usage: JobUsage | null;
 }
 
@@ -701,6 +706,15 @@ export interface JobError {
   param?: string;
   reason: "already_sent" | "concurrency_exceeded" | "consent_required" | "delivery_not_found" | "document_not_recognised" | "environment_mismatch" | "file_corrupt" | "file_not_found" | "file_rejected" | "file_too_large" | "file_url_forbidden" | "file_url_unreachable" | "idempotency_in_progress" | "idempotency_key_reused" | "insufficient_credits" | "internal_error" | "invalid_identifier" | "invalid_json" | "invalid_key" | "invalid_param" | "invalid_password" | "invalid_state" | "ip_not_allowed" | "job_not_found" | "key_expired" | "key_not_found" | "key_revoked" | "message_not_found" | "method_not_allowed" | "missing_key" | "missing_param" | "operation_retired" | "org_suspended" | "password_required" | "payment_method_required" | "provider_error" | "provider_unavailable" | "quota_exceeded" | "rate_limited" | "request_not_found" | "route_not_found" | "schema_invalid" | "scope_missing" | "sender_not_verified" | "service_unavailable" | "suppressed" | "template_not_approved" | "template_not_found" | "timeout" | "token_expired" | "too_many_files" | "too_many_pages" | "unsupported_media_type" | "unsupported_option" | "validation_failed" | "webhook_not_found";
   retryable?: boolean;
+}
+
+export interface JobEvent {
+  at: string;
+  /** What happened (an attempt's error reason, a cancel request) */
+  detail?: Record<string, unknown> | null;
+  /** queued, processing, succeeded, failed, cancelled, or a retry step */
+  status: string;
+  task_id?: string;
 }
 
 /** A public summary of the inputs: file ids and pages, never bytes or URLs */
@@ -730,6 +744,12 @@ export interface JobUsage {
 }
 
 /** A page; pass next_cursor as cursor for the next one (null at the end). */
+export interface JobsEventsData {
+  items: JobEvent[];
+  next_cursor: string | null;
+}
+
+/** A page; pass next_cursor as cursor for the next one (null at the end). */
 export interface JobsListData {
   items: Job[];
   next_cursor: string | null;
@@ -740,6 +760,8 @@ export interface JobsListQuery {
   /** pdf, render, ocr, docai, qr, barcode */
   service?: string;
   operation?: string;
+  /** Only jobs this key created */
+  key_id?: string;
   created_after?: string;
   created_before?: string;
   /** Page size */
@@ -2011,6 +2033,43 @@ export interface RenderTemplateResultBlockedRequest {
   url: string;
 }
 
+export interface RequestRecord {
+  at: string;
+  /** The calling Lowco app */
+  client?: string;
+  /** Decimal */
+  credits: string;
+  /** The job the request created, if any */
+  job_id?: string;
+  key_id?: string;
+  /** request: the HTTP call; job: its job's end */
+  kind: "request" | "job";
+  latency_ms: number;
+  meter?: string;
+  /** sync or async */
+  mode?: string;
+  operation: string;
+  provider_calls: RequestRecordProviderCall[];
+  quantity: number;
+  /** error.reason when it failed */
+  reason?: string;
+  request_id: string;
+  service: string;
+  /** HTTP status (a job's end: 200, 4xx or 5xx) */
+  status: number;
+  trace_id: string;
+}
+
+export interface RequestRecordProviderCall {
+  at: string;
+  capability: string;
+  latency_ms: number;
+  provider: string;
+  provider_code?: string;
+  /** ok or error */
+  status: string;
+}
+
 export interface Settings {
   alert_emails: string[] | null;
   allowed_origins: string[] | null;
@@ -2548,6 +2607,16 @@ export class JobsResource {
     return this.core.call<Job>("POST", `/v1/jobs/${encodeURIComponent(id)}/cancel`, { query: undefined, json: undefined }, options);
   }
 
+  /** A job's timeline, oldest first (queued, processing, the end, with task ids). */
+  events(id: string, options?: RequestOptions): Promise<JobsEventsData> {
+    return this.core.call<JobsEventsData>("GET", `/v1/jobs/${encodeURIComponent(id)}/events`, { query: undefined, json: undefined }, options);
+  }
+
+  /** Every item of events, page after page (follows next_cursor). */
+  eventsAll(id: string, query?: Record<string, unknown>, options?: RequestOptions): AsyncIterable<JobEvent> {
+    return this.core.paginate<JobEvent>(`/v1/jobs/${encodeURIComponent(id)}/events`, query as unknown as Record<string, unknown> | undefined, options);
+  }
+
   /** Read a job; result has the shape the sync call would have returned. */
   get(id: string, options?: RequestOptions): Promise<Job> {
     return this.core.call<Job>("GET", `/v1/jobs/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
@@ -2592,6 +2661,17 @@ export class KeysResource {
   /** Check a key's label, scopes, allowed IPs and expiry before minting it. */
   validate(body: KeyValidate, options?: RequestOptions): Promise<KeyValidated> {
     return this.core.call<KeyValidated>("POST", `/v1/keys/validate`, { query: undefined, json: body }, options);
+  }
+
+}
+
+/** . */
+export class RequestsResource {
+  constructor(private readonly core: Core) {}
+
+  /** What the request log recorded for one request, and its provider path. */
+  get(requestId: string, options?: RequestOptions): Promise<RequestRecord> {
+    return this.core.call<RequestRecord>("GET", `/v1/requests/${encodeURIComponent(requestId)}`, { query: undefined, json: undefined }, options);
   }
 
 }
@@ -2762,6 +2842,8 @@ export class GeneratedClient {
   readonly jobs: JobsResource;
   /** . */
   readonly keys: KeysResource;
+  /** . */
+  readonly requests: RequestsResource;
   /** Environment settings. */
   readonly settings: SettingsResource;
   /** Stored render templates. */
@@ -2782,6 +2864,7 @@ export class GeneratedClient {
     this.files = new FilesResource(core);
     this.jobs = new JobsResource(core);
     this.keys = new KeysResource(core);
+    this.requests = new RequestsResource(core);
     this.settings = new SettingsResource(core);
     this.templates = new TemplatesResource(core);
     this.usage = new UsageResource(core);

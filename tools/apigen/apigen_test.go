@@ -137,3 +137,13 @@ func TestCompatFailsOnBreakingChanges(t *testing.T) {
 		t.Fatalf("additive changes: exit %d\n%s", code, out)
 	}
 }
+
+// A path parameter named like a per-call option (request_id) must not
+// become a duplicate Python argument.
+func TestPythonPathParamsDoNotShadowCallOptions(t *testing.T) {
+	for in, want := range map[string]string{"request_id": "request_id_", "id": "id", "key_id": "key_id", "delivery_id": "delivery_id", "timeout": "timeout_"} {
+		if got := pyPathName(in); got != want {
+			t.Errorf("%s: %s, want %s", in, got, want)
+		}
+	}
+}

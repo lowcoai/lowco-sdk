@@ -99,7 +99,8 @@ var fileKeys = map[string]bool{"file_id": true, "file_url": true, "file_base64":
 var resourceNames = map[string][2]string{
 	"files_upload": {"files", "upload"}, "files_get": {"files", "get"}, "files_delete": {"files", "delete"},
 	"files_content": {"files", "contentUrl"},
-	"jobs_list":     {"jobs", "list"}, "jobs_get": {"jobs", "get"}, "jobs_cancel": {"jobs", "cancel"},
+	"jobs_list":     {"jobs", "list"}, "jobs_get": {"jobs", "get"}, "jobs_cancel": {"jobs", "cancel"}, "jobs_events": {"jobs", "events"},
+	"requests_get":    {"requests", "get"},
 	"webhooks_create": {"webhooks", "create"}, "webhooks_list": {"webhooks", "list"}, "webhooks_get": {"webhooks", "get"},
 	"webhooks_update": {"webhooks", "update"}, "webhooks_delete": {"webhooks", "delete"}, "webhooks_ping": {"webhooks", "ping"},
 	"webhooks_deliveries": {"webhooks", "listDeliveries"}, "webhooks_retry": {"webhooks", "retryDelivery"}, "webhooks_delivery": {"webhooks", "getDelivery"},

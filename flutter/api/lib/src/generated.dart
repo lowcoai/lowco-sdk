@@ -2098,13 +2098,16 @@ class Job {
     this.finishedAt,
     this.input,
     this.jobId,
+    this.keyId,
     this.links,
     this.operation,
     this.progress,
+    this.requestId,
     this.result,
     this.service,
     this.startedAt,
     this.status,
+    this.traceId,
     this.usage,
   });
 
@@ -2116,13 +2119,16 @@ class Job {
         finishedAt: json['finished_at'] as String?,
         input: json['input'] == null ? null : JobInput.fromJson(json['input'] as Map<String, dynamic>),
         jobId: json['job_id'] as String?,
+        keyId: json['key_id'] as String?,
         links: json['links'] == null ? null : JobLinks.fromJson(json['links'] as Map<String, dynamic>),
         operation: json['operation'] as String?,
         progress: json['progress'] == null ? null : JobProgress.fromJson(json['progress'] as Map<String, dynamic>),
+        requestId: json['request_id'] as String?,
         result: (json['result'] as Map?)?.map((k, e) => MapEntry(k as String, (e)!)).cast<String, Object>(),
         service: json['service'] as String?,
         startedAt: json['started_at'] as String?,
         status: json['status'] as String?,
+        traceId: json['trace_id'] as String?,
         usage: json['usage'] == null ? null : JobUsage.fromJson(json['usage'] as Map<String, dynamic>),
       );
 
@@ -2142,11 +2148,17 @@ class Job {
 
   final String? jobId;
 
+  /// The key that created the job (empty for console calls)
+  final String? keyId;
+
   final JobLinks? links;
 
   final String? operation;
 
   final JobProgress? progress;
+
+  /// The request that created the job
+  final String? requestId;
 
   /// Set when succeeded: the operation's data, with output files as file objects and fresh signed links
   final Map<String, Object>? result;
@@ -2156,6 +2168,8 @@ class Job {
   final String? startedAt;
 
   final String? status;
+
+  final String? traceId;
 
   final JobUsage? usage;
 
@@ -2168,13 +2182,16 @@ class Job {
         if (finishedAt != null) 'finished_at': finishedAt!,
         if (input != null) 'input': input!.toJson(),
         if (jobId != null) 'job_id': jobId!,
+        if (keyId != null) 'key_id': keyId!,
         if (links != null) 'links': links!.toJson(),
         if (operation != null) 'operation': operation!,
         if (progress != null) 'progress': progress!.toJson(),
+        if (requestId != null) 'request_id': requestId!,
         if (result != null) 'result': result!,
         if (service != null) 'service': service!,
         if (startedAt != null) 'started_at': startedAt!,
         if (status != null) 'status': status!,
+        if (traceId != null) 'trace_id': traceId!,
         if (usage != null) 'usage': usage!.toJson(),
       };
 }
@@ -2224,6 +2241,40 @@ class JobError {
         if (param != null) 'param': param!,
         if (reason != null) 'reason': reason!,
         if (retryable != null) 'retryable': retryable!,
+      };
+}
+
+class JobEvent {
+  const JobEvent({
+    this.at,
+    this.detail,
+    this.status,
+    this.taskId,
+  });
+
+  factory JobEvent.fromJson(Map<String, dynamic> json) => JobEvent(
+        at: json['at'] as String?,
+        detail: (json['detail'] as Map?)?.map((k, e) => MapEntry(k as String, (e)!)).cast<String, Object>(),
+        status: json['status'] as String?,
+        taskId: json['task_id'] as String?,
+      );
+
+  final String? at;
+
+  /// What happened (an attempt's error reason, a cancel request)
+  final Map<String, Object>? detail;
+
+  /// queued, processing, succeeded, failed, cancelled, or a retry step
+  final String? status;
+
+  final String? taskId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (at != null) 'at': at!,
+        if (detail != null) 'detail': detail!,
+        if (status != null) 'status': status!,
+        if (taskId != null) 'task_id': taskId!,
       };
 }
 
@@ -2334,6 +2385,29 @@ class JobUsage {
 }
 
 /// A page; pass next_cursor as cursor for the next one (null at the end).
+class JobsEventsData {
+  const JobsEventsData({
+    this.items,
+    this.nextCursor,
+  });
+
+  factory JobsEventsData.fromJson(Map<String, dynamic> json) => JobsEventsData(
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : JobEvent.fromJson(e as Map<String, dynamic>))!).toList().cast<JobEvent>(),
+        nextCursor: json['next_cursor'] as String?,
+      );
+
+  final List<JobEvent>? items;
+
+  final String? nextCursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+        if (nextCursor != null) 'next_cursor': nextCursor!,
+      };
+}
+
+/// A page; pass next_cursor as cursor for the next one (null at the end).
 class JobsListData {
   const JobsListData({
     this.items,
@@ -2361,6 +2435,7 @@ class JobsListQuery {
     this.status,
     this.service,
     this.operation,
+    this.keyId,
     this.createdAfter,
     this.createdBefore,
     this.limit,
@@ -2371,6 +2446,7 @@ class JobsListQuery {
         status: json['status'] as String?,
         service: json['service'] as String?,
         operation: json['operation'] as String?,
+        keyId: json['key_id'] as String?,
         createdAfter: json['created_after'] as String?,
         createdBefore: json['created_before'] as String?,
         limit: (json['limit'] as num?)?.toInt(),
@@ -2383,6 +2459,9 @@ class JobsListQuery {
   final String? service;
 
   final String? operation;
+
+  /// Only jobs this key created
+  final String? keyId;
 
   final String? createdAfter;
 
@@ -2399,6 +2478,7 @@ class JobsListQuery {
         if (status != null) 'status': status!,
         if (service != null) 'service': service!,
         if (operation != null) 'operation': operation!,
+        if (keyId != null) 'key_id': keyId!,
         if (createdAfter != null) 'created_after': createdAfter!,
         if (createdBefore != null) 'created_before': createdBefore!,
         if (limit != null) 'limit': limit!,
@@ -6677,6 +6757,153 @@ class RenderTemplateResultBlockedRequest {
       };
 }
 
+class RequestRecord {
+  const RequestRecord({
+    this.at,
+    this.client,
+    this.credits,
+    this.jobId,
+    this.keyId,
+    this.kind,
+    this.latencyMs,
+    this.meter,
+    this.mode,
+    this.operation,
+    this.providerCalls,
+    this.quantity,
+    this.reason,
+    this.requestId,
+    this.service,
+    this.status,
+    this.traceId,
+  });
+
+  factory RequestRecord.fromJson(Map<String, dynamic> json) => RequestRecord(
+        at: json['at'] as String?,
+        client: json['client'] as String?,
+        credits: json['credits'] as String?,
+        jobId: json['job_id'] as String?,
+        keyId: json['key_id'] as String?,
+        kind: json['kind'] as String?,
+        latencyMs: (json['latency_ms'] as num?)?.toInt(),
+        meter: json['meter'] as String?,
+        mode: json['mode'] as String?,
+        operation: json['operation'] as String?,
+        providerCalls: (json['provider_calls'] as List?)?.map((e) => (e == null ? null : RequestRecordProviderCall.fromJson(e as Map<String, dynamic>))!).toList().cast<RequestRecordProviderCall>(),
+        quantity: (json['quantity'] as num?)?.toInt(),
+        reason: json['reason'] as String?,
+        requestId: json['request_id'] as String?,
+        service: json['service'] as String?,
+        status: (json['status'] as num?)?.toInt(),
+        traceId: json['trace_id'] as String?,
+      );
+
+  final String? at;
+
+  /// The calling Lowco app
+  final String? client;
+
+  /// Decimal
+  final String? credits;
+
+  /// The job the request created, if any
+  final String? jobId;
+
+  final String? keyId;
+
+  /// request: the HTTP call; job: its job's end
+  final String? kind;
+
+  final int? latencyMs;
+
+  final String? meter;
+
+  /// sync or async
+  final String? mode;
+
+  final String? operation;
+
+  final List<RequestRecordProviderCall>? providerCalls;
+
+  final int? quantity;
+
+  /// error.reason when it failed
+  final String? reason;
+
+  final String? requestId;
+
+  final String? service;
+
+  /// HTTP status (a job's end: 200, 4xx or 5xx)
+  final int? status;
+
+  final String? traceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (at != null) 'at': at!,
+        if (client != null) 'client': client!,
+        if (credits != null) 'credits': credits!,
+        if (jobId != null) 'job_id': jobId!,
+        if (keyId != null) 'key_id': keyId!,
+        if (kind != null) 'kind': kind!,
+        if (latencyMs != null) 'latency_ms': latencyMs!,
+        if (meter != null) 'meter': meter!,
+        if (mode != null) 'mode': mode!,
+        if (operation != null) 'operation': operation!,
+        if (providerCalls != null) 'provider_calls': providerCalls!.map((e) => e.toJson()).toList(),
+        if (quantity != null) 'quantity': quantity!,
+        if (reason != null) 'reason': reason!,
+        if (requestId != null) 'request_id': requestId!,
+        if (service != null) 'service': service!,
+        if (status != null) 'status': status!,
+        if (traceId != null) 'trace_id': traceId!,
+      };
+}
+
+class RequestRecordProviderCall {
+  const RequestRecordProviderCall({
+    this.at,
+    this.capability,
+    this.latencyMs,
+    this.provider,
+    this.providerCode,
+    this.status,
+  });
+
+  factory RequestRecordProviderCall.fromJson(Map<String, dynamic> json) => RequestRecordProviderCall(
+        at: json['at'] as String?,
+        capability: json['capability'] as String?,
+        latencyMs: (json['latency_ms'] as num?)?.toInt(),
+        provider: json['provider'] as String?,
+        providerCode: json['provider_code'] as String?,
+        status: json['status'] as String?,
+      );
+
+  final String? at;
+
+  final String? capability;
+
+  final int? latencyMs;
+
+  final String? provider;
+
+  final String? providerCode;
+
+  /// ok or error
+  final String? status;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (at != null) 'at': at!,
+        if (capability != null) 'capability': capability!,
+        if (latencyMs != null) 'latency_ms': latencyMs!,
+        if (provider != null) 'provider': provider!,
+        if (providerCode != null) 'provider_code': providerCode!,
+        if (status != null) 'status': status!,
+      };
+}
+
 class Settings {
   const Settings({
     this.alertEmails,
@@ -8066,6 +8293,12 @@ class JobsResource {
   /// Cancel a queued job, or a running one at its next checkpoint.
   Future<Job> cancel(String id, [RequestOptions? options]) => _core.call('POST', '/v1/jobs/${Uri.encodeComponent(id)}/cancel', query: null, body: null, decode: (j) => Job.fromJson(j as Map<String, dynamic>), options: options);
 
+  /// A job's timeline, oldest first (queued, processing, the end, with task ids).
+  Future<JobsEventsData> events(String id, [RequestOptions? options]) => _core.call('GET', '/v1/jobs/${Uri.encodeComponent(id)}/events', query: null, body: null, decode: (j) => JobsEventsData.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Every item of events, page after page (follows next_cursor).
+  Stream<JobEvent> eventsAll(String id, [RequestOptions? options]) => _core.paginate('/v1/jobs/${Uri.encodeComponent(id)}/events', null, (j) => JobEvent.fromJson(j as Map<String, dynamic>), options);
+
   /// Read a job; result has the shape the sync call would have returned.
   Future<Job> get(String id, [RequestOptions? options]) => _core.call('GET', '/v1/jobs/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => Job.fromJson(j as Map<String, dynamic>), options: options);
 
@@ -8097,6 +8330,16 @@ class KeysResource {
 
   /// Check a key's label, scopes, allowed IPs and expiry before minting it.
   Future<KeyValidated> validate(KeyValidate body, [RequestOptions? options]) => _core.call('POST', '/v1/keys/validate', query: null, body: body.toJson(), decode: (j) => KeyValidated.fromJson(j as Map<String, dynamic>), options: options);
+
+}
+
+/// .
+class RequestsResource {
+  RequestsResource(this._core);
+  final Core _core;
+
+  /// What the request log recorded for one request, and its provider path.
+  Future<RequestRecord> get(String requestId, [RequestOptions? options]) => _core.call('GET', '/v1/requests/${Uri.encodeComponent(requestId)}', query: null, body: null, decode: (j) => RequestRecord.fromJson(j as Map<String, dynamic>), options: options);
 
 }
 
@@ -8213,6 +8456,7 @@ class GeneratedClient {
         files = FilesResource(core),
         jobs = JobsResource(core),
         keys = KeysResource(core),
+        requests = RequestsResource(core),
         settings = SettingsResource(core),
         templates = TemplatesResource(core),
         usage = UsageResource(core),
@@ -8247,6 +8491,9 @@ class GeneratedClient {
 
   /// .
   final KeysResource keys;
+
+  /// .
+  final RequestsResource requests;
 
   /// Environment settings.
   final SettingsResource settings;
