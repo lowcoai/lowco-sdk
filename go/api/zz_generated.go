@@ -345,6 +345,17 @@ type CallbackSecret struct {
 	SecretLast4 string `json:"secret_last4"`
 }
 
+// CapabilityHandling is a Lowco API object.
+type CapabilityHandling struct {
+	// ocr.accurate, llm.extract, ...
+	Capability string `json:"capability"`
+	Label      string `json:"label"`
+	// The operations that call it (docai/* is every docai operation)
+	Operations []string `json:"operations"`
+	// Enabled targets of the live route, by priority
+	Providers []ProviderHandling `json:"providers"`
+}
+
 // ClassifyResult is a Lowco API object.
 type ClassifyResult struct {
 	// The label covering the most pages
@@ -381,6 +392,28 @@ type Colors struct {
 	Background *string `json:"background,omitempty"`
 	// #RRGGBB
 	Foreground *string `json:"foreground,omitempty"`
+}
+
+// The data-handling page (UI-08). Operators maintain the providers' profiles; the list follows the live routes.
+type DataHandling struct {
+	// Per capability, the providers in rotation
+	Capabilities []CapabilityHandling `json:"capabilities"`
+	// The data-processing agreement (Enterprise)
+	DpaURL string `json:"dpa_url"`
+	// Input and output retention per environment
+	Retention DataHandlingRetention `json:"retention"`
+	// The public security page
+	SecurityURL string `json:"security_url"`
+	// Test calls are answered by fixtures
+	TestEnvironment string `json:"test_environment"`
+	// The latest route or profile change
+	UpdatedAt *string `json:"updated_at"`
+}
+
+// Input and output retention per environment
+type DataHandlingRetention struct {
+	Live RetentionDefault `json:"live"`
+	Test RetentionDefault `json:"test"`
 }
 
 // DecodeResult is a Lowco API object.
@@ -1717,6 +1750,30 @@ type PdfWatermarkResult struct {
 	Watermarked int `json:"watermarked"`
 }
 
+// A provider in rotation and what it does with your data
+type ProviderHandling struct {
+	// How long the provider keeps what it is sent One of: zero_retention, abuse_monitoring_30d, custom, unknown.
+	DataRetention string `json:"data_retention"`
+	DisplayName   string `json:"display_name"`
+	// DPDP standing One of: in_india, contract_signed, pending.
+	DpdpStatus    string `json:"dpdp_status"`
+	HostingRegion string `json:"hosting_region"`
+	// Processes in India
+	InIndia bool `json:"in_india"`
+	// Lower takes traffic first
+	Priority int `json:"priority"`
+	// No operator has described this provider yet
+	ProfileMissing bool `json:"profile_missing"`
+	// The route target's name
+	Provider string `json:"provider"`
+	// The terms when custom
+	RetentionNote string   `json:"retention_note"`
+	SubProcessors []string `json:"sub_processors"`
+	TermsURL      string   `json:"terms_url"`
+	UpdatedAt     string   `json:"updated_at"`
+	UpdatedBy     string   `json:"updated_by"`
+}
+
 // PurgeReport is a Lowco API object.
 type PurgeReport struct {
 	DeliveriesDeleted int `json:"deliveries_deleted"`
@@ -2245,6 +2302,13 @@ type RequestRecordProviderCall struct {
 	ProviderCode *string `json:"provider_code,omitempty"`
 	// ok or error
 	Status string `json:"status"`
+}
+
+// RetentionDefault is a Lowco API object.
+type RetentionDefault struct {
+	InputHours int `json:"input_hours"`
+	// 0 is zero retention
+	OutputHours int `json:"output_hours"`
 }
 
 // Settings is a Lowco API object.
@@ -3062,6 +3126,15 @@ func (r *RequestsResource) Get(ctx context.Context, requestId string, opts ...Re
 
 // SettingsResource: Environment settings.
 type SettingsResource struct{ c *core }
+
+// DataHandling: Where your data is processed: the providers in rotation per capability with region, retention terms, DPDP status and sub-processors, and your retention per environment.
+func (r *SettingsResource) DataHandling(ctx context.Context, opts ...RequestOption) (*DataHandling, error) {
+	var out DataHandling
+	if err := r.c.call(ctx, http.MethodGet, "/v1/data-handling", toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
 
 // Get: Settings of the calling environment.
 func (r *SettingsResource) Get(ctx context.Context, opts ...RequestOption) (*Settings, error) {

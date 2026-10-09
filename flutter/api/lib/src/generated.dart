@@ -677,6 +677,41 @@ class CallbackSecret {
       };
 }
 
+class CapabilityHandling {
+  const CapabilityHandling({
+    this.capability,
+    this.label,
+    this.operations,
+    this.providers,
+  });
+
+  factory CapabilityHandling.fromJson(Map<String, dynamic> json) => CapabilityHandling(
+        capability: json['capability'] as String?,
+        label: json['label'] as String?,
+        operations: (json['operations'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        providers: (json['providers'] as List?)?.map((e) => (e == null ? null : ProviderHandling.fromJson(e as Map<String, dynamic>))!).toList().cast<ProviderHandling>(),
+      );
+
+  /// ocr.accurate, llm.extract, ...
+  final String? capability;
+
+  final String? label;
+
+  /// The operations that call it (docai/* is every docai operation)
+  final List<String>? operations;
+
+  /// Enabled targets of the live route, by priority
+  final List<ProviderHandling>? providers;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (capability != null) 'capability': capability!,
+        if (label != null) 'label': label!,
+        if (operations != null) 'operations': operations!,
+        if (providers != null) 'providers': providers!.map((e) => e.toJson()).toList(),
+      };
+}
+
 class ClassifyResult {
   const ClassifyResult({
     this.label,
@@ -813,6 +848,78 @@ class Colors {
   Map<String, dynamic> toJson() => {
         if (background != null) 'background': background!,
         if (foreground != null) 'foreground': foreground!,
+      };
+}
+
+/// The data-handling page (UI-08). Operators maintain the providers' profiles; the list follows the live routes.
+class DataHandling {
+  const DataHandling({
+    this.capabilities,
+    this.dpaUrl,
+    this.retention,
+    this.securityUrl,
+    this.testEnvironment,
+    this.updatedAt,
+  });
+
+  factory DataHandling.fromJson(Map<String, dynamic> json) => DataHandling(
+        capabilities: (json['capabilities'] as List?)?.map((e) => (e == null ? null : CapabilityHandling.fromJson(e as Map<String, dynamic>))!).toList().cast<CapabilityHandling>(),
+        dpaUrl: json['dpa_url'] as String?,
+        retention: json['retention'] == null ? null : DataHandlingRetention.fromJson(json['retention'] as Map<String, dynamic>),
+        securityUrl: json['security_url'] as String?,
+        testEnvironment: json['test_environment'] as String?,
+        updatedAt: json['updated_at'] as String?,
+      );
+
+  /// Per capability, the providers in rotation
+  final List<CapabilityHandling>? capabilities;
+
+  /// The data-processing agreement (Enterprise)
+  final String? dpaUrl;
+
+  /// Input and output retention per environment
+  final DataHandlingRetention? retention;
+
+  /// The public security page
+  final String? securityUrl;
+
+  /// Test calls are answered by fixtures
+  final String? testEnvironment;
+
+  /// The latest route or profile change
+  final String? updatedAt;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (capabilities != null) 'capabilities': capabilities!.map((e) => e.toJson()).toList(),
+        if (dpaUrl != null) 'dpa_url': dpaUrl!,
+        if (retention != null) 'retention': retention!.toJson(),
+        if (securityUrl != null) 'security_url': securityUrl!,
+        if (testEnvironment != null) 'test_environment': testEnvironment!,
+        if (updatedAt != null) 'updated_at': updatedAt!,
+      };
+}
+
+/// Input and output retention per environment
+class DataHandlingRetention {
+  const DataHandlingRetention({
+    this.live,
+    this.test,
+  });
+
+  factory DataHandlingRetention.fromJson(Map<String, dynamic> json) => DataHandlingRetention(
+        live: json['live'] == null ? null : RetentionDefault.fromJson(json['live'] as Map<String, dynamic>),
+        test: json['test'] == null ? null : RetentionDefault.fromJson(json['test'] as Map<String, dynamic>),
+      );
+
+  final RetentionDefault? live;
+
+  final RetentionDefault? test;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (live != null) 'live': live!.toJson(),
+        if (test != null) 'test': test!.toJson(),
       };
 }
 
@@ -5192,6 +5299,91 @@ class PdfWatermarkResult {
       };
 }
 
+/// A provider in rotation and what it does with your data
+class ProviderHandling {
+  const ProviderHandling({
+    this.dataRetention,
+    this.displayName,
+    this.dpdpStatus,
+    this.hostingRegion,
+    this.inIndia,
+    this.priority,
+    this.profileMissing,
+    this.provider,
+    this.retentionNote,
+    this.subProcessors,
+    this.termsUrl,
+    this.updatedAt,
+    this.updatedBy,
+  });
+
+  factory ProviderHandling.fromJson(Map<String, dynamic> json) => ProviderHandling(
+        dataRetention: json['data_retention'] as String?,
+        displayName: json['display_name'] as String?,
+        dpdpStatus: json['dpdp_status'] as String?,
+        hostingRegion: json['hosting_region'] as String?,
+        inIndia: json['in_india'] as bool?,
+        priority: (json['priority'] as num?)?.toInt(),
+        profileMissing: json['profile_missing'] as bool?,
+        provider: json['provider'] as String?,
+        retentionNote: json['retention_note'] as String?,
+        subProcessors: (json['sub_processors'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        termsUrl: json['terms_url'] as String?,
+        updatedAt: json['updated_at'] as String?,
+        updatedBy: json['updated_by'] as String?,
+      );
+
+  /// How long the provider keeps what it is sent
+  final String? dataRetention;
+
+  final String? displayName;
+
+  /// DPDP standing
+  final String? dpdpStatus;
+
+  final String? hostingRegion;
+
+  /// Processes in India
+  final bool? inIndia;
+
+  /// Lower takes traffic first
+  final int? priority;
+
+  /// No operator has described this provider yet
+  final bool? profileMissing;
+
+  /// The route target's name
+  final String? provider;
+
+  /// The terms when custom
+  final String? retentionNote;
+
+  final List<String>? subProcessors;
+
+  final String? termsUrl;
+
+  final String? updatedAt;
+
+  final String? updatedBy;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (dataRetention != null) 'data_retention': dataRetention!,
+        if (displayName != null) 'display_name': displayName!,
+        if (dpdpStatus != null) 'dpdp_status': dpdpStatus!,
+        if (hostingRegion != null) 'hosting_region': hostingRegion!,
+        if (inIndia != null) 'in_india': inIndia!,
+        if (priority != null) 'priority': priority!,
+        if (profileMissing != null) 'profile_missing': profileMissing!,
+        if (provider != null) 'provider': provider!,
+        if (retentionNote != null) 'retention_note': retentionNote!,
+        if (subProcessors != null) 'sub_processors': subProcessors!,
+        if (termsUrl != null) 'terms_url': termsUrl!,
+        if (updatedAt != null) 'updated_at': updatedAt!,
+        if (updatedBy != null) 'updated_by': updatedBy!,
+      };
+}
+
 class PurgeReport {
   const PurgeReport({
     this.deliveriesDeleted,
@@ -6904,6 +7096,29 @@ class RequestRecordProviderCall {
       };
 }
 
+class RetentionDefault {
+  const RetentionDefault({
+    this.inputHours,
+    this.outputHours,
+  });
+
+  factory RetentionDefault.fromJson(Map<String, dynamic> json) => RetentionDefault(
+        inputHours: (json['input_hours'] as num?)?.toInt(),
+        outputHours: (json['output_hours'] as num?)?.toInt(),
+      );
+
+  final int? inputHours;
+
+  /// 0 is zero retention
+  final int? outputHours;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (inputHours != null) 'input_hours': inputHours!,
+        if (outputHours != null) 'output_hours': outputHours!,
+      };
+}
+
 class Settings {
   const Settings({
     this.alertEmails,
@@ -8439,6 +8654,9 @@ class RequestsResource {
 class SettingsResource {
   SettingsResource(this._core);
   final Core _core;
+
+  /// Where your data is processed: the providers in rotation per capability with region, retention terms, DPDP status and sub-processors, and your retention per environment.
+  Future<DataHandling> dataHandling([RequestOptions? options]) => _core.call('GET', '/v1/data-handling', query: null, body: null, decode: (j) => DataHandling.fromJson(j as Map<String, dynamic>), options: options);
 
   /// Settings of the calling environment.
   Future<Settings> get([RequestOptions? options]) => _core.call('GET', '/v1/settings', query: null, body: null, decode: (j) => Settings.fromJson(j as Map<String, dynamic>), options: options);

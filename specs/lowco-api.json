@@ -694,6 +694,39 @@
         ],
         "type": "object"
       },
+      "CapabilityHandling": {
+        "additionalProperties": false,
+        "properties": {
+          "capability": {
+            "description": "ocr.accurate, llm.extract, ...",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "operations": {
+            "description": "The operations that call it (docai/* is every docai operation)",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "providers": {
+            "description": "Enabled targets of the live route, by priority",
+            "items": {
+              "$ref": "#/components/schemas/ProviderHandling"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "capability",
+          "label",
+          "operations",
+          "providers"
+        ],
+        "type": "object"
+      },
       "ClassifyResult": {
         "properties": {
           "label": {
@@ -794,6 +827,63 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "DataHandling": {
+        "additionalProperties": false,
+        "description": "The data-handling page (UI-08). Operators maintain the providers' profiles; the list follows the live routes.",
+        "properties": {
+          "capabilities": {
+            "description": "Per capability, the providers in rotation",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityHandling"
+            },
+            "type": "array"
+          },
+          "dpa_url": {
+            "description": "The data-processing agreement (Enterprise)",
+            "type": "string"
+          },
+          "retention": {
+            "additionalProperties": false,
+            "description": "Input and output retention per environment",
+            "properties": {
+              "live": {
+                "$ref": "#/components/schemas/RetentionDefault"
+              },
+              "test": {
+                "$ref": "#/components/schemas/RetentionDefault"
+              }
+            },
+            "required": [
+              "live",
+              "test"
+            ],
+            "type": "object"
+          },
+          "security_url": {
+            "description": "The public security page",
+            "type": "string"
+          },
+          "test_environment": {
+            "description": "Test calls are answered by fixtures",
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "The latest route or profile change",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "capabilities",
+          "dpa_url",
+          "retention",
+          "security_url",
+          "test_environment",
+          "updated_at"
+        ],
         "type": "object"
       },
       "DecodeResult": {
@@ -4657,6 +4747,89 @@
         ],
         "type": "object"
       },
+      "ProviderHandling": {
+        "additionalProperties": false,
+        "description": "A provider in rotation and what it does with your data",
+        "properties": {
+          "data_retention": {
+            "description": "How long the provider keeps what it is sent",
+            "enum": [
+              "zero_retention",
+              "abuse_monitoring_30d",
+              "custom",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "dpdp_status": {
+            "description": "DPDP standing",
+            "enum": [
+              "in_india",
+              "contract_signed",
+              "pending"
+            ],
+            "type": "string"
+          },
+          "hosting_region": {
+            "type": "string"
+          },
+          "in_india": {
+            "description": "Processes in India",
+            "type": "boolean"
+          },
+          "priority": {
+            "description": "Lower takes traffic first",
+            "type": "integer"
+          },
+          "profile_missing": {
+            "description": "No operator has described this provider yet",
+            "type": "boolean"
+          },
+          "provider": {
+            "description": "The route target's name",
+            "type": "string"
+          },
+          "retention_note": {
+            "description": "The terms when custom",
+            "type": "string"
+          },
+          "sub_processors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "terms_url": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updated_by": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_retention",
+          "display_name",
+          "dpdp_status",
+          "hosting_region",
+          "in_india",
+          "priority",
+          "profile_missing",
+          "provider",
+          "retention_note",
+          "sub_processors",
+          "terms_url",
+          "updated_at",
+          "updated_by"
+        ],
+        "type": "object"
+      },
       "PurgeReport": {
         "additionalProperties": false,
         "properties": {
@@ -5807,6 +5980,23 @@
           "service",
           "status",
           "trace_id"
+        ],
+        "type": "object"
+      },
+      "RetentionDefault": {
+        "additionalProperties": false,
+        "properties": {
+          "input_hours": {
+            "type": "integer"
+          },
+          "output_hours": {
+            "description": "0 is zero retention",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "input_hours",
+          "output_hours"
         ],
         "type": "object"
       },
@@ -7482,6 +7672,196 @@
           "billed": false,
           "notes": "Generates and decodes for real; every generated code is read back."
         }
+      }
+    },
+    "/v1/data-handling": {
+      "get": {
+        "operationId": "data_handling",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "summary": {
+                    "summary": "OCR on an Indian provider, Document AI on Lowco's own model",
+                    "value": {
+                      "data": {
+                        "capabilities": [
+                          {
+                            "capability": "ocr.accurate",
+                            "label": "OCR (accurate engine)",
+                            "operations": [
+                              "docai/*",
+                              "ocr/handwriting",
+                              "ocr/text"
+                            ],
+                            "providers": [
+                              {
+                                "data_retention": "zero_retention",
+                                "display_name": "Acme OCR",
+                                "dpdp_status": "in_india",
+                                "hosting_region": "ap-south-1 (Mumbai)",
+                                "in_india": true,
+                                "priority": 0,
+                                "profile_missing": false,
+                                "provider": "acme-ocr",
+                                "retention_note": "",
+                                "sub_processors": [
+                                  "AWS Mumbai"
+                                ],
+                                "terms_url": "https://acme.example/dpa",
+                                "updated_at": "2026-10-01T09:00:00Z",
+                                "updated_by": "usr_ops"
+                              },
+                              {
+                                "data_retention": "abuse_monitoring_30d",
+                                "display_name": "Beta Vision",
+                                "dpdp_status": "contract_signed",
+                                "hosting_region": "Singapore",
+                                "in_india": false,
+                                "priority": 1,
+                                "profile_missing": false,
+                                "provider": "beta-ocr",
+                                "retention_note": "Kept 30 days for abuse monitoring, then deleted",
+                                "sub_processors": [
+                                  "Google Cloud Singapore"
+                                ],
+                                "terms_url": "https://beta.example/terms",
+                                "updated_at": "2026-10-01T09:00:00Z",
+                                "updated_by": "usr_ops"
+                              }
+                            ]
+                          },
+                          {
+                            "capability": "llm.extract",
+                            "label": "Document AI (LLM extraction)",
+                            "operations": [
+                              "docai/*"
+                            ],
+                            "providers": [
+                              {
+                                "data_retention": "zero_retention",
+                                "display_name": "Lowco LLM",
+                                "dpdp_status": "in_india",
+                                "hosting_region": "Lowco, Bengaluru",
+                                "in_india": true,
+                                "priority": 0,
+                                "profile_missing": false,
+                                "provider": "lowco-llm",
+                                "retention_note": "",
+                                "sub_processors": [],
+                                "terms_url": "",
+                                "updated_at": "2026-10-02T09:00:00Z",
+                                "updated_by": "usr_ops"
+                              }
+                            ]
+                          }
+                        ],
+                        "dpa_url": "https://lowco.ai/legal/dpa",
+                        "retention": {
+                          "live": {
+                            "input_hours": 24,
+                            "output_hours": 168
+                          },
+                          "test": {
+                            "input_hours": 24,
+                            "output_hours": 24
+                          }
+                        },
+                        "security_url": "https://lowco.ai/security",
+                        "test_environment": "Test-environment calls are answered by recorded fixtures and never reach a provider.",
+                        "updated_at": "2026-10-02T09:00:00Z"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DataHandling"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The data-handling summary",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "scope": {
+                    "summary": "A key without the settings read scope",
+                    "value": {
+                      "error": {
+                        "code": 403,
+                        "doc_url": "https://docs.lowco.ai/api/errors#scope_missing",
+                        "message": "This key lacks the scope api.platform.settings.read.",
+                        "reason": "scope_missing",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: environment_mismatch, ip_not_allowed, org_suspended, scope_missing.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Where your data is processed: the providers in rotation per capability with region, retention terms, DPDP status and sub-processors, and your retention per environment",
+        "tags": [
+          "settings"
+        ],
+        "x-lowco-scope": "api.platform.settings.read"
       }
     },
     "/v1/docai/classify": {

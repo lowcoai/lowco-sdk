@@ -266,6 +266,15 @@ class CallbackSecret(TypedDict):
     secret: str
     secret_last4: str
 
+class CapabilityHandling(TypedDict):
+    capability: str
+    """ocr.accurate, llm.extract, ..."""
+    label: str
+    operations: list[str]
+    """The operations that call it (docai/* is every docai operation)"""
+    providers: list[ProviderHandling]
+    """Enabled targets of the live route, by priority"""
+
 class ClassifyResult(TypedDict):
     label: str
     """The label covering the most pages"""
@@ -290,6 +299,26 @@ class Colors(TypedDict):
     """#RRGGBB or transparent"""
     foreground: NotRequired[str]
     """#RRGGBB"""
+
+class DataHandling(TypedDict):
+    """The data-handling page (UI-08). Operators maintain the providers' profiles; the list follows the live routes."""
+    capabilities: list[CapabilityHandling]
+    """Per capability, the providers in rotation"""
+    dpa_url: str
+    """The data-processing agreement (Enterprise)"""
+    retention: DataHandlingRetention
+    """Input and output retention per environment"""
+    security_url: str
+    """The public security page"""
+    test_environment: str
+    """Test calls are answered by fixtures"""
+    updated_at: Optional[str]
+    """The latest route or profile change"""
+
+class DataHandlingRetention(TypedDict):
+    """Input and output retention per environment"""
+    live: RetentionDefault
+    test: RetentionDefault
 
 class DecodeResult(TypedDict):
     codes: list[DecodedCode]
@@ -1446,6 +1475,29 @@ class PdfWatermarkResult(TypedDict):
     watermarked: int
     """Pages stamped"""
 
+class ProviderHandling(TypedDict):
+    """A provider in rotation and what it does with your data"""
+    data_retention: Literal["zero_retention", "abuse_monitoring_30d", "custom", "unknown"]
+    """How long the provider keeps what it is sent"""
+    display_name: str
+    dpdp_status: Literal["in_india", "contract_signed", "pending"]
+    """DPDP standing"""
+    hosting_region: str
+    in_india: bool
+    """Processes in India"""
+    priority: int
+    """Lower takes traffic first"""
+    profile_missing: bool
+    """No operator has described this provider yet"""
+    provider: str
+    """The route target's name"""
+    retention_note: str
+    """The terms when custom"""
+    sub_processors: list[str]
+    terms_url: str
+    updated_at: str
+    updated_by: str
+
 class PurgeReport(TypedDict):
     deliveries_deleted: int
     environment: Literal["live", "test"]
@@ -1911,6 +1963,11 @@ class RequestRecordProviderCall(TypedDict):
     provider_code: NotRequired[str]
     status: str
     """ok or error"""
+
+class RetentionDefault(TypedDict):
+    input_hours: int
+    output_hours: int
+    """0 is zero retention"""
 
 class Settings(TypedDict):
     alert_emails: Optional[list[str]]
@@ -2887,6 +2944,10 @@ class SettingsResource:
 
     def __init__(self, core: Core) -> None:
         self._core = core
+
+    def data_handling(self, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> DataHandling:
+        """Where your data is processed: the providers in rotation per capability with region, retention terms, DPDP status and sub-processors, and your retention per environment."""
+        return self._core.call("GET", f"/v1/data-handling", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
     def get(self, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Settings:
         """Settings of the calling environment."""

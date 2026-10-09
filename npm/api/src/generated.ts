@@ -263,6 +263,16 @@ export interface CallbackSecret {
   secret_last4: string;
 }
 
+export interface CapabilityHandling {
+  /** ocr.accurate, llm.extract, ... */
+  capability: string;
+  label: string;
+  /** The operations that call it (docai/* is every docai operation) */
+  operations: string[];
+  /** Enabled targets of the live route, by priority */
+  providers: ProviderHandling[];
+}
+
 export interface ClassifyResult {
   /** The label covering the most pages */
   label: string;
@@ -295,6 +305,28 @@ export interface Colors {
   background?: string;
   /** #RRGGBB */
   foreground?: string;
+}
+
+/** The data-handling page (UI-08). Operators maintain the providers' profiles; the list follows the live routes. */
+export interface DataHandling {
+  /** Per capability, the providers in rotation */
+  capabilities: CapabilityHandling[];
+  /** The data-processing agreement (Enterprise) */
+  dpa_url: string;
+  /** Input and output retention per environment */
+  retention: DataHandlingRetention;
+  /** The public security page */
+  security_url: string;
+  /** Test calls are answered by fixtures */
+  test_environment: string;
+  /** The latest route or profile change */
+  updated_at: string | null;
+}
+
+/** Input and output retention per environment */
+export interface DataHandlingRetention {
+  live: RetentionDefault;
+  test: RetentionDefault;
 }
 
 export interface DecodeResult {
@@ -1565,6 +1597,30 @@ export interface PdfWatermarkResult {
   watermarked: number;
 }
 
+/** A provider in rotation and what it does with your data */
+export interface ProviderHandling {
+  /** How long the provider keeps what it is sent */
+  data_retention: "zero_retention" | "abuse_monitoring_30d" | "custom" | "unknown";
+  display_name: string;
+  /** DPDP standing */
+  dpdp_status: "in_india" | "contract_signed" | "pending";
+  hosting_region: string;
+  /** Processes in India */
+  in_india: boolean;
+  /** Lower takes traffic first */
+  priority: number;
+  /** No operator has described this provider yet */
+  profile_missing: boolean;
+  /** The route target's name */
+  provider: string;
+  /** The terms when custom */
+  retention_note: string;
+  sub_processors: string[];
+  terms_url: string;
+  updated_at: string;
+  updated_by: string;
+}
+
 export interface PurgeReport {
   deliveries_deleted: number;
   environment: "live" | "test";
@@ -2068,6 +2124,12 @@ export interface RequestRecordProviderCall {
   provider_code?: string;
   /** ok or error */
   status: string;
+}
+
+export interface RetentionDefault {
+  input_hours: number;
+  /** 0 is zero retention */
+  output_hours: number;
 }
 
 export interface Settings {
@@ -2704,6 +2766,11 @@ export class RequestsResource {
 /** Environment settings. */
 export class SettingsResource {
   constructor(private readonly core: Core) {}
+
+  /** Where your data is processed: the providers in rotation per capability with region, retention terms, DPDP status and sub-processors, and your retention per environment. */
+  dataHandling(options?: RequestOptions): Promise<DataHandling> {
+    return this.core.call<DataHandling>("GET", `/v1/data-handling`, { query: undefined, json: undefined }, options);
+  }
 
   /** Settings of the calling environment. */
   get(options?: RequestOptions): Promise<Settings> {
