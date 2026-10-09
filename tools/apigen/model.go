@@ -108,6 +108,7 @@ var resourceNames = map[string][2]string{
 	"render_templates_create":  {"templates", "create"}, "render_templates_list": {"templates", "list"},
 	"render_templates_get": {"templates", "get"}, "render_templates_update": {"templates", "update"},
 	"render_templates_delete": {"templates", "delete"}, "render_templates_versions": {"templates", "listVersions"},
+	"render_templates_pin": {"templates", "pin"}, "render_templates_unpin": {"templates", "unpin"},
 	"settings_get": {"settings", "get"}, "settings_update": {"settings", "update"}, "settings_purge": {"settings", "purge"}, "data_handling": {"settings", "dataHandling"},
 	"usage_get": {"usage", "get"}, "usage_alerts": {"usage", "alerts"}, "overview": {"usage", "overview"},
 	"audit_list": {"audit", "list"},

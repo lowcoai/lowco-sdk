@@ -1889,8 +1889,14 @@ class RenderTemplate(TypedDict):
     """When the template was created"""
     created_by: NotRequired[str]
     engine: str
+    last_used_at: Optional[str]
+    """The latest of them"""
     name: str
     page_options: Optional[PageOptions]
+    pinned_by: str
+    """Who pinned it"""
+    pinned_version: Optional[int]
+    """The version render/template uses when a call names none; null renders the latest"""
     sample_data: NotRequired[Any]
     """Example data for previews"""
     source: NotRequired[str]
@@ -1898,6 +1904,8 @@ class RenderTemplate(TypedDict):
     template_id: str
     updated_at: str
     """When this version was made"""
+    uses: int
+    """Renders that resolved this template"""
     version: int
 
 class RenderTemplateCreate(TypedDict):
@@ -1939,6 +1947,10 @@ class RenderTemplatePatch(TypedDict):
     sample_data: NotRequired[Any]
     """Up to 1 MB of JSON"""
     source: NotRequired[str]
+
+class RenderTemplatePin(TypedDict):
+    version: int
+    """The version to pin"""
 
 class RenderTemplateRequest(TypedDict):
     """The operation's options."""
@@ -3036,7 +3048,7 @@ class TemplatesResource:
         return self._core.call("POST", f"/v1/render/templates", query=None, json=_drop_none({"engine": engine, "name": name, "page_options": page_options, "sample_data": sample_data, "source": source}), idempotency_key=idempotency_key, request_id=request_id)
 
     def delete(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Deleted:
-        """Delete a template and every version."""
+        """Delete a template and every version (refused while pinned)."""
         return self._core.call("DELETE", f"/v1/render/templates/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
     def get(self, id: str, *, version: Optional[int] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> RenderTemplate:
@@ -3058,6 +3070,14 @@ class TemplatesResource:
     def list_versions_all(self, id: str, *, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[TemplateVersion]:
         """Every item of list_versions, page after page (follows next_cursor)."""
         return self._core.paginate(f"/v1/render/templates/{_seg(id)}/versions", {"limit": limit}, request_id=request_id)
+
+    def pin(self, id: str, *, version: int, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> RenderTemplate:
+        """Pin a version: render/template uses it when a call names no version, and the template cannot be deleted until unpinned."""
+        return self._core.call("PUT", f"/v1/render/templates/{_seg(id)}/pin", query=None, json=_drop_none({"version": version}), idempotency_key=idempotency_key, request_id=request_id)
+
+    def unpin(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> RenderTemplate:
+        """Remove the pin: the latest version renders again."""
+        return self._core.call("DELETE", f"/v1/render/templates/{_seg(id)}/pin", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
     def update(self, id: str, *, name: Optional[str] = None, page_options: Optional[PageOptions] = None, sample_data: Optional[Any] = None, source: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> RenderTemplate:
         """Make the next version; fields left out are carried over and earlier versions keep rendering as they were."""

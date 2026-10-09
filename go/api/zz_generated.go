@@ -2228,11 +2228,17 @@ type RenderHtmlResultBlockedRequest struct {
 // RenderTemplate is a Lowco API object.
 type RenderTemplate struct {
 	// When the template was created
-	CreatedAt   string       `json:"created_at"`
-	CreatedBy   *string      `json:"created_by,omitempty"`
-	Engine      string       `json:"engine"`
+	CreatedAt string  `json:"created_at"`
+	CreatedBy *string `json:"created_by,omitempty"`
+	Engine    string  `json:"engine"`
+	// The latest of them
+	LastUsedAt  *string      `json:"last_used_at"`
 	Name        string       `json:"name"`
 	PageOptions *PageOptions `json:"page_options"`
+	// Who pinned it
+	PinnedBy string `json:"pinned_by"`
+	// The version render/template uses when a call names none; null renders the latest
+	PinnedVersion *int `json:"pinned_version"`
 	// Example data for previews
 	SampleData any `json:"sample_data,omitempty"`
 	// Not in list items
@@ -2240,7 +2246,9 @@ type RenderTemplate struct {
 	TemplateID string  `json:"template_id"`
 	// When this version was made
 	UpdatedAt string `json:"updated_at"`
-	Version   int    `json:"version"`
+	// Renders that resolved this template
+	Uses    int `json:"uses"`
+	Version int `json:"version"`
 }
 
 // RenderTemplateCreate is a Lowco API object.
@@ -2286,6 +2294,12 @@ type RenderTemplatePatch struct {
 	// Up to 1 MB of JSON
 	SampleData any     `json:"sample_data,omitempty"`
 	Source     *string `json:"source,omitempty"`
+}
+
+// RenderTemplatePin is a Lowco API object.
+type RenderTemplatePin struct {
+	// The version to pin
+	Version int `json:"version"`
 }
 
 // The operation's options.
@@ -3260,7 +3274,7 @@ func (r *TemplatesResource) Create(ctx context.Context, body RenderTemplateCreat
 	return &out, nil
 }
 
-// Delete: Delete a template and every version.
+// Delete: Delete a template and every version (refused while pinned).
 func (r *TemplatesResource) Delete(ctx context.Context, id string, opts ...RequestOption) (*Deleted, error) {
 	var out Deleted
 	if err := r.c.call(ctx, http.MethodDelete, sprintf("/v1/render/templates/%s", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
@@ -3304,6 +3318,24 @@ func (r *TemplatesResource) ListVersions(ctx context.Context, id string, query *
 // ListVersionsAll pages through ListVersions, following next_cursor.
 func (r *TemplatesResource) ListVersionsAll(ctx context.Context, id string, query *TemplatesListVersionsQuery, opts ...RequestOption) *Pager[TemplateVersion] {
 	return newPager[TemplateVersion](r.c, sprintf("/v1/render/templates/%s/versions", url.PathEscape(id)), toQuery(query), opts)
+}
+
+// Pin: Pin a version: render/template uses it when a call names no version, and the template cannot be deleted until unpinned.
+func (r *TemplatesResource) Pin(ctx context.Context, id string, body RenderTemplatePin, opts ...RequestOption) (*RenderTemplate, error) {
+	var out RenderTemplate
+	if err := r.c.call(ctx, http.MethodPut, sprintf("/v1/render/templates/%s/pin", url.PathEscape(id)), toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Unpin: Remove the pin: the latest version renders again.
+func (r *TemplatesResource) Unpin(ctx context.Context, id string, opts ...RequestOption) (*RenderTemplate, error) {
+	var out RenderTemplate
+	if err := r.c.call(ctx, http.MethodDelete, sprintf("/v1/render/templates/%s/pin", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // Update: Make the next version; fields left out are carried over and earlier versions keep rendering as they were.

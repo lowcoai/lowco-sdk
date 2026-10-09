@@ -6838,12 +6838,16 @@ class RenderTemplate {
     this.createdAt,
     this.createdBy,
     this.engine,
+    this.lastUsedAt,
     this.name,
     this.pageOptions,
+    this.pinnedBy,
+    this.pinnedVersion,
     this.sampleData,
     this.source,
     this.templateId,
     this.updatedAt,
+    this.uses,
     this.version,
   });
 
@@ -6851,12 +6855,16 @@ class RenderTemplate {
         createdAt: json['created_at'] as String?,
         createdBy: json['created_by'] as String?,
         engine: json['engine'] as String?,
+        lastUsedAt: json['last_used_at'] as String?,
         name: json['name'] as String?,
         pageOptions: json['page_options'] == null ? null : PageOptions.fromJson(json['page_options'] as Map<String, dynamic>),
+        pinnedBy: json['pinned_by'] as String?,
+        pinnedVersion: (json['pinned_version'] as num?)?.toInt(),
         sampleData: json['sample_data'],
         source: json['source'] as String?,
         templateId: json['template_id'] as String?,
         updatedAt: json['updated_at'] as String?,
+        uses: (json['uses'] as num?)?.toInt(),
         version: (json['version'] as num?)?.toInt(),
       );
 
@@ -6867,9 +6875,18 @@ class RenderTemplate {
 
   final String? engine;
 
+  /// The latest of them
+  final String? lastUsedAt;
+
   final String? name;
 
   final PageOptions? pageOptions;
+
+  /// Who pinned it
+  final String? pinnedBy;
+
+  /// The version render/template uses when a call names none; null renders the latest
+  final int? pinnedVersion;
 
   /// Example data for previews
   final Object? sampleData;
@@ -6882,6 +6899,9 @@ class RenderTemplate {
   /// When this version was made
   final String? updatedAt;
 
+  /// Renders that resolved this template
+  final int? uses;
+
   final int? version;
 
   /// The wire form; null fields are left out (file inputs are sent separately).
@@ -6889,12 +6909,16 @@ class RenderTemplate {
         if (createdAt != null) 'created_at': createdAt!,
         if (createdBy != null) 'created_by': createdBy!,
         if (engine != null) 'engine': engine!,
+        if (lastUsedAt != null) 'last_used_at': lastUsedAt!,
         if (name != null) 'name': name!,
         if (pageOptions != null) 'page_options': pageOptions!.toJson(),
+        if (pinnedBy != null) 'pinned_by': pinnedBy!,
+        if (pinnedVersion != null) 'pinned_version': pinnedVersion!,
         if (sampleData != null) 'sample_data': sampleData!,
         if (source != null) 'source': source!,
         if (templateId != null) 'template_id': templateId!,
         if (updatedAt != null) 'updated_at': updatedAt!,
+        if (uses != null) 'uses': uses!,
         if (version != null) 'version': version!,
       };
 }
@@ -7032,6 +7056,24 @@ class RenderTemplatePatch {
         if (pageOptions != null) 'page_options': pageOptions!.toJson(),
         if (sampleData != null) 'sample_data': sampleData!,
         if (source != null) 'source': source!,
+      };
+}
+
+class RenderTemplatePin {
+  const RenderTemplatePin({
+    this.version,
+  });
+
+  factory RenderTemplatePin.fromJson(Map<String, dynamic> json) => RenderTemplatePin(
+        version: (json['version'] as num?)?.toInt(),
+      );
+
+  /// The version to pin
+  final int? version;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (version != null) 'version': version!,
       };
 }
 
@@ -8965,7 +9007,7 @@ class TemplatesResource {
   /// Store a Handlebars template as version 1.
   Future<RenderTemplate> create(RenderTemplateCreate body, [RequestOptions? options]) => _core.call('POST', '/v1/render/templates', query: null, body: body.toJson(), decode: (j) => RenderTemplate.fromJson(j as Map<String, dynamic>), options: options);
 
-  /// Delete a template and every version.
+  /// Delete a template and every version (refused while pinned).
   Future<Deleted> delete(String id, [RequestOptions? options]) => _core.call('DELETE', '/v1/render/templates/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => Deleted.fromJson(j as Map<String, dynamic>), options: options);
 
   /// Read a template: the latest version, or ?version=n.
@@ -8982,6 +9024,12 @@ class TemplatesResource {
 
   /// Every item of listVersions, page after page (follows next_cursor).
   Stream<TemplateVersion> listVersionsAll(String id, TemplatesListVersionsQuery? query, [RequestOptions? options]) => _core.paginate('/v1/render/templates/${Uri.encodeComponent(id)}/versions', query?.toJson(), (j) => TemplateVersion.fromJson(j as Map<String, dynamic>), options);
+
+  /// Pin a version: render/template uses it when a call names no version, and the template cannot be deleted until unpinned.
+  Future<RenderTemplate> pin(String id, RenderTemplatePin body, [RequestOptions? options]) => _core.call('PUT', '/v1/render/templates/${Uri.encodeComponent(id)}/pin', query: null, body: body.toJson(), decode: (j) => RenderTemplate.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Remove the pin: the latest version renders again.
+  Future<RenderTemplate> unpin(String id, [RequestOptions? options]) => _core.call('DELETE', '/v1/render/templates/${Uri.encodeComponent(id)}/pin', query: null, body: null, decode: (j) => RenderTemplate.fromJson(j as Map<String, dynamic>), options: options);
 
   /// Make the next version; fields left out are carried over and earlier versions keep rendering as they were.
   Future<RenderTemplate> update(String id, RenderTemplatePatch body, [RequestOptions? options]) => _core.call('PATCH', '/v1/render/templates/${Uri.encodeComponent(id)}', query: null, body: body.toJson(), decode: (j) => RenderTemplate.fromJson(j as Map<String, dynamic>), options: options);

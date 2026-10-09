@@ -2057,8 +2057,14 @@ export interface RenderTemplate {
   created_at: string;
   created_by?: string;
   engine: string;
+  /** The latest of them */
+  last_used_at: string | null;
   name: string;
   page_options: PageOptions | null;
+  /** Who pinned it */
+  pinned_by: string;
+  /** The version render/template uses when a call names none; null renders the latest */
+  pinned_version: number | null;
   /** Example data for previews */
   sample_data?: unknown;
   /** Not in list items */
@@ -2066,6 +2072,8 @@ export interface RenderTemplate {
   template_id: string;
   /** When this version was made */
   updated_at: string;
+  /** Renders that resolved this template */
+  uses: number;
   version: number;
 }
 
@@ -2110,6 +2118,11 @@ export interface RenderTemplatePatch {
   /** Up to 1 MB of JSON */
   sample_data?: unknown;
   source?: string;
+}
+
+export interface RenderTemplatePin {
+  /** The version to pin */
+  version: number;
 }
 
 /** The operation's options. */
@@ -2878,7 +2891,7 @@ export class TemplatesResource {
     return this.core.call<RenderTemplate>("POST", `/v1/render/templates`, { query: undefined, json: body }, options);
   }
 
-  /** Delete a template and every version. */
+  /** Delete a template and every version (refused while pinned). */
   delete(id: string, options?: RequestOptions): Promise<Deleted> {
     return this.core.call<Deleted>("DELETE", `/v1/render/templates/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
   }
@@ -2906,6 +2919,16 @@ export class TemplatesResource {
   /** Every item of listVersions, page after page (follows next_cursor). */
   listVersionsAll(id: string, query?: Omit<TemplatesListVersionsQuery, "cursor">, options?: RequestOptions): AsyncIterable<TemplateVersion> {
     return this.core.paginate<TemplateVersion>(`/v1/render/templates/${encodeURIComponent(id)}/versions`, query as unknown as Record<string, unknown> | undefined, options);
+  }
+
+  /** Pin a version: render/template uses it when a call names no version, and the template cannot be deleted until unpinned. */
+  pin(id: string, body: RenderTemplatePin, options?: RequestOptions): Promise<RenderTemplate> {
+    return this.core.call<RenderTemplate>("PUT", `/v1/render/templates/${encodeURIComponent(id)}/pin`, { query: undefined, json: body }, options);
+  }
+
+  /** Remove the pin: the latest version renders again. */
+  unpin(id: string, options?: RequestOptions): Promise<RenderTemplate> {
+    return this.core.call<RenderTemplate>("DELETE", `/v1/render/templates/${encodeURIComponent(id)}/pin`, { query: undefined, json: undefined }, options);
   }
 
   /** Make the next version; fields left out are carried over and earlier versions keep rendering as they were. */
