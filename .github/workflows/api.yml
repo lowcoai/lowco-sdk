@@ -1,0 +1,119 @@
+name: Lowco API SDKs
+
+# The four Lowco API packages (docs/api.md). Runs on every change to them, to
+# the vendored OpenAPI document or to the generator, on a schedule (to catch a
+# breaking change in lowco-api's document before it is synced), and on a
+# version tag, when the publish jobs run after every check passed.
+on:
+  pull_request:
+    paths: ["specs/**", "tools/apigen/**", "npm/api/**", "python/api/**", "go/api/**", "flutter/api/**", ".github/workflows/api.yml"]
+  push:
+    branches: [main]
+    paths: ["specs/**", "tools/apigen/**", "npm/api/**", "python/api/**", "go/api/**", "flutter/api/**", ".github/workflows/api.yml"]
+    tags: ["api-v*"]
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    # The breaking-change gate against lowco-api's current document, then the
+    # generated sources must match the vendored one.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: backend-platform/lowco-api
+          path: lowco-api
+          token: ${{ secrets.LOWCO_API_READ_TOKEN }}
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.26" }
+      - name: Breaking changes (vendored → lowco-api main)
+        run: make api-compat LOWCO_API=lowco-api
+      - name: Generated sources are current
+        run: make api-check
+      - name: Generator tests
+        run: cd tools/apigen && go test -count=1 ./...
+
+  go:
+    needs: contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.22" }
+      - run: cd go/api && go vet ./... && go test -race -count=1 ./...
+      - name: Quickstart against the test environment
+        env: { LOWCO_API_KEY: "${{ secrets.LOWCO_API_TEST_KEY }}" }
+        run: cd go/api && go build -o /tmp/quickstart ./examples/quickstart && cd "$RUNNER_TEMP" && curl -sSfo invoice.pdf https://docs.lowco.ai/samples/gst-invoice.pdf && /tmp/quickstart
+
+  node:
+    needs: contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: cd npm/api && npm ci && npm run typecheck && npm test
+      - name: Quickstart against the test environment
+        env: { LOWCO_API_KEY: "${{ secrets.LOWCO_API_TEST_KEY }}" }
+        run: cd "$RUNNER_TEMP" && curl -sSfo invoice.pdf https://docs.lowco.ai/samples/gst-invoice.pdf && node "$GITHUB_WORKSPACE/npm/api/examples/quickstart.mjs"
+
+  python:
+    needs: contract
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: { python: ["3.9", "3.12"] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ matrix.python }}" }
+      - run: pip install typing-extensions && cd python/api && python -m unittest discover -s tests
+      - name: Quickstart against the test environment
+        env: { LOWCO_API_KEY: "${{ secrets.LOWCO_API_TEST_KEY }}", PYTHONPATH: "${{ github.workspace }}/python/api/src" }
+        run: cd "$RUNNER_TEMP" && curl -sSfo invoice.pdf https://docs.lowco.ai/samples/gst-invoice.pdf && python "$GITHUB_WORKSPACE/python/api/examples/quickstart.py"
+
+  dart:
+    needs: contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: cd flutter/api && dart pub get && dart analyze && dart test
+      - name: Quickstart against the test environment
+        env: { LOWCO_API_KEY: "${{ secrets.LOWCO_API_TEST_KEY }}" }
+        run: cd "$RUNNER_TEMP" && curl -sSfo invoice.pdf https://docs.lowco.ai/samples/gst-invoice.pdf && dart --packages="$GITHUB_WORKSPACE/flutter/api/.dart_tool/package_config.json" "$GITHUB_WORKSPACE/flutter/api/example/quickstart.dart"
+
+  # Publishing runs only for an api-v* tag and only after every check above
+  # passed, so a breaking document change can never be published.
+  publish:
+    if: startsWith(github.ref, 'refs/tags/api-v')
+    needs: [contract, go, node, python, dart]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", registry-url: "https://registry.npmjs.org" }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: dart-lang/setup-dart@v1
+      - name: npm (@lowcoai/api)
+        env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }
+        run: cd npm/api && npm ci && npm publish --access public
+      - name: PyPI (lowcoai-api)
+        run: pip install build twine && cd python/api && python -m build && twine upload dist/*
+        env: { TWINE_USERNAME: __token__, TWINE_PASSWORD: "${{ secrets.PYPI_TOKEN }}" }
+      - name: pub.dev (lowcoai_api)
+        run: cd flutter/api && dart pub publish --force
+      - name: Go module tag (go/api/vX.Y.Z)
+        run: |
+          v="${GITHUB_REF_NAME#api-}"
+          git tag "go/api/$v" && git push origin "go/api/$v"
