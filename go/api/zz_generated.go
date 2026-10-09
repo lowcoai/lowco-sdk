@@ -246,11 +246,11 @@ type AuditListVerifyData struct {
 
 // AuditListVerifyQuery is a Lowco API object.
 type AuditListVerifyQuery struct {
-	// Only this operation (a verify lookup, or a document type read by docai/kyc) One of: aadhaar-offline, bank-account, cin, docai/kyc/aadhaar, docai/kyc/driving_licence, docai/kyc/pan_card, docai/kyc/passport, docai/kyc/voter_id, driving-licence, email, fssai, gstin, iec, ifsc, mobile, pan, pan-aadhaar-link, passport, udyam, upi, vehicle-rc, voter-id.
+	// Only this operation (a verify lookup, a fraud check or verify/kyc, or a document type read by docai/kyc) One of: aadhaar-offline, bank-account, cin, docai/kyc/aadhaar, docai/kyc/driving_licence, docai/kyc/pan_card, docai/kyc/passport, docai/kyc/voter_id, document-tamper, driving-licence, duplicate-document, email, face-match, fssai, gstin, iec, ifsc, kyc, liveness, mobile, pan, pan-aadhaar-link, passport, udyam, upi, vehicle-rc, voter-id.
 	Operation *string `json:"operation,omitempty"`
 	// One of: valid, invalid, not_found, inactive, mismatch, unavailable.
 	Result *string `json:"result,omitempty"`
-	// Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged
+	// Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged. Not for aadhaar-offline, docai/kyc/aadhaar or the fraud checks (their fingerprint is the file's): find those by reference_id
 	Identifier  *string `json:"identifier,omitempty"`
 	ReferenceID *string `json:"reference_id,omitempty"`
 	// A batch's rows
@@ -1231,6 +1231,98 @@ type KYCResult struct {
 	Validation     []ValidationIssue  `json:"validation"`
 	VoterID        *KYCVoterID        `json:"voter_id,omitempty"`
 	Warnings       []string           `json:"warnings,omitempty"`
+}
+
+// verify/kyc: the document read, its online check and the face match in one answer
+type KYCVerifyResult struct {
+	// docai/kyc's reading
+	Document KYCVerifyResultDocument `json:"document"`
+	// The selfie against the document; null without a selfie
+	FaceMatch *KYCVerifyResultFaceMatch `json:"face_match"`
+	// verified: every check passed; review: something could not be checked; rejected: a check failed One of: verified, review, rejected.
+	KycResult string `json:"kyc_result"`
+	// The lookup that matches the document (verify/pan, driving-licence, voter-id or passport); null when none ran
+	OnlineCheck *KYCVerifyResultOnlineCheck `json:"online_check"`
+	// Rejections first, then what needs review
+	Reasons     []KYCVerifyResultReason `json:"reasons"`
+	ReferenceID string                  `json:"reference_id"`
+	RequestID   string                  `json:"request_id"`
+}
+
+// docai/kyc's reading
+type KYCVerifyResultDocument struct {
+	DocumentConfidence float64 `json:"document_confidence"`
+	// One of: pan_card, aadhaar, driving_licence, passport, voter_id.
+	DocumentType string `json:"document_type"`
+	// The document type's fields, each a Field (as docai/kyc answers them); a value only the back carries has source.side back
+	Fields map[string]any `json:"fields"`
+	// Pages read, the back's included
+	PageCount int `json:"page_count"`
+	// Issues on the back carry side: back
+	Validation []ValidationIssue `json:"validation"`
+}
+
+// The selfie against the document; null without a selfie
+type KYCVerifyResultFaceMatch struct {
+	CheckedAt string `json:"checked_at"`
+	// The check's details
+	Details map[string]any `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *KYCVerifyResultFaceMatchNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// With name in the request and a name at the source
+type KYCVerifyResultFaceMatchNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The lookup that matches the document (verify/pan, driving-licence, voter-id or passport); null when none ran
+type KYCVerifyResultOnlineCheck struct {
+	CheckedAt string `json:"checked_at"`
+	// The check's details
+	Details map[string]any `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *KYCVerifyResultOnlineCheckNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) One of: valid, invalid, not_found, inactive, mismatch, unavailable.
+	Result string `json:"result"`
+	// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// With name in the request and a name at the source
+type KYCVerifyResultOnlineCheckNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// Why it is not simply verified
+type KYCVerifyResultReason struct {
+	// online_not_found, face_mismatch, pan_invalid, expired, no_online_check, ...
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 // KYCVoterID is a Lowco API object.
@@ -2730,6 +2822,8 @@ type Settings struct {
 	DocAILabels []string `json:"docai_labels"`
 	// One of: live, test.
 	Environment string `json:"environment"`
+	// verify/face-match's and verify/kyc's default threshold (0.8)
+	FaceMatchThreshold float64 `json:"face_match_threshold"`
 	// From the plan; read-only
 	MaxJobsInFlight int `json:"max_jobs_in_flight"`
 	// Decimal string; null is no cap
@@ -2750,6 +2844,8 @@ type SettingsPatch struct {
 	DefaultWebhookIds     []string `json:"default_webhook_ids,omitempty"`
 	// docai/classify labels used when a call sends none; [] restores the standard labels
 	DocAILabels []string `json:"docai_labels,omitempty"`
+	// The similarity a face match needs when a call names no threshold
+	FaceMatchThreshold *float64 `json:"face_match_threshold,omitempty"`
 	// Decimal string. In live it may not exceed the plan's ceiling (each priced meter's hard cap times its price; 422 on monthly_credit_cap)
 	MonthlyCreditCap    *string `json:"monthly_credit_cap,omitempty"`
 	RetentionInputHours *int    `json:"retention_input_hours,omitempty"`
@@ -2803,6 +2899,17 @@ type TablesResultTable struct {
 	Headers []string   `json:"headers"`
 	Page    int        `json:"page"`
 	Rows    [][]string `json:"rows"`
+}
+
+// A sign of tampering, with where it was seen
+type TamperIndicator struct {
+	Bbox       *BBox   `json:"bbox,omitempty"`
+	Confidence float64 `json:"confidence"`
+	// What was seen
+	Detail string `json:"detail"`
+	Page   *int   `json:"page,omitempty"`
+	// copy_move: a region repeats elsewhere; font_inconsistency: a figure in another font; metadata_edits: saved by an editor or after it was made; resaved_image: a photo recompressed One of: copy_move, font_inconsistency, metadata_edits, resaved_image.
+	Type string `json:"type"`
 }
 
 // TemplateVersion is a Lowco API object.
@@ -3332,6 +3439,84 @@ type VerifyCinResultNameMatch struct {
 	Source string `json:"source"`
 }
 
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type VerifyDocumentTamperParams struct {
+	// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+	File FileInput `json:"-"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type VerifyDocumentTamperRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Base64, URL-safe base64 or a data: URL
+	FileBase64 *string `json:"file_base64,omitempty"`
+	// A stored file of this org and environment (POST /v1/files)
+	FileID *string `json:"file_id,omitempty"`
+	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+	FileURL *string `json:"file_url,omitempty"`
+	// Name for the stored input
+	Filename *string `json:"filename,omitempty"`
+	// Opens a protected PDF; never stored or logged
+	Password *string `json:"password,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The common verify response
+type VerifyDocumentTamperResult struct {
+	CheckedAt string `json:"checked_at"`
+	// The analysis (local in both environments)
+	Details VerifyDocumentTamperResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyDocumentTamperResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free) One of: valid, invalid, mismatch, unavailable.
+	Result string `json:"result"`
+	// Who answered: the provider, the Lowco sandbox, or Lowco's own analysis
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// The analysis (local in both environments)
+type VerifyDocumentTamperResultDetails struct {
+	// One of: pdf, jpeg, image.
+	Format *string `json:"format,omitempty"`
+	// Most confident first; empty when nothing was found
+	Indicators []TamperIndicator `json:"indicators"`
+	// Pages read
+	Pages *int `json:"pages,omitempty"`
+	// 1 minus the product of the indicators' complements
+	TamperScore float64 `json:"tamper_score"`
+	// tamper_score is 0.5 or more
+	Tampered bool `json:"tampered"`
+}
+
+// With name in the request and a name at the source
+type VerifyDocumentTamperResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
 // The operation's options.
 type VerifyDrivingLicenceParams struct {
 	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
@@ -3406,6 +3591,99 @@ type VerifyDrivingLicenceResultNameMatch struct {
 	Source string `json:"source"`
 }
 
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type VerifyDuplicateDocumentParams struct {
+	// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+	File FileInput `json:"-"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// Where to look: org (the default and only scope) One of: org.
+	Scope *string `json:"scope,omitempty"`
+}
+
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type VerifyDuplicateDocumentRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Base64, URL-safe base64 or a data: URL
+	FileBase64 *string `json:"file_base64,omitempty"`
+	// A stored file of this org and environment (POST /v1/files)
+	FileID *string `json:"file_id,omitempty"`
+	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+	FileURL *string `json:"file_url,omitempty"`
+	// Name for the stored input
+	Filename *string `json:"filename,omitempty"`
+	// Opens a protected PDF; never stored or logged
+	Password *string `json:"password,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// Where to look: org (the default and only scope) One of: org.
+	Scope *string `json:"scope,omitempty"`
+}
+
+// The common verify response
+type VerifyDuplicateDocumentResult struct {
+	CheckedAt string `json:"checked_at"`
+	// The org's earlier documents like this one
+	Details VerifyDuplicateDocumentResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyDuplicateDocumentResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free) One of: valid, invalid, mismatch, unavailable.
+	Result string `json:"result"`
+	// Who answered: the provider, the Lowco sandbox, or Lowco's own analysis
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// The org's earlier documents like this one
+type VerifyDuplicateDocumentResultDetails struct {
+	// This document's index entry, kept 365 days
+	DocumentID string `json:"document_id"`
+	// At least one match
+	Duplicate bool `json:"duplicate"`
+	// image: the dHash of the image or a scan's page; text: the SimHash of a PDF's text layer One of: image, text.
+	HashKind string `json:"hash_kind"`
+	// Most similar first, at most 10
+	Matches []VerifyDuplicateDocumentResultDetailsMatche `json:"matches"`
+}
+
+// An earlier document
+type VerifyDuplicateDocumentResultDetailsMatche struct {
+	FirstSeenAt string `json:"first_seen_at"`
+	// The index entry (ddh_…)
+	ID string `json:"id"`
+	// The reference_id it was checked with
+	ReferenceID string `json:"reference_id"`
+	// Byte for byte the same file
+	SameFile bool `json:"same_file"`
+	// How alike (0.9 or more)
+	Similarity float64 `json:"similarity"`
+}
+
+// With name in the request and a name at the source
+type VerifyDuplicateDocumentResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
 // The operation's options.
 type VerifyEmailParams struct {
 	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
@@ -3469,6 +3747,80 @@ type VerifyEmailResultDetails struct {
 
 // With name in the request and a name at the source
 type VerifyEmailResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// The operation's options.
+type VerifyFaceMatchParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// An extra file input (face)
+	Face FileInput `json:"-"`
+	// An extra file input (reference)
+	Reference FileInput `json:"-"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// Similarity a match needs, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)
+	Threshold *float64 `json:"threshold,omitempty"`
+}
+
+// The operation's options.
+type VerifyFaceMatchRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// An extra file input (face); in multipart, a part named face
+	Face *FileRef `json:"face,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// An extra file input (reference); in multipart, a part named reference
+	Reference *FileRef `json:"reference,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// Similarity a match needs, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)
+	Threshold *float64 `json:"threshold,omitempty"`
+}
+
+// The common verify response
+type VerifyFaceMatchResult struct {
+	CheckedAt string `json:"checked_at"`
+	// The match; empty when unavailable
+	Details VerifyFaceMatchResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyFaceMatchResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free) One of: valid, invalid, mismatch, unavailable.
+	Result string `json:"result"`
+	// Who answered: the provider, the Lowco sandbox, or Lowco's own analysis
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// The match; empty when unavailable
+type VerifyFaceMatchResultDetails struct {
+	// similarity reached the threshold
+	Match *bool `json:"match,omitempty"`
+	// How alike the two faces are (the sandbox: how alike the two images are)
+	Similarity *float64 `json:"similarity,omitempty"`
+	// The threshold applied: the call's, else the org's face_match_threshold
+	Threshold *float64 `json:"threshold,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyFaceMatchResultNameMatch struct {
 	// The name you sent
 	Input string `json:"input"`
 	// 1 is the same name; under 0.8 a valid record is mismatch
@@ -3780,6 +4132,145 @@ type VerifyIfscResultDetailsChannels struct {
 
 // With name in the request and a name at the source
 type VerifyIfscResultNameMatch struct {
+	// The name you sent
+	Input string `json:"input"`
+	// 1 is the same name; under 0.8 a valid record is mismatch
+	Score float64 `json:"score"`
+	// The name at the source (a vehicle owner's masked without consent_owner)
+	Source string `json:"source"`
+}
+
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type VerifyKycParams struct {
+	// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+	File FileInput `json:"-"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// An extra file input (back)
+	Back FileInput `json:"-"`
+	// An extra file input (selfie)
+	Selfie FileInput `json:"-"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// pan_card, aadhaar, driving_licence, passport or voter_id (detected otherwise) One of: pan_card, aadhaar, driving_licence, passport, voter_id.
+	DocumentType *string `json:"document_type,omitempty"`
+	// Look the document up at its source (default true)
+	OnlineCheck *bool `json:"online_check,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// Face match threshold, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)
+	Threshold *float64 `json:"threshold,omitempty"`
+}
+
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type VerifyKycRequest struct {
+	// An extra file input (back); in multipart, a part named back
+	Back *FileRef `json:"back,omitempty"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// pan_card, aadhaar, driving_licence, passport or voter_id (detected otherwise) One of: pan_card, aadhaar, driving_licence, passport, voter_id.
+	DocumentType *string `json:"document_type,omitempty"`
+	// Base64, URL-safe base64 or a data: URL
+	FileBase64 *string `json:"file_base64,omitempty"`
+	// A stored file of this org and environment (POST /v1/files)
+	FileID *string `json:"file_id,omitempty"`
+	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+	FileURL *string `json:"file_url,omitempty"`
+	// Name for the stored input
+	Filename *string `json:"filename,omitempty"`
+	// Look the document up at its source (default true)
+	OnlineCheck *bool `json:"online_check,omitempty"`
+	// Opens a protected PDF; never stored or logged
+	Password *string `json:"password,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// An extra file input (selfie); in multipart, a part named selfie
+	Selfie *FileRef `json:"selfie,omitempty"`
+	// Face match threshold, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)
+	Threshold *float64 `json:"threshold,omitempty"`
+}
+
+// VerifyKycResult is a Lowco API value.
+type VerifyKycResult = KYCVerifyResult
+
+// The operation's options.
+type VerifyLivenessParams struct {
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// An extra file input (video)
+	Video FileInput `json:"-"`
+	// An extra file input (frame_1)
+	Frame1 FileInput `json:"-"`
+	// An extra file input (frame_2)
+	Frame2 FileInput `json:"-"`
+	// An extra file input (frame_3)
+	Frame3 FileInput `json:"-"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// The operation's options.
+type VerifyLivenessRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// An extra file input (frame_1); in multipart, a part named frame_1
+	Frame1 *FileRef `json:"frame_1,omitempty"`
+	// An extra file input (frame_2); in multipart, a part named frame_2
+	Frame2 *FileRef `json:"frame_2,omitempty"`
+	// An extra file input (frame_3); in multipart, a part named frame_3
+	Frame3 *FileRef `json:"frame_3,omitempty"`
+	// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the lookup, returned and kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// An extra file input (video); in multipart, a part named video
+	Video *FileRef `json:"video,omitempty"`
+}
+
+// The common verify response
+type VerifyLivenessResult struct {
+	CheckedAt string `json:"checked_at"`
+	// The verdict; empty when unavailable
+	Details VerifyLivenessResultDetails `json:"details"`
+	// With name in the request and a name at the source
+	NameMatch *VerifyLivenessResultNameMatch `json:"name_match"`
+	// Your reference_id
+	ReferenceID string `json:"reference_id"`
+	RequestID   string `json:"request_id"`
+	// valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free) One of: valid, invalid, mismatch, unavailable.
+	Result string `json:"result"`
+	// Who answered: the provider, the Lowco sandbox, or Lowco's own analysis
+	Source string `json:"source"`
+	// true only for result valid
+	Verified bool `json:"verified"`
+}
+
+// The verdict; empty when unavailable
+type VerifyLivenessResultDetails struct {
+	// Frames compared (0 for a video in the sandbox)
+	FramesChecked *int `json:"frames_checked,omitempty"`
+	// A live person
+	Live *bool `json:"live,omitempty"`
+	// How sure
+	Score *float64 `json:"score,omitempty"`
+	// Why it is not live (the sandbox reports the first three)
+	SpoofIndicators []string `json:"spoof_indicators,omitempty"`
+}
+
+// With name in the request and a name at the source
+type VerifyLivenessResultNameMatch struct {
 	// The name you sent
 	Input string `json:"input"`
 	// 1 is the same name; under 0.8 a valid record is mismatch
@@ -4869,6 +5360,16 @@ func (s *VerifyService) Cin(ctx context.Context, p VerifyCinParams, opts ...Call
 	return out.decode(s.c)
 }
 
+// DocumentTamper: Signs a document image or PDF was altered: tamper score and indicators with where they are. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_tamper; scope api.verify.document_tamper.execute.
+func (s *VerifyService) DocumentTamper(ctx context.Context, p VerifyDocumentTamperParams, opts ...CallOption) (*Answer[VerifyDocumentTamperResult], error) {
+	var out Answer[VerifyDocumentTamperResult]
+	err := s.c.operation(ctx, "/v1/verify/document-tamper", "file", p.File, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
 // DrivingLicence: A driving licence: holder, validity, classes, issuing RTO. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_dl; scope api.verify.driving_licence.execute.
 func (s *VerifyService) DrivingLicence(ctx context.Context, p VerifyDrivingLicenceParams, opts ...CallOption) (*Answer[VerifyDrivingLicenceResult], error) {
 	var out Answer[VerifyDrivingLicenceResult]
@@ -4879,10 +5380,30 @@ func (s *VerifyService) DrivingLicence(ctx context.Context, p VerifyDrivingLicen
 	return out.decode(s.c)
 }
 
+// DuplicateDocument: Find the same document among your org's documents of the last 365 days. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_duplicate; scope api.verify.duplicate_document.execute.
+func (s *VerifyService) DuplicateDocument(ctx context.Context, p VerifyDuplicateDocumentParams, opts ...CallOption) (*Answer[VerifyDuplicateDocumentResult], error) {
+	var out Answer[VerifyDuplicateDocumentResult]
+	err := s.c.operation(ctx, "/v1/verify/duplicate-document", "file", p.File, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
 // Email: An email address: syntax, MX, disposable, role address, deliverable, suggestion. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_email; scope api.verify.email.execute.
 func (s *VerifyService) Email(ctx context.Context, p VerifyEmailParams, opts ...CallOption) (*Answer[VerifyEmailResult], error) {
 	var out Answer[VerifyEmailResult]
 	err := s.c.operation(ctx, "/v1/verify/email", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// FaceMatch: Compare two face images: similarity and match at your threshold. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_face_match; scope api.verify.face_match.execute.
+func (s *VerifyService) FaceMatch(ctx context.Context, p VerifyFaceMatchParams, opts ...CallOption) (*Answer[VerifyFaceMatchResult], error) {
+	var out Answer[VerifyFaceMatchResult]
+	err := s.c.operation(ctx, "/v1/verify/face-match", "none", nil, nil, map[string]FileInput{"face": p.Face, "reference": p.Reference}, p, &out.raw, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -4923,6 +5444,26 @@ func (s *VerifyService) Iec(ctx context.Context, p VerifyIecParams, opts ...Call
 func (s *VerifyService) IFSC(ctx context.Context, p VerifyIfscParams, opts ...CallOption) (*Answer[VerifyIfscResult], error) {
 	var out Answer[VerifyIfscResult]
 	err := s.c.operation(ctx, "/v1/verify/ifsc", "none", nil, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// Kyc: One-call KYC: the ID document read, its online check, and a face match with a selfie. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.verify.kyc.execute.
+func (s *VerifyService) Kyc(ctx context.Context, p VerifyKycParams, opts ...CallOption) (*Answer[VerifyKycResult], error) {
+	var out Answer[VerifyKycResult]
+	err := s.c.operation(ctx, "/v1/verify/kyc", "file", p.File, nil, map[string]FileInput{"back": p.Back, "selfie": p.Selfie}, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// Liveness: Check a short video or 3 frames are of a live person: live, score, spoof indicators. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_liveness; scope api.verify.liveness.execute.
+func (s *VerifyService) Liveness(ctx context.Context, p VerifyLivenessParams, opts ...CallOption) (*Answer[VerifyLivenessResult], error) {
+	var out Answer[VerifyLivenessResult]
+	err := s.c.operation(ctx, "/v1/verify/liveness", "none", nil, nil, map[string]FileInput{"video": p.Video, "frame_1": p.Frame1, "frame_2": p.Frame2, "frame_3": p.Frame3}, p, &out.raw, opts)
 	if err != nil {
 		return nil, err
 	}

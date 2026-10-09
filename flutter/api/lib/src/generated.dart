@@ -389,12 +389,12 @@ class AuditListVerifyQuery {
         format: json['format'] as String?,
       );
 
-  /// Only this operation (a verify lookup, or a document type read by docai/kyc)
+  /// Only this operation (a verify lookup, a fraud check or verify/kyc, or a document type read by docai/kyc)
   final String? operation;
 
   final String? result;
 
-  /// Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged
+  /// Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged. Not for aadhaar-offline, docai/kyc/aadhaar or the fraud checks (their fingerprint is the file's): find those by reference_id
   final String? identifier;
 
   final String? referenceId;
@@ -3701,6 +3701,304 @@ class KYCResult {
         if (validation != null) 'validation': validation!.map((e) => e.toJson()).toList(),
         if (voterId != null) 'voter_id': voterId!.toJson(),
         if (warnings != null) 'warnings': warnings!,
+      };
+}
+
+/// verify/kyc: the document read, its online check and the face match in one answer
+class KYCVerifyResult {
+  const KYCVerifyResult({
+    this.document,
+    this.faceMatch,
+    this.kycResult,
+    this.onlineCheck,
+    this.reasons,
+    this.referenceId,
+    this.requestId,
+  });
+
+  factory KYCVerifyResult.fromJson(Map<String, dynamic> json) => KYCVerifyResult(
+        document: json['document'] == null ? null : KYCVerifyResultDocument.fromJson(json['document'] as Map<String, dynamic>),
+        faceMatch: json['face_match'] == null ? null : KYCVerifyResultFaceMatch.fromJson(json['face_match'] as Map<String, dynamic>),
+        kycResult: json['kyc_result'] as String?,
+        onlineCheck: json['online_check'] == null ? null : KYCVerifyResultOnlineCheck.fromJson(json['online_check'] as Map<String, dynamic>),
+        reasons: (json['reasons'] as List?)?.map((e) => (e == null ? null : KYCVerifyResultReason.fromJson(e as Map<String, dynamic>))!).toList().cast<KYCVerifyResultReason>(),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+      );
+
+  /// docai/kyc's reading
+  final KYCVerifyResultDocument? document;
+
+  /// The selfie against the document; null without a selfie
+  final KYCVerifyResultFaceMatch? faceMatch;
+
+  /// verified: every check passed; review: something could not be checked; rejected: a check failed
+  final String? kycResult;
+
+  /// The lookup that matches the document (verify/pan, driving-licence, voter-id or passport); null when none ran
+  final KYCVerifyResultOnlineCheck? onlineCheck;
+
+  /// Rejections first, then what needs review
+  final List<KYCVerifyResultReason>? reasons;
+
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (document != null) 'document': document!.toJson(),
+        if (faceMatch != null) 'face_match': faceMatch!.toJson(),
+        if (kycResult != null) 'kyc_result': kycResult!,
+        if (onlineCheck != null) 'online_check': onlineCheck!.toJson(),
+        if (reasons != null) 'reasons': reasons!.map((e) => e.toJson()).toList(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+      };
+}
+
+/// docai/kyc's reading
+class KYCVerifyResultDocument {
+  const KYCVerifyResultDocument({
+    this.documentConfidence,
+    this.documentType,
+    this.fields,
+    this.pageCount,
+    this.validation,
+  });
+
+  factory KYCVerifyResultDocument.fromJson(Map<String, dynamic> json) => KYCVerifyResultDocument(
+        documentConfidence: json['document_confidence'] as num?,
+        documentType: json['document_type'] as String?,
+        fields: (json['fields'] as Map?)?.map((k, e) => MapEntry(k as String, (e)!)).cast<String, Object>(),
+        pageCount: (json['page_count'] as num?)?.toInt(),
+        validation: (json['validation'] as List?)?.map((e) => (e == null ? null : ValidationIssue.fromJson(e as Map<String, dynamic>))!).toList().cast<ValidationIssue>(),
+      );
+
+  final num? documentConfidence;
+
+  final String? documentType;
+
+  /// The document type's fields, each a Field (as docai/kyc answers them); a value only the back carries has source.side back
+  final Map<String, Object>? fields;
+
+  /// Pages read, the back's included
+  final int? pageCount;
+
+  /// Issues on the back carry side: back
+  final List<ValidationIssue>? validation;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (documentConfidence != null) 'document_confidence': documentConfidence!,
+        if (documentType != null) 'document_type': documentType!,
+        if (fields != null) 'fields': fields!,
+        if (pageCount != null) 'page_count': pageCount!,
+        if (validation != null) 'validation': validation!.map((e) => e.toJson()).toList(),
+      };
+}
+
+/// The selfie against the document; null without a selfie
+class KYCVerifyResultFaceMatch {
+  const KYCVerifyResultFaceMatch({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory KYCVerifyResultFaceMatch.fromJson(Map<String, dynamic> json) => KYCVerifyResultFaceMatch(
+        checkedAt: json['checked_at'] as String?,
+        details: (json['details'] as Map?)?.map((k, e) => MapEntry(k as String, (e)!)).cast<String, Object>(),
+        nameMatch: json['name_match'] == null ? null : KYCVerifyResultFaceMatchNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// The check's details
+  final Map<String, Object>? details;
+
+  /// With name in the request and a name at the source
+  final KYCVerifyResultFaceMatchNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!,
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// With name in the request and a name at the source
+class KYCVerifyResultFaceMatchNameMatch {
+  const KYCVerifyResultFaceMatchNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory KYCVerifyResultFaceMatchNameMatch.fromJson(Map<String, dynamic> json) => KYCVerifyResultFaceMatchNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The lookup that matches the document (verify/pan, driving-licence, voter-id or passport); null when none ran
+class KYCVerifyResultOnlineCheck {
+  const KYCVerifyResultOnlineCheck({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory KYCVerifyResultOnlineCheck.fromJson(Map<String, dynamic> json) => KYCVerifyResultOnlineCheck(
+        checkedAt: json['checked_at'] as String?,
+        details: (json['details'] as Map?)?.map((k, e) => MapEntry(k as String, (e)!)).cast<String, Object>(),
+        nameMatch: json['name_match'] == null ? null : KYCVerifyResultOnlineCheckNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// The check's details
+  final Map<String, Object>? details;
+
+  /// With name in the request and a name at the source
+  final KYCVerifyResultOnlineCheckNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)
+  final String? result;
+
+  /// The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!,
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// With name in the request and a name at the source
+class KYCVerifyResultOnlineCheckNameMatch {
+  const KYCVerifyResultOnlineCheckNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory KYCVerifyResultOnlineCheckNameMatch.fromJson(Map<String, dynamic> json) => KYCVerifyResultOnlineCheckNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// Why it is not simply verified
+class KYCVerifyResultReason {
+  const KYCVerifyResultReason({
+    this.code,
+    this.message,
+  });
+
+  factory KYCVerifyResultReason.fromJson(Map<String, dynamic> json) => KYCVerifyResultReason(
+        code: json['code'] as String?,
+        message: json['message'] as String?,
+      );
+
+  /// online_not_found, face_mismatch, pan_invalid, expired, no_online_check, ...
+  final String? code;
+
+  final String? message;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (code != null) 'code': code!,
+        if (message != null) 'message': message!,
       };
 }
 
@@ -8548,6 +8846,7 @@ class Settings {
     this.defaultWebhookIds,
     this.docaiLabels,
     this.environment,
+    this.faceMatchThreshold,
     this.maxJobsInFlight,
     this.monthlyCreditCap,
     this.retentionInputHours,
@@ -8562,6 +8861,7 @@ class Settings {
         defaultWebhookIds: (json['default_webhook_ids'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
         docaiLabels: (json['docai_labels'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
         environment: json['environment'] as String?,
+        faceMatchThreshold: json['face_match_threshold'] as num?,
         maxJobsInFlight: (json['max_jobs_in_flight'] as num?)?.toInt(),
         monthlyCreditCap: json['monthly_credit_cap'] as String?,
         retentionInputHours: (json['retention_input_hours'] as num?)?.toInt(),
@@ -8580,6 +8880,9 @@ class Settings {
   final List<String>? docaiLabels;
 
   final String? environment;
+
+  /// verify/face-match's and verify/kyc's default threshold (0.8)
+  final num? faceMatchThreshold;
 
   /// From the plan; read-only
   final int? maxJobsInFlight;
@@ -8603,6 +8906,7 @@ class Settings {
         if (defaultWebhookIds != null) 'default_webhook_ids': defaultWebhookIds!,
         if (docaiLabels != null) 'docai_labels': docaiLabels!,
         if (environment != null) 'environment': environment!,
+        if (faceMatchThreshold != null) 'face_match_threshold': faceMatchThreshold!,
         if (maxJobsInFlight != null) 'max_jobs_in_flight': maxJobsInFlight!,
         if (monthlyCreditCap != null) 'monthly_credit_cap': monthlyCreditCap!,
         if (retentionInputHours != null) 'retention_input_hours': retentionInputHours!,
@@ -8619,6 +8923,7 @@ class SettingsPatch {
     this.clearMonthlyCreditCap,
     this.defaultWebhookIds,
     this.docaiLabels,
+    this.faceMatchThreshold,
     this.monthlyCreditCap,
     this.retentionInputHours,
     this.retentionOutputHours,
@@ -8631,6 +8936,7 @@ class SettingsPatch {
         clearMonthlyCreditCap: json['clear_monthly_credit_cap'] as bool?,
         defaultWebhookIds: (json['default_webhook_ids'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
         docaiLabels: (json['docai_labels'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        faceMatchThreshold: json['face_match_threshold'] as num?,
         monthlyCreditCap: json['monthly_credit_cap'] as String?,
         retentionInputHours: (json['retention_input_hours'] as num?)?.toInt(),
         retentionOutputHours: (json['retention_output_hours'] as num?)?.toInt(),
@@ -8649,6 +8955,9 @@ class SettingsPatch {
   /// docai/classify labels used when a call sends none; \[] restores the standard labels
   final List<String>? docaiLabels;
 
+  /// The similarity a face match needs when a call names no threshold
+  final num? faceMatchThreshold;
+
   /// Decimal string. In live it may not exceed the plan's ceiling (each priced meter's hard cap times its price; 422 on monthly_credit_cap)
   final String? monthlyCreditCap;
 
@@ -8666,6 +8975,7 @@ class SettingsPatch {
         if (clearMonthlyCreditCap != null) 'clear_monthly_credit_cap': clearMonthlyCreditCap!,
         if (defaultWebhookIds != null) 'default_webhook_ids': defaultWebhookIds!,
         if (docaiLabels != null) 'docai_labels': docaiLabels!,
+        if (faceMatchThreshold != null) 'face_match_threshold': faceMatchThreshold!,
         if (monthlyCreditCap != null) 'monthly_credit_cap': monthlyCreditCap!,
         if (retentionInputHours != null) 'retention_input_hours': retentionInputHours!,
         if (retentionOutputHours != null) 'retention_output_hours': retentionOutputHours!,
@@ -8851,6 +9161,46 @@ class TablesResultTable {
         if (headers != null) 'headers': headers!,
         if (page != null) 'page': page!,
         if (rows != null) 'rows': rows!,
+      };
+}
+
+/// A sign of tampering, with where it was seen
+class TamperIndicator {
+  const TamperIndicator({
+    this.bbox,
+    this.confidence,
+    this.detail,
+    this.page,
+    this.type,
+  });
+
+  factory TamperIndicator.fromJson(Map<String, dynamic> json) => TamperIndicator(
+        bbox: json['bbox'] == null ? null : BBox.fromJson(json['bbox'] as Map<String, dynamic>),
+        confidence: json['confidence'] as num?,
+        detail: json['detail'] as String?,
+        page: (json['page'] as num?)?.toInt(),
+        type: json['type'] as String?,
+      );
+
+  final BBox? bbox;
+
+  final num? confidence;
+
+  /// What was seen
+  final String? detail;
+
+  final int? page;
+
+  /// copy_move: a region repeats elsewhere; font_inconsistency: a figure in another font; metadata_edits: saved by an editor or after it was made; resaved_image: a photo recompressed
+  final String? type;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (bbox != null) 'bbox': bbox!.toJson(),
+        if (confidence != null) 'confidence': confidence!,
+        if (detail != null) 'detail': detail!,
+        if (page != null) 'page': page!,
+        if (type != null) 'type': type!,
       };
 }
 
@@ -10626,6 +10976,245 @@ class VerifyCinResultNameMatch {
       };
 }
 
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class VerifyDocumentTamperParams {
+  const VerifyDocumentTamperParams({
+    required this.file,
+    this.consent,
+    this.purpose,
+    this.callbackUrl,
+    this.referenceId,
+  });
+
+  /// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+  final FileInput file;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+
+  /// The named file inputs.
+  Map<String, FileInput?> get fileInputs => {'file': file};
+
+  /// The files, in order.
+  List<FileInput>? get manyFiles => null;
+}
+
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class VerifyDocumentTamperRequest {
+  const VerifyDocumentTamperRequest({
+    this.callbackUrl,
+    this.consent,
+    this.fileBase64,
+    this.fileId,
+    this.fileUrl,
+    this.filename,
+    this.password,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory VerifyDocumentTamperRequest.fromJson(Map<String, dynamic> json) => VerifyDocumentTamperRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        fileBase64: json['file_base64'] as String?,
+        fileId: json['file_id'] as String?,
+        fileUrl: json['file_url'] as String?,
+        filename: json['filename'] as String?,
+        password: json['password'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Base64, URL-safe base64 or a data: URL
+  final String? fileBase64;
+
+  /// A stored file of this org and environment (POST /v1/files)
+  final String? fileId;
+
+  /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+  final String? fileUrl;
+
+  /// Name for the stored input
+  final String? filename;
+
+  /// Opens a protected PDF; never stored or logged
+  final String? password;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (fileBase64 != null) 'file_base64': fileBase64!,
+        if (fileId != null) 'file_id': fileId!,
+        if (fileUrl != null) 'file_url': fileUrl!,
+        if (filename != null) 'filename': filename!,
+        if (password != null) 'password': password!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+/// The common verify response
+class VerifyDocumentTamperResult {
+  const VerifyDocumentTamperResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyDocumentTamperResult.fromJson(Map<String, dynamic> json) => VerifyDocumentTamperResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyDocumentTamperResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyDocumentTamperResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// The analysis (local in both environments)
+  final VerifyDocumentTamperResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyDocumentTamperResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free)
+  final String? result;
+
+  /// Who answered: the provider, the Lowco sandbox, or Lowco's own analysis
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// The analysis (local in both environments)
+class VerifyDocumentTamperResultDetails {
+  const VerifyDocumentTamperResultDetails({
+    this.format,
+    this.indicators,
+    this.pages,
+    this.tamperScore,
+    this.tampered,
+  });
+
+  factory VerifyDocumentTamperResultDetails.fromJson(Map<String, dynamic> json) => VerifyDocumentTamperResultDetails(
+        format: json['format'] as String?,
+        indicators: (json['indicators'] as List?)?.map((e) => (e == null ? null : TamperIndicator.fromJson(e as Map<String, dynamic>))!).toList().cast<TamperIndicator>(),
+        pages: (json['pages'] as num?)?.toInt(),
+        tamperScore: json['tamper_score'] as num?,
+        tampered: json['tampered'] as bool?,
+      );
+
+  final String? format;
+
+  /// Most confident first; empty when nothing was found
+  final List<TamperIndicator>? indicators;
+
+  /// Pages read
+  final int? pages;
+
+  /// 1 minus the product of the indicators' complements
+  final num? tamperScore;
+
+  /// tamper_score is 0.5 or more
+  final bool? tampered;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (format != null) 'format': format!,
+        if (indicators != null) 'indicators': indicators!.map((e) => e.toJson()).toList(),
+        if (pages != null) 'pages': pages!,
+        if (tamperScore != null) 'tamper_score': tamperScore!,
+        if (tampered != null) 'tampered': tampered!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyDocumentTamperResultNameMatch {
+  const VerifyDocumentTamperResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyDocumentTamperResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyDocumentTamperResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
 /// The operation's options.
 class VerifyDrivingLicenceParams {
   const VerifyDrivingLicenceParams({
@@ -10859,6 +11448,293 @@ class VerifyDrivingLicenceResultNameMatch {
       };
 }
 
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class VerifyDuplicateDocumentParams {
+  const VerifyDuplicateDocumentParams({
+    required this.file,
+    this.consent,
+    this.purpose,
+    this.callbackUrl,
+    this.referenceId,
+    this.scope,
+  });
+
+  /// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+  final FileInput file;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// Where to look: org (the default and only scope)
+  final String? scope;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (scope != null) 'scope': scope!,
+      };
+
+  /// The named file inputs.
+  Map<String, FileInput?> get fileInputs => {'file': file};
+
+  /// The files, in order.
+  List<FileInput>? get manyFiles => null;
+}
+
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class VerifyDuplicateDocumentRequest {
+  const VerifyDuplicateDocumentRequest({
+    this.callbackUrl,
+    this.consent,
+    this.fileBase64,
+    this.fileId,
+    this.fileUrl,
+    this.filename,
+    this.password,
+    this.purpose,
+    this.referenceId,
+    this.scope,
+  });
+
+  factory VerifyDuplicateDocumentRequest.fromJson(Map<String, dynamic> json) => VerifyDuplicateDocumentRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        fileBase64: json['file_base64'] as String?,
+        fileId: json['file_id'] as String?,
+        fileUrl: json['file_url'] as String?,
+        filename: json['filename'] as String?,
+        password: json['password'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+        scope: json['scope'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Base64, URL-safe base64 or a data: URL
+  final String? fileBase64;
+
+  /// A stored file of this org and environment (POST /v1/files)
+  final String? fileId;
+
+  /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+  final String? fileUrl;
+
+  /// Name for the stored input
+  final String? filename;
+
+  /// Opens a protected PDF; never stored or logged
+  final String? password;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// Where to look: org (the default and only scope)
+  final String? scope;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (fileBase64 != null) 'file_base64': fileBase64!,
+        if (fileId != null) 'file_id': fileId!,
+        if (fileUrl != null) 'file_url': fileUrl!,
+        if (filename != null) 'filename': filename!,
+        if (password != null) 'password': password!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (scope != null) 'scope': scope!,
+      };
+}
+
+/// The common verify response
+class VerifyDuplicateDocumentResult {
+  const VerifyDuplicateDocumentResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyDuplicateDocumentResult.fromJson(Map<String, dynamic> json) => VerifyDuplicateDocumentResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyDuplicateDocumentResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyDuplicateDocumentResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// The org's earlier documents like this one
+  final VerifyDuplicateDocumentResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyDuplicateDocumentResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free)
+  final String? result;
+
+  /// Who answered: the provider, the Lowco sandbox, or Lowco's own analysis
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// The org's earlier documents like this one
+class VerifyDuplicateDocumentResultDetails {
+  const VerifyDuplicateDocumentResultDetails({
+    this.documentId,
+    this.duplicate,
+    this.hashKind,
+    this.matches,
+  });
+
+  factory VerifyDuplicateDocumentResultDetails.fromJson(Map<String, dynamic> json) => VerifyDuplicateDocumentResultDetails(
+        documentId: json['document_id'] as String?,
+        duplicate: json['duplicate'] as bool?,
+        hashKind: json['hash_kind'] as String?,
+        matches: (json['matches'] as List?)?.map((e) => (e == null ? null : VerifyDuplicateDocumentResultDetailsMatche.fromJson(e as Map<String, dynamic>))!).toList().cast<VerifyDuplicateDocumentResultDetailsMatche>(),
+      );
+
+  /// This document's index entry, kept 365 days
+  final String? documentId;
+
+  /// At least one match
+  final bool? duplicate;
+
+  /// image: the dHash of the image or a scan's page; text: the SimHash of a PDF's text layer
+  final String? hashKind;
+
+  /// Most similar first, at most 10
+  final List<VerifyDuplicateDocumentResultDetailsMatche>? matches;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (documentId != null) 'document_id': documentId!,
+        if (duplicate != null) 'duplicate': duplicate!,
+        if (hashKind != null) 'hash_kind': hashKind!,
+        if (matches != null) 'matches': matches!.map((e) => e.toJson()).toList(),
+      };
+}
+
+/// An earlier document
+class VerifyDuplicateDocumentResultDetailsMatche {
+  const VerifyDuplicateDocumentResultDetailsMatche({
+    this.firstSeenAt,
+    this.id,
+    this.referenceId,
+    this.sameFile,
+    this.similarity,
+  });
+
+  factory VerifyDuplicateDocumentResultDetailsMatche.fromJson(Map<String, dynamic> json) => VerifyDuplicateDocumentResultDetailsMatche(
+        firstSeenAt: json['first_seen_at'] as String?,
+        id: json['id'] as String?,
+        referenceId: json['reference_id'] as String?,
+        sameFile: json['same_file'] as bool?,
+        similarity: json['similarity'] as num?,
+      );
+
+  final String? firstSeenAt;
+
+  /// The index entry (ddh_…)
+  final String? id;
+
+  /// The reference_id it was checked with
+  final String? referenceId;
+
+  /// Byte for byte the same file
+  final bool? sameFile;
+
+  /// How alike (0.9 or more)
+  final num? similarity;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (firstSeenAt != null) 'first_seen_at': firstSeenAt!,
+        if (id != null) 'id': id!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (sameFile != null) 'same_file': sameFile!,
+        if (similarity != null) 'similarity': similarity!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyDuplicateDocumentResultNameMatch {
+  const VerifyDuplicateDocumentResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyDuplicateDocumentResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyDuplicateDocumentResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
 /// The operation's options.
 class VerifyEmailParams {
   const VerifyEmailParams({
@@ -11064,6 +11940,231 @@ class VerifyEmailResultNameMatch {
   });
 
   factory VerifyEmailResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyEmailResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// The operation's options.
+class VerifyFaceMatchParams {
+  const VerifyFaceMatchParams({
+    this.consent,
+    this.purpose,
+    this.face,
+    this.reference,
+    this.callbackUrl,
+    this.referenceId,
+    this.threshold,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// An extra file input (face)
+  final FileInput? face;
+
+  /// An extra file input (reference)
+  final FileInput? reference;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// Similarity a match needs, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)
+  final num? threshold;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (threshold != null) 'threshold': threshold!,
+      };
+
+  /// The named file inputs.
+  Map<String, FileInput?> get fileInputs => {'face': face, 'reference': reference};
+
+  /// The files, in order.
+  List<FileInput>? get manyFiles => null;
+}
+
+/// The operation's options.
+class VerifyFaceMatchRequest {
+  const VerifyFaceMatchRequest({
+    this.callbackUrl,
+    this.consent,
+    this.face,
+    this.purpose,
+    this.reference,
+    this.referenceId,
+    this.threshold,
+  });
+
+  factory VerifyFaceMatchRequest.fromJson(Map<String, dynamic> json) => VerifyFaceMatchRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        face: json['face'] == null ? null : FileRef.fromJson(json['face'] as Map<String, dynamic>),
+        purpose: json['purpose'] as String?,
+        reference: json['reference'] == null ? null : FileRef.fromJson(json['reference'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        threshold: json['threshold'] as num?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// An extra file input (face); in multipart, a part named face
+  final FileRef? face;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// An extra file input (reference); in multipart, a part named reference
+  final FileRef? reference;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// Similarity a match needs, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)
+  final num? threshold;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (face != null) 'face': face!.toJson(),
+        if (purpose != null) 'purpose': purpose!,
+        if (reference != null) 'reference': reference!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (threshold != null) 'threshold': threshold!,
+      };
+}
+
+/// The common verify response
+class VerifyFaceMatchResult {
+  const VerifyFaceMatchResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyFaceMatchResult.fromJson(Map<String, dynamic> json) => VerifyFaceMatchResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyFaceMatchResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyFaceMatchResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// The match; empty when unavailable
+  final VerifyFaceMatchResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyFaceMatchResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free)
+  final String? result;
+
+  /// Who answered: the provider, the Lowco sandbox, or Lowco's own analysis
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// The match; empty when unavailable
+class VerifyFaceMatchResultDetails {
+  const VerifyFaceMatchResultDetails({
+    this.match,
+    this.similarity,
+    this.threshold,
+  });
+
+  factory VerifyFaceMatchResultDetails.fromJson(Map<String, dynamic> json) => VerifyFaceMatchResultDetails(
+        match: json['match'] as bool?,
+        similarity: json['similarity'] as num?,
+        threshold: json['threshold'] as num?,
+      );
+
+  /// similarity reached the threshold
+  final bool? match;
+
+  /// How alike the two faces are (the sandbox: how alike the two images are)
+  final num? similarity;
+
+  /// The threshold applied: the call's, else the org's face_match_threshold
+  final num? threshold;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (match != null) 'match': match!,
+        if (similarity != null) 'similarity': similarity!,
+        if (threshold != null) 'threshold': threshold!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyFaceMatchResultNameMatch {
+  const VerifyFaceMatchResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyFaceMatchResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyFaceMatchResultNameMatch(
         input: json['input'] as String?,
         score: json['score'] as num?,
         source: json['source'] as String?,
@@ -12074,6 +13175,408 @@ class VerifyIfscResultNameMatch {
   });
 
   factory VerifyIfscResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyIfscResultNameMatch(
+        input: json['input'] as String?,
+        score: json['score'] as num?,
+        source: json['source'] as String?,
+      );
+
+  /// The name you sent
+  final String? input;
+
+  /// 1 is the same name; under 0.8 a valid record is mismatch
+  final num? score;
+
+  /// The name at the source (a vehicle owner's masked without consent_owner)
+  final String? source;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (input != null) 'input': input!,
+        if (score != null) 'score': score!,
+        if (source != null) 'source': source!,
+      };
+}
+
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class VerifyKycParams {
+  const VerifyKycParams({
+    required this.file,
+    this.consent,
+    this.purpose,
+    this.back,
+    this.selfie,
+    this.callbackUrl,
+    this.documentType,
+    this.onlineCheck,
+    this.referenceId,
+    this.threshold,
+  });
+
+  /// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+  final FileInput file;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// An extra file input (back)
+  final FileInput? back;
+
+  /// An extra file input (selfie)
+  final FileInput? selfie;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// pan_card, aadhaar, driving_licence, passport or voter_id (detected otherwise)
+  final String? documentType;
+
+  /// Look the document up at its source (default true)
+  final bool? onlineCheck;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// Face match threshold, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)
+  final num? threshold;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (documentType != null) 'document_type': documentType!,
+        if (onlineCheck != null) 'online_check': onlineCheck!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (threshold != null) 'threshold': threshold!,
+      };
+
+  /// The named file inputs.
+  Map<String, FileInput?> get fileInputs => {'file': file, 'back': back, 'selfie': selfie};
+
+  /// The files, in order.
+  List<FileInput>? get manyFiles => null;
+}
+
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class VerifyKycRequest {
+  const VerifyKycRequest({
+    this.back,
+    this.callbackUrl,
+    this.consent,
+    this.documentType,
+    this.fileBase64,
+    this.fileId,
+    this.fileUrl,
+    this.filename,
+    this.onlineCheck,
+    this.password,
+    this.purpose,
+    this.referenceId,
+    this.selfie,
+    this.threshold,
+  });
+
+  factory VerifyKycRequest.fromJson(Map<String, dynamic> json) => VerifyKycRequest(
+        back: json['back'] == null ? null : FileRef.fromJson(json['back'] as Map<String, dynamic>),
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        documentType: json['document_type'] as String?,
+        fileBase64: json['file_base64'] as String?,
+        fileId: json['file_id'] as String?,
+        fileUrl: json['file_url'] as String?,
+        filename: json['filename'] as String?,
+        onlineCheck: json['online_check'] as bool?,
+        password: json['password'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+        selfie: json['selfie'] == null ? null : FileRef.fromJson(json['selfie'] as Map<String, dynamic>),
+        threshold: json['threshold'] as num?,
+      );
+
+  /// An extra file input (back); in multipart, a part named back
+  final FileRef? back;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// pan_card, aadhaar, driving_licence, passport or voter_id (detected otherwise)
+  final String? documentType;
+
+  /// Base64, URL-safe base64 or a data: URL
+  final String? fileBase64;
+
+  /// A stored file of this org and environment (POST /v1/files)
+  final String? fileId;
+
+  /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+  final String? fileUrl;
+
+  /// Name for the stored input
+  final String? filename;
+
+  /// Look the document up at its source (default true)
+  final bool? onlineCheck;
+
+  /// Opens a protected PDF; never stored or logged
+  final String? password;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// An extra file input (selfie); in multipart, a part named selfie
+  final FileRef? selfie;
+
+  /// Face match threshold, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)
+  final num? threshold;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (back != null) 'back': back!.toJson(),
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (documentType != null) 'document_type': documentType!,
+        if (fileBase64 != null) 'file_base64': fileBase64!,
+        if (fileId != null) 'file_id': fileId!,
+        if (fileUrl != null) 'file_url': fileUrl!,
+        if (filename != null) 'filename': filename!,
+        if (onlineCheck != null) 'online_check': onlineCheck!,
+        if (password != null) 'password': password!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (selfie != null) 'selfie': selfie!.toJson(),
+        if (threshold != null) 'threshold': threshold!,
+      };
+}
+
+typedef VerifyKycResult = KYCVerifyResult;
+
+/// The operation's options.
+class VerifyLivenessParams {
+  const VerifyLivenessParams({
+    this.consent,
+    this.purpose,
+    this.video,
+    this.frame1,
+    this.frame2,
+    this.frame3,
+    this.callbackUrl,
+    this.referenceId,
+  });
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// An extra file input (video)
+  final FileInput? video;
+
+  /// An extra file input (frame_1)
+  final FileInput? frame1;
+
+  /// An extra file input (frame_2)
+  final FileInput? frame2;
+
+  /// An extra file input (frame_3)
+  final FileInput? frame3;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+
+  /// The named file inputs.
+  Map<String, FileInput?> get fileInputs => {'video': video, 'frame_1': frame1, 'frame_2': frame2, 'frame_3': frame3};
+
+  /// The files, in order.
+  List<FileInput>? get manyFiles => null;
+}
+
+/// The operation's options.
+class VerifyLivenessRequest {
+  const VerifyLivenessRequest({
+    this.callbackUrl,
+    this.consent,
+    this.frame1,
+    this.frame2,
+    this.frame3,
+    this.purpose,
+    this.referenceId,
+    this.video,
+  });
+
+  factory VerifyLivenessRequest.fromJson(Map<String, dynamic> json) => VerifyLivenessRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        frame1: json['frame_1'] == null ? null : FileRef.fromJson(json['frame_1'] as Map<String, dynamic>),
+        frame2: json['frame_2'] == null ? null : FileRef.fromJson(json['frame_2'] as Map<String, dynamic>),
+        frame3: json['frame_3'] == null ? null : FileRef.fromJson(json['frame_3'] as Map<String, dynamic>),
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+        video: json['video'] == null ? null : FileRef.fromJson(json['video'] as Map<String, dynamic>),
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// An extra file input (frame_1); in multipart, a part named frame_1
+  final FileRef? frame1;
+
+  /// An extra file input (frame_2); in multipart, a part named frame_2
+  final FileRef? frame2;
+
+  /// An extra file input (frame_3); in multipart, a part named frame_3
+  final FileRef? frame3;
+
+  /// Why you are looking this up (kept in the audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the lookup, returned and kept in the audit log
+  final String? referenceId;
+
+  /// An extra file input (video); in multipart, a part named video
+  final FileRef? video;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (frame1 != null) 'frame_1': frame1!.toJson(),
+        if (frame2 != null) 'frame_2': frame2!.toJson(),
+        if (frame3 != null) 'frame_3': frame3!.toJson(),
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (video != null) 'video': video!.toJson(),
+      };
+}
+
+/// The common verify response
+class VerifyLivenessResult {
+  const VerifyLivenessResult({
+    this.checkedAt,
+    this.details,
+    this.nameMatch,
+    this.referenceId,
+    this.requestId,
+    this.result,
+    this.source,
+    this.verified,
+  });
+
+  factory VerifyLivenessResult.fromJson(Map<String, dynamic> json) => VerifyLivenessResult(
+        checkedAt: json['checked_at'] as String?,
+        details: json['details'] == null ? null : VerifyLivenessResultDetails.fromJson(json['details'] as Map<String, dynamic>),
+        nameMatch: json['name_match'] == null ? null : VerifyLivenessResultNameMatch.fromJson(json['name_match'] as Map<String, dynamic>),
+        referenceId: json['reference_id'] as String?,
+        requestId: json['request_id'] as String?,
+        result: json['result'] as String?,
+        source: json['source'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  final String? checkedAt;
+
+  /// The verdict; empty when unavailable
+  final VerifyLivenessResultDetails? details;
+
+  /// With name in the request and a name at the source
+  final VerifyLivenessResultNameMatch? nameMatch;
+
+  /// Your reference_id
+  final String? referenceId;
+
+  final String? requestId;
+
+  /// valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free)
+  final String? result;
+
+  /// Who answered: the provider, the Lowco sandbox, or Lowco's own analysis
+  final String? source;
+
+  /// true only for result valid
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (details != null) 'details': details!.toJson(),
+        if (nameMatch != null) 'name_match': nameMatch!.toJson(),
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (requestId != null) 'request_id': requestId!,
+        if (result != null) 'result': result!,
+        if (source != null) 'source': source!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+/// The verdict; empty when unavailable
+class VerifyLivenessResultDetails {
+  const VerifyLivenessResultDetails({
+    this.framesChecked,
+    this.live,
+    this.score,
+    this.spoofIndicators,
+  });
+
+  factory VerifyLivenessResultDetails.fromJson(Map<String, dynamic> json) => VerifyLivenessResultDetails(
+        framesChecked: (json['frames_checked'] as num?)?.toInt(),
+        live: json['live'] as bool?,
+        score: json['score'] as num?,
+        spoofIndicators: (json['spoof_indicators'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+      );
+
+  /// Frames compared (0 for a video in the sandbox)
+  final int? framesChecked;
+
+  /// A live person
+  final bool? live;
+
+  /// How sure
+  final num? score;
+
+  /// Why it is not live (the sandbox reports the first three)
+  final List<String>? spoofIndicators;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (framesChecked != null) 'frames_checked': framesChecked!,
+        if (live != null) 'live': live!,
+        if (score != null) 'score': score!,
+        if (spoofIndicators != null) 'spoof_indicators': spoofIndicators!,
+      };
+}
+
+/// With name in the request and a name at the source
+class VerifyLivenessResultNameMatch {
+  const VerifyLivenessResultNameMatch({
+    this.input,
+    this.score,
+    this.source,
+  });
+
+  factory VerifyLivenessResultNameMatch.fromJson(Map<String, dynamic> json) => VerifyLivenessResultNameMatch(
         input: json['input'] as String?,
         score: json['score'] as num?,
         source: json['source'] as String?,
@@ -14559,11 +16062,20 @@ class VerifyOperations {
   /// A company (CIN) or LLP (LLPIN): name, status, class, ROC, capital, address, directors. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_cin; scope api.verify.cin.execute.
   Future<Answer<VerifyCinResult>> cin(VerifyCinParams params, [CallOptions? options]) => _core.operation('/v1/verify/cin', params.toJson(), const {}, null, VerifyCinResult.fromJson, options);
 
+  /// Signs a document image or PDF was altered: tamper score and indicators with where they are. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_tamper; scope api.verify.document_tamper.execute.
+  Future<Answer<VerifyDocumentTamperResult>> documentTamper(VerifyDocumentTamperParams params, [CallOptions? options]) => _core.operation('/v1/verify/document-tamper', params.toJson(), params.fileInputs, null, VerifyDocumentTamperResult.fromJson, options);
+
   /// A driving licence: holder, validity, classes, issuing RTO. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_dl; scope api.verify.driving_licence.execute.
   Future<Answer<VerifyDrivingLicenceResult>> drivingLicence(VerifyDrivingLicenceParams params, [CallOptions? options]) => _core.operation('/v1/verify/driving-licence', params.toJson(), const {}, null, VerifyDrivingLicenceResult.fromJson, options);
 
+  /// Find the same document among your org's documents of the last 365 days. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_duplicate; scope api.verify.duplicate_document.execute.
+  Future<Answer<VerifyDuplicateDocumentResult>> duplicateDocument(VerifyDuplicateDocumentParams params, [CallOptions? options]) => _core.operation('/v1/verify/duplicate-document', params.toJson(), params.fileInputs, null, VerifyDuplicateDocumentResult.fromJson, options);
+
   /// An email address: syntax, MX, disposable, role address, deliverable, suggestion. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_email; scope api.verify.email.execute.
   Future<Answer<VerifyEmailResult>> email(VerifyEmailParams params, [CallOptions? options]) => _core.operation('/v1/verify/email', params.toJson(), const {}, null, VerifyEmailResult.fromJson, options);
+
+  /// Compare two face images: similarity and match at your threshold. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_face_match; scope api.verify.face_match.execute.
+  Future<Answer<VerifyFaceMatchResult>> faceMatch(VerifyFaceMatchParams params, [CallOptions? options]) => _core.operation('/v1/verify/face-match', params.toJson(), params.fileInputs, null, VerifyFaceMatchResult.fromJson, options);
 
   /// An FSSAI licence: business, type, status, validity, premises. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_fssai; scope api.verify.fssai.execute.
   Future<Answer<VerifyFssaiResult>> fssai(VerifyFssaiParams params, [CallOptions? options]) => _core.operation('/v1/verify/fssai', params.toJson(), const {}, null, VerifyFssaiResult.fromJson, options);
@@ -14576,6 +16088,12 @@ class VerifyOperations {
 
   /// An IFSC: bank, branch, address and supported channels (free). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_ifsc; scope api.verify.ifsc.execute.
   Future<Answer<VerifyIfscResult>> ifsc(VerifyIfscParams params, [CallOptions? options]) => _core.operation('/v1/verify/ifsc', params.toJson(), const {}, null, VerifyIfscResult.fromJson, options);
+
+  /// One-call KYC: the ID document read, its online check, and a face match with a selfie. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.verify.kyc.execute.
+  Future<Answer<VerifyKycResult>> kyc(VerifyKycParams params, [CallOptions? options]) => _core.operation('/v1/verify/kyc', params.toJson(), params.fileInputs, null, KYCVerifyResult.fromJson, options);
+
+  /// Check a short video or 3 frames are of a live person: live, score, spoof indicators. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_liveness; scope api.verify.liveness.execute.
+  Future<Answer<VerifyLivenessResult>> liveness(VerifyLivenessParams params, [CallOptions? options]) => _core.operation('/v1/verify/liveness', params.toJson(), params.fileInputs, null, VerifyLivenessResult.fromJson, options);
 
   /// A mobile number: validity, operator, circle, type, ported, DND. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_mobile; scope api.verify.mobile.execute.
   Future<Answer<VerifyMobileResult>> mobile(VerifyMobileParams params, [CallOptions? options]) => _core.operation('/v1/verify/mobile', params.toJson(), const {}, null, VerifyMobileResult.fromJson, options);

@@ -3530,6 +3530,266 @@
         ],
         "type": "object"
       },
+      "KYCVerifyResult": {
+        "additionalProperties": false,
+        "description": "verify/kyc: the document read, its online check and the face match in one answer",
+        "properties": {
+          "document": {
+            "additionalProperties": false,
+            "description": "docai/kyc's reading",
+            "properties": {
+              "document_confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "document_type": {
+                "enum": [
+                  "pan_card",
+                  "aadhaar",
+                  "driving_licence",
+                  "passport",
+                  "voter_id"
+                ],
+                "type": "string"
+              },
+              "fields": {
+                "additionalProperties": true,
+                "description": "The document type's fields, each a Field (as docai/kyc answers them); a value only the back carries has source.side back",
+                "type": "object"
+              },
+              "page_count": {
+                "description": "Pages read, the back's included",
+                "type": "integer"
+              },
+              "validation": {
+                "description": "Issues on the back carry side: back",
+                "items": {
+                  "$ref": "#/components/schemas/ValidationIssue"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "document_confidence",
+              "document_type",
+              "fields",
+              "page_count",
+              "validation"
+            ],
+            "type": "object"
+          },
+          "face_match": {
+            "additionalProperties": false,
+            "description": "The selfie against the document; null without a selfie",
+            "nullable": true,
+            "properties": {
+              "checked_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "details": {
+                "additionalProperties": true,
+                "description": "The check's details",
+                "type": "object"
+              },
+              "name_match": {
+                "additionalProperties": false,
+                "description": "With name in the request and a name at the source",
+                "nullable": true,
+                "properties": {
+                  "input": {
+                    "description": "The name you sent",
+                    "type": "string"
+                  },
+                  "score": {
+                    "description": "1 is the same name; under 0.8 a valid record is mismatch",
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "source": {
+                    "description": "The name at the source (a vehicle owner's masked without consent_owner)",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "input",
+                  "score",
+                  "source"
+                ],
+                "type": "object"
+              },
+              "reference_id": {
+                "description": "Your reference_id",
+                "type": "string"
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "result": {
+                "description": "valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)",
+                "enum": [
+                  "valid",
+                  "invalid",
+                  "not_found",
+                  "inactive",
+                  "mismatch",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              "source": {
+                "description": "The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)",
+                "type": "string"
+              },
+              "verified": {
+                "description": "true only for result valid",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "checked_at",
+              "details",
+              "name_match",
+              "reference_id",
+              "request_id",
+              "result",
+              "source",
+              "verified"
+            ],
+            "type": "object"
+          },
+          "kyc_result": {
+            "description": "verified: every check passed; review: something could not be checked; rejected: a check failed",
+            "enum": [
+              "verified",
+              "review",
+              "rejected"
+            ],
+            "type": "string"
+          },
+          "online_check": {
+            "additionalProperties": false,
+            "description": "The lookup that matches the document (verify/pan, driving-licence, voter-id or passport); null when none ran",
+            "nullable": true,
+            "properties": {
+              "checked_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "details": {
+                "additionalProperties": true,
+                "description": "The check's details",
+                "type": "object"
+              },
+              "name_match": {
+                "additionalProperties": false,
+                "description": "With name in the request and a name at the source",
+                "nullable": true,
+                "properties": {
+                  "input": {
+                    "description": "The name you sent",
+                    "type": "string"
+                  },
+                  "score": {
+                    "description": "1 is the same name; under 0.8 a valid record is mismatch",
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "source": {
+                    "description": "The name at the source (a vehicle owner's masked without consent_owner)",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "input",
+                  "score",
+                  "source"
+                ],
+                "type": "object"
+              },
+              "reference_id": {
+                "description": "Your reference_id",
+                "type": "string"
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "result": {
+                "description": "valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)",
+                "enum": [
+                  "valid",
+                  "invalid",
+                  "not_found",
+                  "inactive",
+                  "mismatch",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              "source": {
+                "description": "The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)",
+                "type": "string"
+              },
+              "verified": {
+                "description": "true only for result valid",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "checked_at",
+              "details",
+              "name_match",
+              "reference_id",
+              "request_id",
+              "result",
+              "source",
+              "verified"
+            ],
+            "type": "object"
+          },
+          "reasons": {
+            "description": "Rejections first, then what needs review",
+            "items": {
+              "additionalProperties": false,
+              "description": "Why it is not simply verified",
+              "properties": {
+                "code": {
+                  "description": "online_not_found, face_mismatch, pan_invalid, expired, no_online_check, ...",
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "message"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "reference_id": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "document",
+          "face_match",
+          "kyc_result",
+          "online_check",
+          "reasons",
+          "reference_id",
+          "request_id"
+        ],
+        "type": "object"
+      },
       "KYCVoterID": {
         "additionalProperties": false,
         "properties": {
@@ -7138,6 +7398,12 @@
             ],
             "type": "string"
           },
+          "face_match_threshold": {
+            "description": "verify/face-match's and verify/kyc's default threshold (0.8)",
+            "maximum": 0.99,
+            "minimum": 0.5,
+            "type": "number"
+          },
           "max_jobs_in_flight": {
             "description": "From the plan; read-only",
             "type": "integer"
@@ -7168,6 +7434,7 @@
           "default_webhook_ids",
           "docai_labels",
           "environment",
+          "face_match_threshold",
           "max_jobs_in_flight",
           "monthly_credit_cap",
           "retention_input_hours",
@@ -7215,6 +7482,12 @@
             },
             "maxItems": 50,
             "type": "array"
+          },
+          "face_match_threshold": {
+            "description": "The similarity a face match needs when a call names no threshold",
+            "maximum": 0.99,
+            "minimum": 0.5,
+            "type": "number"
           },
           "monthly_credit_cap": {
             "description": "Decimal string. In live it may not exceed the plan's ceiling (each priced meter's hard cap times its price; 422 on monthly_credit_cap)",
@@ -7316,6 +7589,44 @@
           "tables",
           "table_count",
           "page_count"
+        ],
+        "type": "object"
+      },
+      "TamperIndicator": {
+        "additionalProperties": false,
+        "description": "A sign of tampering, with where it was seen",
+        "properties": {
+          "bbox": {
+            "$ref": "#/components/schemas/BBox"
+          },
+          "confidence": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "detail": {
+            "description": "What was seen",
+            "type": "string"
+          },
+          "page": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "type": {
+            "description": "copy_move: a region repeats elsewhere; font_inconsistency: a figure in another font; metadata_edits: saved by an editor or after it was made; resaved_image: a photo recompressed",
+            "enum": [
+              "copy_move",
+              "font_inconsistency",
+              "metadata_edits",
+              "resaved_image"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "confidence",
+          "detail",
+          "type"
         ],
         "type": "object"
       },
@@ -8419,6 +8730,196 @@
         ],
         "type": "object"
       },
+      "VerifyDocumentTamperRequest": {
+        "additionalProperties": false,
+        "description": "Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.",
+        "oneOf": [
+          {
+            "required": [
+              "file_id"
+            ],
+            "title": "file_id"
+          },
+          {
+            "required": [
+              "file_url"
+            ],
+            "title": "file_url"
+          },
+          {
+            "required": [
+              "file_base64"
+            ],
+            "title": "file_base64"
+          }
+        ],
+        "properties": {
+          "callback_url": {
+            "description": "Public https URL that receives this job's webhook",
+            "format": "uri",
+            "type": "string"
+          },
+          "consent": {
+            "description": "Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.",
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "file_base64": {
+            "description": "Base64, URL-safe base64 or a data: URL",
+            "type": "string"
+          },
+          "file_id": {
+            "description": "A stored file of this org and environment (POST /v1/files)",
+            "type": "string"
+          },
+          "file_url": {
+            "description": "Public https URL, fetched with SSRF protection (10 s, 3 redirects)",
+            "format": "uri",
+            "type": "string"
+          },
+          "filename": {
+            "description": "Name for the stored input",
+            "type": "string"
+          },
+          "password": {
+            "description": "Opens a protected PDF; never stored or logged",
+            "type": "string"
+          },
+          "purpose": {
+            "description": "Why you are looking this up (kept in the audit log). Missing is 422 consent_required.",
+            "example": "Vendor onboarding",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "reference_id": {
+            "description": "Your id for the lookup, returned and kept in the audit log",
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "required": [
+          "consent",
+          "purpose"
+        ],
+        "type": "object"
+      },
+      "VerifyDocumentTamperResult": {
+        "additionalProperties": false,
+        "description": "The common verify response",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": false,
+            "description": "The analysis (local in both environments)",
+            "properties": {
+              "format": {
+                "enum": [
+                  "pdf",
+                  "jpeg",
+                  "image"
+                ],
+                "type": "string"
+              },
+              "indicators": {
+                "description": "Most confident first; empty when nothing was found",
+                "items": {
+                  "$ref": "#/components/schemas/TamperIndicator"
+                },
+                "type": "array"
+              },
+              "pages": {
+                "description": "Pages read",
+                "type": "integer"
+              },
+              "tamper_score": {
+                "description": "1 minus the product of the indicators' complements",
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "tampered": {
+                "description": "tamper_score is 0.5 or more",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "indicators",
+              "tamper_score",
+              "tampered"
+            ],
+            "type": "object"
+          },
+          "name_match": {
+            "additionalProperties": false,
+            "description": "With name in the request and a name at the source",
+            "nullable": true,
+            "properties": {
+              "input": {
+                "description": "The name you sent",
+                "type": "string"
+              },
+              "score": {
+                "description": "1 is the same name; under 0.8 a valid record is mismatch",
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "source": {
+                "description": "The name at the source (a vehicle owner's masked without consent_owner)",
+                "type": "string"
+              }
+            },
+            "required": [
+              "input",
+              "score",
+              "source"
+            ],
+            "type": "object"
+          },
+          "reference_id": {
+            "description": "Your reference_id",
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "result": {
+            "description": "valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free)",
+            "enum": [
+              "valid",
+              "invalid",
+              "mismatch",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "description": "Who answered: the provider, the Lowco sandbox, or Lowco's own analysis",
+            "type": "string"
+          },
+          "verified": {
+            "description": "true only for result valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "checked_at",
+          "details",
+          "name_match",
+          "reference_id",
+          "request_id",
+          "result",
+          "source",
+          "verified"
+        ],
+        "type": "object"
+      },
       "VerifyDrivingLicenceRequest": {
         "additionalProperties": false,
         "description": "The operation's options.",
@@ -8573,6 +9074,232 @@
         ],
         "type": "object"
       },
+      "VerifyDuplicateDocumentRequest": {
+        "additionalProperties": false,
+        "description": "Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.",
+        "oneOf": [
+          {
+            "required": [
+              "file_id"
+            ],
+            "title": "file_id"
+          },
+          {
+            "required": [
+              "file_url"
+            ],
+            "title": "file_url"
+          },
+          {
+            "required": [
+              "file_base64"
+            ],
+            "title": "file_base64"
+          }
+        ],
+        "properties": {
+          "callback_url": {
+            "description": "Public https URL that receives this job's webhook",
+            "format": "uri",
+            "type": "string"
+          },
+          "consent": {
+            "description": "Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.",
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "file_base64": {
+            "description": "Base64, URL-safe base64 or a data: URL",
+            "type": "string"
+          },
+          "file_id": {
+            "description": "A stored file of this org and environment (POST /v1/files)",
+            "type": "string"
+          },
+          "file_url": {
+            "description": "Public https URL, fetched with SSRF protection (10 s, 3 redirects)",
+            "format": "uri",
+            "type": "string"
+          },
+          "filename": {
+            "description": "Name for the stored input",
+            "type": "string"
+          },
+          "password": {
+            "description": "Opens a protected PDF; never stored or logged",
+            "type": "string"
+          },
+          "purpose": {
+            "description": "Why you are looking this up (kept in the audit log). Missing is 422 consent_required.",
+            "example": "Vendor onboarding",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "reference_id": {
+            "description": "Your id for the lookup, returned and kept in the audit log",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "scope": {
+            "default": "org",
+            "description": "Where to look: org (the default and only scope)",
+            "enum": [
+              "org"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "consent",
+          "purpose"
+        ],
+        "type": "object"
+      },
+      "VerifyDuplicateDocumentResult": {
+        "additionalProperties": false,
+        "description": "The common verify response",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": false,
+            "description": "The org's earlier documents like this one",
+            "properties": {
+              "document_id": {
+                "description": "This document's index entry, kept 365 days",
+                "type": "string"
+              },
+              "duplicate": {
+                "description": "At least one match",
+                "type": "boolean"
+              },
+              "hash_kind": {
+                "description": "image: the dHash of the image or a scan's page; text: the SimHash of a PDF's text layer",
+                "enum": [
+                  "image",
+                  "text"
+                ],
+                "type": "string"
+              },
+              "matches": {
+                "description": "Most similar first, at most 10",
+                "items": {
+                  "additionalProperties": false,
+                  "description": "An earlier document",
+                  "properties": {
+                    "first_seen_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "id": {
+                      "description": "The index entry (ddh_…)",
+                      "type": "string"
+                    },
+                    "reference_id": {
+                      "description": "The reference_id it was checked with",
+                      "type": "string"
+                    },
+                    "same_file": {
+                      "description": "Byte for byte the same file",
+                      "type": "boolean"
+                    },
+                    "similarity": {
+                      "description": "How alike (0.9 or more)",
+                      "maximum": 1,
+                      "minimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "first_seen_at",
+                    "id",
+                    "reference_id",
+                    "same_file",
+                    "similarity"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "document_id",
+              "duplicate",
+              "hash_kind",
+              "matches"
+            ],
+            "type": "object"
+          },
+          "name_match": {
+            "additionalProperties": false,
+            "description": "With name in the request and a name at the source",
+            "nullable": true,
+            "properties": {
+              "input": {
+                "description": "The name you sent",
+                "type": "string"
+              },
+              "score": {
+                "description": "1 is the same name; under 0.8 a valid record is mismatch",
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "source": {
+                "description": "The name at the source (a vehicle owner's masked without consent_owner)",
+                "type": "string"
+              }
+            },
+            "required": [
+              "input",
+              "score",
+              "source"
+            ],
+            "type": "object"
+          },
+          "reference_id": {
+            "description": "Your reference_id",
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "result": {
+            "description": "valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free)",
+            "enum": [
+              "valid",
+              "invalid",
+              "mismatch",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "description": "Who answered: the provider, the Lowco sandbox, or Lowco's own analysis",
+            "type": "string"
+          },
+          "verified": {
+            "description": "true only for result valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "checked_at",
+          "details",
+          "name_match",
+          "reference_id",
+          "request_id",
+          "result",
+          "source",
+          "verified"
+        ],
+        "type": "object"
+      },
       "VerifyEmailRequest": {
         "additionalProperties": false,
         "description": "The operation's options.",
@@ -8703,6 +9430,159 @@
           },
           "source": {
             "description": "The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)",
+            "type": "string"
+          },
+          "verified": {
+            "description": "true only for result valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "checked_at",
+          "details",
+          "name_match",
+          "reference_id",
+          "request_id",
+          "result",
+          "source",
+          "verified"
+        ],
+        "type": "object"
+      },
+      "VerifyFaceMatchRequest": {
+        "additionalProperties": false,
+        "description": "The operation's options.",
+        "properties": {
+          "callback_url": {
+            "description": "Public https URL that receives this job's webhook",
+            "format": "uri",
+            "type": "string"
+          },
+          "consent": {
+            "description": "Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.",
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "face": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileRef"
+              }
+            ],
+            "description": "An extra file input (face); in multipart, a part named face"
+          },
+          "purpose": {
+            "description": "Why you are looking this up (kept in the audit log). Missing is 422 consent_required.",
+            "example": "Vendor onboarding",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "reference": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileRef"
+              }
+            ],
+            "description": "An extra file input (reference); in multipart, a part named reference"
+          },
+          "reference_id": {
+            "description": "Your id for the lookup, returned and kept in the audit log",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "threshold": {
+            "description": "Similarity a match needs, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)",
+            "maximum": 0.99,
+            "minimum": 0.5,
+            "type": "number"
+          }
+        },
+        "required": [
+          "consent",
+          "purpose"
+        ],
+        "type": "object"
+      },
+      "VerifyFaceMatchResult": {
+        "additionalProperties": false,
+        "description": "The common verify response",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": false,
+            "description": "The match; empty when unavailable",
+            "properties": {
+              "match": {
+                "description": "similarity reached the threshold",
+                "type": "boolean"
+              },
+              "similarity": {
+                "description": "How alike the two faces are (the sandbox: how alike the two images are)",
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "threshold": {
+                "description": "The threshold applied: the call's, else the org's face_match_threshold",
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "name_match": {
+            "additionalProperties": false,
+            "description": "With name in the request and a name at the source",
+            "nullable": true,
+            "properties": {
+              "input": {
+                "description": "The name you sent",
+                "type": "string"
+              },
+              "score": {
+                "description": "1 is the same name; under 0.8 a valid record is mismatch",
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "source": {
+                "description": "The name at the source (a vehicle owner's masked without consent_owner)",
+                "type": "string"
+              }
+            },
+            "required": [
+              "input",
+              "score",
+              "source"
+            ],
+            "type": "object"
+          },
+          "reference_id": {
+            "description": "Your reference_id",
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "result": {
+            "description": "valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free)",
+            "enum": [
+              "valid",
+              "invalid",
+              "mismatch",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "description": "Who answered: the provider, the Lowco sandbox, or Lowco's own analysis",
             "type": "string"
           },
           "verified": {
@@ -9350,6 +10230,299 @@
           },
           "source": {
             "description": "The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)",
+            "type": "string"
+          },
+          "verified": {
+            "description": "true only for result valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "checked_at",
+          "details",
+          "name_match",
+          "reference_id",
+          "request_id",
+          "result",
+          "source",
+          "verified"
+        ],
+        "type": "object"
+      },
+      "VerifyKycRequest": {
+        "additionalProperties": false,
+        "description": "Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.",
+        "oneOf": [
+          {
+            "required": [
+              "file_id"
+            ],
+            "title": "file_id"
+          },
+          {
+            "required": [
+              "file_url"
+            ],
+            "title": "file_url"
+          },
+          {
+            "required": [
+              "file_base64"
+            ],
+            "title": "file_base64"
+          }
+        ],
+        "properties": {
+          "back": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileRef"
+              }
+            ],
+            "description": "An extra file input (back); in multipart, a part named back"
+          },
+          "callback_url": {
+            "description": "Public https URL that receives this job's webhook",
+            "format": "uri",
+            "type": "string"
+          },
+          "consent": {
+            "description": "Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.",
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "document_type": {
+            "description": "pan_card, aadhaar, driving_licence, passport or voter_id (detected otherwise)",
+            "enum": [
+              "pan_card",
+              "aadhaar",
+              "driving_licence",
+              "passport",
+              "voter_id"
+            ],
+            "type": "string"
+          },
+          "file_base64": {
+            "description": "Base64, URL-safe base64 or a data: URL",
+            "type": "string"
+          },
+          "file_id": {
+            "description": "A stored file of this org and environment (POST /v1/files)",
+            "type": "string"
+          },
+          "file_url": {
+            "description": "Public https URL, fetched with SSRF protection (10 s, 3 redirects)",
+            "format": "uri",
+            "type": "string"
+          },
+          "filename": {
+            "description": "Name for the stored input",
+            "type": "string"
+          },
+          "online_check": {
+            "default": true,
+            "description": "Look the document up at its source (default true)",
+            "type": "boolean"
+          },
+          "password": {
+            "description": "Opens a protected PDF; never stored or logged",
+            "type": "string"
+          },
+          "purpose": {
+            "description": "Why you are looking this up (kept in the audit log). Missing is 422 consent_required.",
+            "example": "Vendor onboarding",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "reference_id": {
+            "description": "Your id for the lookup, returned and kept in the audit log",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "selfie": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileRef"
+              }
+            ],
+            "description": "An extra file input (selfie); in multipart, a part named selfie"
+          },
+          "threshold": {
+            "description": "Face match threshold, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)",
+            "maximum": 0.99,
+            "minimum": 0.5,
+            "type": "number"
+          }
+        },
+        "required": [
+          "consent",
+          "purpose"
+        ],
+        "type": "object"
+      },
+      "VerifyKycResult": {
+        "$ref": "#/components/schemas/KYCVerifyResult"
+      },
+      "VerifyLivenessRequest": {
+        "additionalProperties": false,
+        "description": "The operation's options.",
+        "properties": {
+          "callback_url": {
+            "description": "Public https URL that receives this job's webhook",
+            "format": "uri",
+            "type": "string"
+          },
+          "consent": {
+            "description": "Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required.",
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "frame_1": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileRef"
+              }
+            ],
+            "description": "An extra file input (frame_1); in multipart, a part named frame_1"
+          },
+          "frame_2": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileRef"
+              }
+            ],
+            "description": "An extra file input (frame_2); in multipart, a part named frame_2"
+          },
+          "frame_3": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileRef"
+              }
+            ],
+            "description": "An extra file input (frame_3); in multipart, a part named frame_3"
+          },
+          "purpose": {
+            "description": "Why you are looking this up (kept in the audit log). Missing is 422 consent_required.",
+            "example": "Vendor onboarding",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "reference_id": {
+            "description": "Your id for the lookup, returned and kept in the audit log",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "video": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FileRef"
+              }
+            ],
+            "description": "An extra file input (video); in multipart, a part named video"
+          }
+        },
+        "required": [
+          "consent",
+          "purpose"
+        ],
+        "type": "object"
+      },
+      "VerifyLivenessResult": {
+        "additionalProperties": false,
+        "description": "The common verify response",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": false,
+            "description": "The verdict; empty when unavailable",
+            "properties": {
+              "frames_checked": {
+                "description": "Frames compared (0 for a video in the sandbox)",
+                "type": "integer"
+              },
+              "live": {
+                "description": "A live person",
+                "type": "boolean"
+              },
+              "score": {
+                "description": "How sure",
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "spoof_indicators": {
+                "description": "Why it is not live (the sandbox reports the first three)",
+                "items": {
+                  "enum": [
+                    "static_frames",
+                    "scene_change",
+                    "too_few_frames",
+                    "screen_replay",
+                    "mask",
+                    "deepfake"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "name_match": {
+            "additionalProperties": false,
+            "description": "With name in the request and a name at the source",
+            "nullable": true,
+            "properties": {
+              "input": {
+                "description": "The name you sent",
+                "type": "string"
+              },
+              "score": {
+                "description": "1 is the same name; under 0.8 a valid record is mismatch",
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "source": {
+                "description": "The name at the source (a vehicle owner's masked without consent_owner)",
+                "type": "string"
+              }
+            },
+            "required": [
+              "input",
+              "score",
+              "source"
+            ],
+            "type": "object"
+          },
+          "reference_id": {
+            "description": "Your reference_id",
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "result": {
+            "description": "valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free)",
+            "enum": [
+              "valid",
+              "invalid",
+              "mismatch",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "description": "Who answered: the provider, the Lowco sandbox, or Lowco's own analysis",
             "type": "string"
           },
           "verified": {
@@ -26740,6 +27913,7 @@
                         ],
                         "docai_labels": [],
                         "environment": "live",
+                        "face_match_threshold": 0.8,
                         "max_jobs_in_flight": 50,
                         "monthly_credit_cap": "5000.0000",
                         "retention_input_hours": 24,
@@ -26882,6 +28056,7 @@
                         ],
                         "docai_labels": [],
                         "environment": "live",
+                        "face_match_threshold": 0.8,
                         "max_jobs_in_flight": 50,
                         "monthly_credit_cap": "5000.0000",
                         "retention_input_hours": 24,
@@ -27889,7 +29064,7 @@
         "operationId": "verify_audit_list",
         "parameters": [
           {
-            "description": "Only this operation (a verify lookup, or a document type read by docai/kyc)",
+            "description": "Only this operation (a verify lookup, a fraud check or verify/kyc, or a document type read by docai/kyc)",
             "in": "query",
             "name": "operation",
             "schema": {
@@ -27902,12 +29077,17 @@
                 "docai/kyc/pan_card",
                 "docai/kyc/passport",
                 "docai/kyc/voter_id",
+                "document-tamper",
                 "driving-licence",
+                "duplicate-document",
                 "email",
+                "face-match",
                 "fssai",
                 "gstin",
                 "iec",
                 "ifsc",
+                "kyc",
+                "liveness",
                 "mobile",
                 "pan",
                 "pan-aadhaar-link",
@@ -27937,7 +29117,7 @@
             }
           },
           {
-            "description": "Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged",
+            "description": "Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged. Not for aadhaar-offline, docai/kyc/aadhaar or the fraud checks (their fingerprint is the file's): find those by reference_id",
             "in": "query",
             "name": "identifier",
             "schema": {
@@ -29158,6 +30338,375 @@
         }
       }
     },
+    "/v1/verify/document-tamper": {
+      "post": {
+        "description": "Signs a document image or PDF was altered: tamper score and indicators with where they are. A synchronous call still running at 25 s is promoted to a job and answered 202. Beta. A body field callback_url (public https) receives the job's webhook instead of the environment's default endpoints.",
+        "operationId": "verify_document_tamper",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Mode"
+          },
+          {
+            "$ref": "#/components/parameters/Prefer"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/Accept"
+          },
+          {
+            "$ref": "#/components/parameters/RequestID"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "invoice-pdf": {
+                  "summary": "A PDF to check",
+                  "value": {
+                    "consent": true,
+                    "file_id": "file_01JA9C2R8T1W4Y7A0C3E6G9J2M",
+                    "purpose": "Customer onboarding",
+                    "reference_id": "cust-9"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/VerifyDocumentTamperRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "callback_url": {
+                    "format": "uri",
+                    "type": "string"
+                  },
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "options": {
+                    "description": "The operation's options as a JSON object; plain fields named like the options work too",
+                    "type": "string"
+                  },
+                  "password": {
+                    "description": "Opens a protected PDF",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "clean": {
+                    "summary": "Nothing found",
+                    "value": {
+                      "data": {
+                        "checked_at": "2027-01-10T09:00:00Z",
+                        "details": {
+                          "format": "image",
+                          "indicators": [],
+                          "pages": 1,
+                          "tamper_score": 0,
+                          "tampered": false
+                        },
+                        "name_match": null,
+                        "reference_id": "cust-9",
+                        "request_id": "req_test",
+                        "result": "valid",
+                        "source": "Lowco document analysis",
+                        "verified": true
+                      },
+                      "status": 1
+                    }
+                  },
+                  "tampered": {
+                    "summary": "An amount in another font, edited after it was made",
+                    "value": {
+                      "data": {
+                        "checked_at": "2027-01-10T09:00:00Z",
+                        "details": {
+                          "format": "pdf",
+                          "indicators": [
+                            {
+                              "confidence": 0.6,
+                              "detail": "Producer is iLovePDF, an editing tool.",
+                              "type": "metadata_edits"
+                            },
+                            {
+                              "bbox": {
+                                "h": 12,
+                                "w": 73.37,
+                                "x": 50,
+                                "y": 130
+                              },
+                              "confidence": 0.55,
+                              "detail": "\"Total 9000.00\" is set in courier; the page's other figures are in helvetica.",
+                              "page": 1,
+                              "type": "font_inconsistency"
+                            },
+                            {
+                              "confidence": 0.5,
+                              "detail": "The file was saved 2 times: its content was changed after it was made.",
+                              "type": "metadata_edits"
+                            },
+                            {
+                              "confidence": 0.3,
+                              "detail": "Modified 2026-09-20 12:00, after it was created 2026-09-01 10:00.",
+                              "type": "metadata_edits"
+                            }
+                          ],
+                          "pages": 1,
+                          "tamper_score": 0.937,
+                          "tampered": true
+                        },
+                        "name_match": null,
+                        "reference_id": "cust-9",
+                        "request_id": "req_test",
+                        "result": "mismatch",
+                        "source": "Lowco document analysis",
+                        "verified": false
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/VerifyDocumentTamperResult"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Finished in the request.",
+            "headers": {
+              "X-Lowco-Credits-Used": {
+                "$ref": "#/components/headers/X-Lowco-Credits-Used"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "job": {
+                    "summary": "Accepted as a job",
+                    "value": {
+                      "data": {
+                        "attempts": 0,
+                        "created_at": "2026-10-09T09:30:00Z",
+                        "error": null,
+                        "expires_at": "2026-10-16T09:30:00Z",
+                        "finished_at": null,
+                        "input": {
+                          "file_id": "file_01JA9C2M7Q4V8X3K6T1R5N0W2E",
+                          "pages": 12
+                        },
+                        "job_id": "job_01JA9C3B5E8G1J4M7P0R3T6W9Y",
+                        "links": {
+                          "cancel": "/v1/jobs/job_01JA9C3B5E8G1J4M7P0R3T6W9Y/cancel",
+                          "self": "/v1/jobs/job_01JA9C3B5E8G1J4M7P0R3T6W9Y"
+                        },
+                        "operation": "document-tamper",
+                        "progress": null,
+                        "result": null,
+                        "service": "verify",
+                        "started_at": null,
+                        "status": "queued",
+                        "usage": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Job"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Accepted as a job; poll links.self or wait for the webhook.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "$ref": "#/components/headers/Idempotent-Replayed"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "unreadable": {
+                    "summary": "Not a readable PDF or image",
+                    "value": {
+                      "error": {
+                        "code": 422,
+                        "doc_url": "https://docs.lowco.ai/api/errors#file_corrupt",
+                        "message": "The document could not be read as a PDF or an image.",
+                        "param": "file",
+                        "reason": "file_corrupt",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: consent_required, document_not_recognised, file_corrupt, file_rejected, file_url_forbidden, file_url_unreachable, idempotency_key_reused, invalid_identifier, invalid_password, password_required, schema_invalid, sender_not_verified, suppressed, template_not_approved, too_many_files, too_many_pages, validation_failed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayTimeout"
+          }
+        },
+        "summary": "Signs a document image or PDF was altered: tamper score and indicators with where they are",
+        "tags": [
+          "verify"
+        ],
+        "x-lowco-default-mode": "sync",
+        "x-lowco-family": "verify",
+        "x-lowco-input": "file",
+        "x-lowco-limits": {
+          "max_pages": 50,
+          "max_mb": 10
+        },
+        "x-lowco-meter": {
+          "free": false,
+          "name": "api_verify_tamper",
+          "unit": "call"
+        },
+        "x-lowco-output": "json",
+        "x-lowco-scope": "api.verify.document_tamper.execute",
+        "x-lowco-status": "beta",
+        "x-lowco-sync-limit": {},
+        "x-lowco-test-fixture": {
+          "behaviour": "real",
+          "max_mb": 5,
+          "max_pages": 20,
+          "billed": false,
+          "notes": "Analysed locally in both environments; duplicates are found among the environment's own documents."
+        }
+      }
+    },
     "/v1/verify/driving-licence": {
       "post": {
         "description": "A driving licence: holder, validity, classes, issuing RTO. A synchronous call still running at 25 s is promoted to a job and answered 202. Beta. A body field callback_url (public https) receives the job's webhook instead of the environment's default endpoints.",
@@ -29537,6 +31086,354 @@
         }
       }
     },
+    "/v1/verify/duplicate-document": {
+      "post": {
+        "description": "Find the same document among your org's documents of the last 365 days. A synchronous call still running at 25 s is promoted to a job and answered 202. Beta. A body field callback_url (public https) receives the job's webhook instead of the environment's default endpoints.",
+        "operationId": "verify_duplicate_document",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Mode"
+          },
+          {
+            "$ref": "#/components/parameters/Prefer"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/Accept"
+          },
+          {
+            "$ref": "#/components/parameters/RequestID"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "scan": {
+                  "summary": "A scan to look for among the org's documents",
+                  "value": {
+                    "consent": true,
+                    "file_id": "file_01JA9C2R8T1W4Y7A0C3E6G9J2M",
+                    "purpose": "Customer onboarding",
+                    "reference_id": "cust-9",
+                    "scope": "org"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/VerifyDuplicateDocumentRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "callback_url": {
+                    "format": "uri",
+                    "type": "string"
+                  },
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "options": {
+                    "description": "The operation's options as a JSON object; plain fields named like the options work too",
+                    "type": "string"
+                  },
+                  "password": {
+                    "description": "Opens a protected PDF",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "duplicate": {
+                    "summary": "Seen before (same file)",
+                    "value": {
+                      "data": {
+                        "checked_at": "2027-01-10T09:00:00Z",
+                        "details": {
+                          "document_id": "ddh_01JA9C4H8K1M4P7R0T3W6Y9A2D",
+                          "duplicate": true,
+                          "hash_kind": "image",
+                          "matches": [
+                            {
+                              "first_seen_at": "2026-11-02T10:15:00Z",
+                              "id": "ddh_01J9ZZ4H8K1M4P7R0T3W6Y9A2C",
+                              "reference_id": "cust-7",
+                              "same_file": true,
+                              "similarity": 1
+                            }
+                          ]
+                        },
+                        "name_match": null,
+                        "reference_id": "cust-9",
+                        "request_id": "req_test",
+                        "result": "mismatch",
+                        "source": "Lowco document index",
+                        "verified": false
+                      },
+                      "status": 1
+                    }
+                  },
+                  "unique": {
+                    "summary": "Not seen in 365 days",
+                    "value": {
+                      "data": {
+                        "checked_at": "2027-01-10T09:00:00Z",
+                        "details": {
+                          "document_id": "ddh_01JA9C4H8K1M4P7R0T3W6Y9A2D",
+                          "duplicate": false,
+                          "hash_kind": "image",
+                          "matches": []
+                        },
+                        "name_match": null,
+                        "reference_id": "cust-9",
+                        "request_id": "req_test",
+                        "result": "valid",
+                        "source": "Lowco document index",
+                        "verified": true
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/VerifyDuplicateDocumentResult"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Finished in the request.",
+            "headers": {
+              "X-Lowco-Credits-Used": {
+                "$ref": "#/components/headers/X-Lowco-Credits-Used"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "job": {
+                    "summary": "Accepted as a job",
+                    "value": {
+                      "data": {
+                        "attempts": 0,
+                        "created_at": "2026-10-09T09:30:00Z",
+                        "error": null,
+                        "expires_at": "2026-10-16T09:30:00Z",
+                        "finished_at": null,
+                        "input": {
+                          "file_id": "file_01JA9C2M7Q4V8X3K6T1R5N0W2E",
+                          "pages": 12
+                        },
+                        "job_id": "job_01JA9C3B5E8G1J4M7P0R3T6W9Y",
+                        "links": {
+                          "cancel": "/v1/jobs/job_01JA9C3B5E8G1J4M7P0R3T6W9Y/cancel",
+                          "self": "/v1/jobs/job_01JA9C3B5E8G1J4M7P0R3T6W9Y"
+                        },
+                        "operation": "duplicate-document",
+                        "progress": null,
+                        "result": null,
+                        "service": "verify",
+                        "started_at": null,
+                        "status": "queued",
+                        "usage": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Job"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Accepted as a job; poll links.self or wait for the webhook.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "$ref": "#/components/headers/Idempotent-Replayed"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "scope": {
+                    "summary": "An unsupported scope",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_param",
+                        "message": "scope \"world\" is not supported: org is the only scope.",
+                        "param": "scope",
+                        "reason": "invalid_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayTimeout"
+          }
+        },
+        "summary": "Find the same document among your org's documents of the last 365 days",
+        "tags": [
+          "verify"
+        ],
+        "x-lowco-default-mode": "sync",
+        "x-lowco-family": "verify",
+        "x-lowco-input": "file",
+        "x-lowco-limits": {
+          "max_pages": 50,
+          "max_mb": 10
+        },
+        "x-lowco-meter": {
+          "free": false,
+          "name": "api_verify_duplicate",
+          "unit": "call"
+        },
+        "x-lowco-output": "json",
+        "x-lowco-scope": "api.verify.duplicate_document.execute",
+        "x-lowco-status": "beta",
+        "x-lowco-sync-limit": {},
+        "x-lowco-test-fixture": {
+          "behaviour": "real",
+          "max_mb": 5,
+          "max_pages": 20,
+          "billed": false,
+          "notes": "Analysed locally in both environments; duplicates are found among the environment's own documents."
+        }
+      }
+    },
     "/v1/verify/email": {
       "post": {
         "description": "An email address: syntax, MX, disposable, role address, deliverable, suggestion. A synchronous call still running at 25 s is promoted to a job and answered 202. Beta. A body field callback_url (public https) receives the job's webhook instead of the environment's default endpoints.",
@@ -29895,6 +31792,345 @@
           "max_pages": 20,
           "billed": false,
           "notes": "Test keys never reach a source (fixtures 2027-01, docs/verify.md): the identifier's last digit picks the answer (1 valid, 2 not_found, 3 inactive, 4 mismatch, 5 unavailable; a GSTIN's 13th character, a PAN's last digit; UPI and email the part before the @)."
+        }
+      }
+    },
+    "/v1/verify/face-match": {
+      "post": {
+        "description": "Compare two face images: similarity and match at your threshold. A synchronous call still running at 25 s is promoted to a job and answered 202. Beta. A body field callback_url (public https) receives the job's webhook instead of the environment's default endpoints.",
+        "operationId": "verify_face_match",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Mode"
+          },
+          {
+            "$ref": "#/components/parameters/Prefer"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/Accept"
+          },
+          {
+            "$ref": "#/components/parameters/RequestID"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "selfie-and-id-photo": {
+                  "summary": "A selfie against the ID document's photo",
+                  "value": {
+                    "consent": true,
+                    "face": {
+                      "file_id": "file_01JA9C2R8T1W4Y7A0C3E6G9J2N"
+                    },
+                    "purpose": "Customer onboarding",
+                    "reference": {
+                      "file_id": "file_01JA9C2R8T1W4Y7A0C3E6G9J2M"
+                    },
+                    "reference_id": "cust-9"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/VerifyFaceMatchRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "callback_url": {
+                    "format": "uri",
+                    "type": "string"
+                  },
+                  "face": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "options": {
+                    "description": "The operation's options as a JSON object; plain fields named like the options work too",
+                    "type": "string"
+                  },
+                  "reference": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "match": {
+                    "summary": "The same person (sandbox: the same photo)",
+                    "value": {
+                      "data": {
+                        "checked_at": "2027-01-10T09:00:00Z",
+                        "details": {
+                          "match": true,
+                          "similarity": 1,
+                          "threshold": 0.8
+                        },
+                        "name_match": null,
+                        "reference_id": "cust-9",
+                        "request_id": "req_test",
+                        "result": "valid",
+                        "source": "Lowco sandbox",
+                        "verified": true
+                      },
+                      "status": 1
+                    }
+                  },
+                  "no-match": {
+                    "summary": "Another person",
+                    "value": {
+                      "data": {
+                        "checked_at": "2027-01-10T09:00:00Z",
+                        "details": {
+                          "match": false,
+                          "similarity": 0.469,
+                          "threshold": 0.8
+                        },
+                        "name_match": null,
+                        "reference_id": "cust-9",
+                        "request_id": "req_test",
+                        "result": "mismatch",
+                        "source": "Lowco sandbox",
+                        "verified": false
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/VerifyFaceMatchResult"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Finished in the request.",
+            "headers": {
+              "X-Lowco-Credits-Used": {
+                "$ref": "#/components/headers/X-Lowco-Credits-Used"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "job": {
+                    "summary": "Accepted as a job",
+                    "value": {
+                      "data": {
+                        "attempts": 0,
+                        "created_at": "2026-10-09T09:30:00Z",
+                        "error": null,
+                        "expires_at": "2026-10-16T09:30:00Z",
+                        "finished_at": null,
+                        "input": {},
+                        "job_id": "job_01JA9C3B5E8G1J4M7P0R3T6W9Y",
+                        "links": {
+                          "cancel": "/v1/jobs/job_01JA9C3B5E8G1J4M7P0R3T6W9Y/cancel",
+                          "self": "/v1/jobs/job_01JA9C3B5E8G1J4M7P0R3T6W9Y"
+                        },
+                        "operation": "face-match",
+                        "progress": null,
+                        "result": null,
+                        "service": "verify",
+                        "started_at": null,
+                        "status": "queued",
+                        "usage": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Job"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Accepted as a job; poll links.self or wait for the webhook.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "$ref": "#/components/headers/Idempotent-Replayed"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "no-consent": {
+                    "summary": "consent missing",
+                    "value": {
+                      "error": {
+                        "code": 422,
+                        "doc_url": "https://docs.lowco.ai/api/errors#consent_required",
+                        "message": "Send consent: true: the person this check is about agreed to it.",
+                        "param": "consent",
+                        "reason": "consent_required",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: consent_required, document_not_recognised, file_corrupt, file_rejected, file_url_forbidden, file_url_unreachable, idempotency_key_reused, invalid_identifier, invalid_password, password_required, schema_invalid, sender_not_verified, suppressed, template_not_approved, too_many_files, too_many_pages, validation_failed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayTimeout"
+          }
+        },
+        "summary": "Compare two face images: similarity and match at your threshold",
+        "tags": [
+          "verify"
+        ],
+        "x-lowco-default-mode": "sync",
+        "x-lowco-extra-files": [
+          "face",
+          "reference"
+        ],
+        "x-lowco-family": "verify",
+        "x-lowco-input": "none",
+        "x-lowco-limits": {
+          "max_mb": 10
+        },
+        "x-lowco-meter": {
+          "free": false,
+          "name": "api_verify_face_match",
+          "unit": "call"
+        },
+        "x-lowco-output": "json",
+        "x-lowco-scope": "api.verify.face_match.execute",
+        "x-lowco-status": "beta",
+        "x-lowco-sync-limit": {},
+        "x-lowco-test-fixture": {
+          "behaviour": "sandbox",
+          "max_mb": 5,
+          "max_pages": 20,
+          "billed": false,
+          "notes": "Test keys never reach a provider: the sandbox compares the two images by perceptual hash, so the same photo matches and a different one does not."
         }
       }
     },
@@ -31401,6 +33637,822 @@
           "max_pages": 20,
           "billed": false,
           "notes": "Test keys never reach a source (fixtures 2027-01, docs/verify.md): the identifier's last digit picks the answer (1 valid, 2 not_found, 3 inactive, 4 mismatch, 5 unavailable; a GSTIN's 13th character, a PAN's last digit; UPI and email the part before the @)."
+        }
+      }
+    },
+    "/v1/verify/kyc": {
+      "post": {
+        "description": "One-call KYC: the ID document read, its online check, and a face match with a selfie. Synchronous up to 5 pages, a job above. A synchronous call still running at 25 s is promoted to a job and answered 202. Beta. A body field callback_url (public https) receives the job's webhook instead of the environment's default endpoints.",
+        "operationId": "verify_kyc",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Mode"
+          },
+          {
+            "$ref": "#/components/parameters/Prefer"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/Accept"
+          },
+          {
+            "$ref": "#/components/parameters/RequestID"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "pan-and-selfie": {
+                  "summary": "A PAN card with a selfie",
+                  "value": {
+                    "consent": true,
+                    "file_id": "file_01JA9C2R8T1W4Y7A0C3E6G9J2M",
+                    "purpose": "Customer onboarding",
+                    "reference_id": "cust-9",
+                    "selfie": {
+                      "file_id": "file_01JA9C2R8T1W4Y7A0C3E6G9J2N"
+                    }
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/VerifyKycRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "back": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "callback_url": {
+                    "format": "uri",
+                    "type": "string"
+                  },
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "options": {
+                    "description": "The operation's options as a JSON object; plain fields named like the options work too",
+                    "type": "string"
+                  },
+                  "password": {
+                    "description": "Opens a protected PDF",
+                    "type": "string"
+                  },
+                  "selfie": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "rejected": {
+                    "summary": "The PAN is not found at the source",
+                    "value": {
+                      "data": {
+                        "document": {
+                          "document_confidence": 0.98,
+                          "document_type": "pan_card",
+                          "fields": {
+                            "date_of_birth": {
+                              "confidence": 0.95,
+                              "source": {
+                                "page": 1
+                              },
+                              "value": "1990-04-15"
+                            },
+                            "father_name": {
+                              "confidence": 0.95,
+                              "source": {
+                                "page": 1
+                              },
+                              "value": "SURESH KUMAR"
+                            },
+                            "name": {
+                              "confidence": 0.95,
+                              "source": {
+                                "page": 1
+                              },
+                              "value": "RAVI KUMAR"
+                            },
+                            "number": {
+                              "confidence": 0.95,
+                              "source": {
+                                "page": 1
+                              },
+                              "value": "ABCPE1232F"
+                            }
+                          },
+                          "page_count": 1,
+                          "validation": []
+                        },
+                        "face_match": null,
+                        "kyc_result": "rejected",
+                        "online_check": {
+                          "checked_at": "2027-01-10T09:00:00Z",
+                          "details": {},
+                          "name_match": null,
+                          "reference_id": "cust-9",
+                          "request_id": "req_test",
+                          "result": "not_found",
+                          "source": "NSDL",
+                          "verified": false
+                        },
+                        "reasons": [
+                          {
+                            "code": "online_not_found",
+                            "message": "The source says the document is not found."
+                          }
+                        ],
+                        "reference_id": "cust-9",
+                        "request_id": "req_test"
+                      },
+                      "status": 1
+                    }
+                  },
+                  "verified": {
+                    "summary": "Read, found at NSDL, the selfie matches",
+                    "value": {
+                      "data": {
+                        "document": {
+                          "document_confidence": 0.98,
+                          "document_type": "pan_card",
+                          "fields": {
+                            "date_of_birth": {
+                              "confidence": 0.95,
+                              "source": {
+                                "page": 1
+                              },
+                              "value": "1990-04-15"
+                            },
+                            "father_name": {
+                              "confidence": 0.95,
+                              "source": {
+                                "page": 1
+                              },
+                              "value": "SURESH KUMAR"
+                            },
+                            "name": {
+                              "confidence": 0.95,
+                              "source": {
+                                "page": 1
+                              },
+                              "value": "RAVI KUMAR"
+                            },
+                            "number": {
+                              "confidence": 0.95,
+                              "source": {
+                                "page": 1
+                              },
+                              "value": "ABCPE1231F"
+                            }
+                          },
+                          "page_count": 1,
+                          "validation": []
+                        },
+                        "face_match": {
+                          "checked_at": "2027-01-10T09:00:00Z",
+                          "details": {
+                            "match": true,
+                            "similarity": 1,
+                            "threshold": 0.8
+                          },
+                          "name_match": null,
+                          "reference_id": "cust-9",
+                          "request_id": "req_test",
+                          "result": "valid",
+                          "source": "Lowco sandbox",
+                          "verified": true
+                        },
+                        "kyc_result": "verified",
+                        "online_check": {
+                          "checked_at": "2027-01-10T09:00:00Z",
+                          "details": {
+                            "aadhaar_seeding": "Y",
+                            "category": "Individual",
+                            "dob_match": true,
+                            "name": "RAVI KUMAR",
+                            "status": "Valid"
+                          },
+                          "name_match": {
+                            "input": "RAVI KUMAR",
+                            "score": 1,
+                            "source": "RAVI KUMAR"
+                          },
+                          "reference_id": "cust-9",
+                          "request_id": "req_test",
+                          "result": "valid",
+                          "source": "NSDL",
+                          "verified": true
+                        },
+                        "reasons": [],
+                        "reference_id": "cust-9",
+                        "request_id": "req_test"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/VerifyKycResult"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Finished in the request.",
+            "headers": {
+              "X-Lowco-Credits-Used": {
+                "$ref": "#/components/headers/X-Lowco-Credits-Used"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "job": {
+                    "summary": "Accepted as a job",
+                    "value": {
+                      "data": {
+                        "attempts": 0,
+                        "created_at": "2026-10-09T09:30:00Z",
+                        "error": null,
+                        "expires_at": "2026-10-16T09:30:00Z",
+                        "finished_at": null,
+                        "input": {
+                          "file_id": "file_01JA9C2M7Q4V8X3K6T1R5N0W2E",
+                          "pages": 12
+                        },
+                        "job_id": "job_01JA9C3B5E8G1J4M7P0R3T6W9Y",
+                        "links": {
+                          "cancel": "/v1/jobs/job_01JA9C3B5E8G1J4M7P0R3T6W9Y/cancel",
+                          "self": "/v1/jobs/job_01JA9C3B5E8G1J4M7P0R3T6W9Y"
+                        },
+                        "operation": "kyc",
+                        "progress": null,
+                        "result": null,
+                        "service": "verify",
+                        "started_at": null,
+                        "status": "queued",
+                        "usage": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Job"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Accepted as a job; poll links.self or wait for the webhook.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "$ref": "#/components/headers/Idempotent-Replayed"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "no-purpose": {
+                    "summary": "purpose missing",
+                    "value": {
+                      "error": {
+                        "code": 422,
+                        "doc_url": "https://docs.lowco.ai/api/errors#consent_required",
+                        "message": "Say why you are checking this in purpose (up to 200 characters).",
+                        "param": "purpose",
+                        "reason": "consent_required",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: consent_required, document_not_recognised, file_corrupt, file_rejected, file_url_forbidden, file_url_unreachable, idempotency_key_reused, invalid_identifier, invalid_password, password_required, schema_invalid, sender_not_verified, suppressed, template_not_approved, too_many_files, too_many_pages, validation_failed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayTimeout"
+          }
+        },
+        "summary": "One-call KYC: the ID document read, its online check, and a face match with a selfie",
+        "tags": [
+          "verify"
+        ],
+        "x-lowco-default-mode": "sync",
+        "x-lowco-extra-files": [
+          "back",
+          "selfie"
+        ],
+        "x-lowco-family": "verify",
+        "x-lowco-input": "file",
+        "x-lowco-limits": {
+          "max_pages": 5,
+          "max_mb": 10
+        },
+        "x-lowco-meter": {
+          "free": false,
+          "name": "api_docai_pages",
+          "unit": "page"
+        },
+        "x-lowco-output": "json",
+        "x-lowco-scope": "api.verify.kyc.execute",
+        "x-lowco-status": "beta",
+        "x-lowco-sync-limit": {
+          "pages": 5
+        },
+        "x-lowco-test-fixture": {
+          "behaviour": "fixture",
+          "max_mb": 5,
+          "max_pages": 20,
+          "billed": false,
+          "notes": "docai/kyc reads with the fixture model; the online check follows the verify sandbox (the number's last digit); the face match follows the face-match sandbox."
+        }
+      }
+    },
+    "/v1/verify/liveness": {
+      "post": {
+        "description": "Check a short video or 3 frames are of a live person: live, score, spoof indicators. A synchronous call still running at 25 s is promoted to a job and answered 202. Beta. A body field callback_url (public https) receives the job's webhook instead of the environment's default endpoints.",
+        "operationId": "verify_liveness",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Mode"
+          },
+          {
+            "$ref": "#/components/parameters/Prefer"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/Accept"
+          },
+          {
+            "$ref": "#/components/parameters/RequestID"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "three-frames": {
+                  "summary": "Three frames from the camera",
+                  "value": {
+                    "consent": true,
+                    "frame_1": {
+                      "file_id": "file_01JA9C2R8T1W4Y7A0C3E6G9J2M"
+                    },
+                    "frame_2": {
+                      "file_id": "file_01JA9C2R8T1W4Y7A0C3E6G9J2N"
+                    },
+                    "frame_3": {
+                      "file_id": "file_01JA9C2R8T1W4Y7A0C3E6G9J2P"
+                    },
+                    "purpose": "Customer onboarding",
+                    "reference_id": "cust-9"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/VerifyLivenessRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "callback_url": {
+                    "format": "uri",
+                    "type": "string"
+                  },
+                  "frame_1": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "frame_2": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "frame_3": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "options": {
+                    "description": "The operation's options as a JSON object; plain fields named like the options work too",
+                    "type": "string"
+                  },
+                  "video": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "live": {
+                    "summary": "A live person",
+                    "value": {
+                      "data": {
+                        "checked_at": "2027-01-10T09:00:00Z",
+                        "details": {
+                          "frames_checked": 3,
+                          "live": true,
+                          "score": 0.9,
+                          "spoof_indicators": []
+                        },
+                        "name_match": null,
+                        "reference_id": "cust-9",
+                        "request_id": "req_test",
+                        "result": "valid",
+                        "source": "Lowco sandbox",
+                        "verified": true
+                      },
+                      "status": 1
+                    }
+                  },
+                  "static": {
+                    "summary": "A photo held up: static_frames",
+                    "value": {
+                      "data": {
+                        "checked_at": "2027-01-10T09:00:00Z",
+                        "details": {
+                          "frames_checked": 3,
+                          "live": false,
+                          "score": 0.1,
+                          "spoof_indicators": [
+                            "static_frames"
+                          ]
+                        },
+                        "name_match": null,
+                        "reference_id": "cust-9",
+                        "request_id": "req_test",
+                        "result": "mismatch",
+                        "source": "Lowco sandbox",
+                        "verified": false
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/VerifyLivenessResult"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Finished in the request.",
+            "headers": {
+              "X-Lowco-Credits-Used": {
+                "$ref": "#/components/headers/X-Lowco-Credits-Used"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "job": {
+                    "summary": "Accepted as a job",
+                    "value": {
+                      "data": {
+                        "attempts": 0,
+                        "created_at": "2026-10-09T09:30:00Z",
+                        "error": null,
+                        "expires_at": "2026-10-16T09:30:00Z",
+                        "finished_at": null,
+                        "input": {},
+                        "job_id": "job_01JA9C3B5E8G1J4M7P0R3T6W9Y",
+                        "links": {
+                          "cancel": "/v1/jobs/job_01JA9C3B5E8G1J4M7P0R3T6W9Y/cancel",
+                          "self": "/v1/jobs/job_01JA9C3B5E8G1J4M7P0R3T6W9Y"
+                        },
+                        "operation": "liveness",
+                        "progress": null,
+                        "result": null,
+                        "service": "verify",
+                        "started_at": null,
+                        "status": "queued",
+                        "usage": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Job"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Accepted as a job; poll links.self or wait for the webhook.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "$ref": "#/components/headers/Idempotent-Replayed"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "one-frame": {
+                    "summary": "Neither a video nor three frames",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#missing_param",
+                        "message": "Send a short video, or three frames as frame_1, frame_2 and frame_3.",
+                        "param": "video",
+                        "reason": "missing_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayTimeout"
+          }
+        },
+        "summary": "Check a short video or 3 frames are of a live person: live, score, spoof indicators",
+        "tags": [
+          "verify"
+        ],
+        "x-lowco-default-mode": "sync",
+        "x-lowco-extra-files": [
+          "video",
+          "frame_1",
+          "frame_2",
+          "frame_3"
+        ],
+        "x-lowco-family": "verify",
+        "x-lowco-input": "none",
+        "x-lowco-limits": {
+          "max_mb": 25
+        },
+        "x-lowco-meter": {
+          "free": false,
+          "name": "api_verify_liveness",
+          "unit": "call"
+        },
+        "x-lowco-output": "json",
+        "x-lowco-scope": "api.verify.liveness.execute",
+        "x-lowco-status": "beta",
+        "x-lowco-sync-limit": {},
+        "x-lowco-test-fixture": {
+          "behaviour": "sandbox",
+          "max_mb": 5,
+          "max_pages": 20,
+          "billed": false,
+          "notes": "Three frames: identical frames are static_frames (a photo), unrelated ones scene_change, moving ones live. A video is live in the sandbox."
         }
       }
     },

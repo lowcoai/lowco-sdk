@@ -180,11 +180,11 @@ class AuditListVerifyData(TypedDict):
     next_cursor: Optional[str]
 
 class AuditListVerifyQuery(TypedDict):
-    operation: NotRequired[Literal["aadhaar-offline", "bank-account", "cin", "docai/kyc/aadhaar", "docai/kyc/driving_licence", "docai/kyc/pan_card", "docai/kyc/passport", "docai/kyc/voter_id", "driving-licence", "email", "fssai", "gstin", "iec", "ifsc", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]]
-    """Only this operation (a verify lookup, or a document type read by docai/kyc)"""
+    operation: NotRequired[Literal["aadhaar-offline", "bank-account", "cin", "docai/kyc/aadhaar", "docai/kyc/driving_licence", "docai/kyc/pan_card", "docai/kyc/passport", "docai/kyc/voter_id", "document-tamper", "driving-licence", "duplicate-document", "email", "face-match", "fssai", "gstin", "iec", "ifsc", "kyc", "liveness", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]]
+    """Only this operation (a verify lookup, a fraud check or verify/kyc, or a document type read by docai/kyc)"""
     result: NotRequired[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]]
     identifier: NotRequired[str]
-    """Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged"""
+    """Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged. Not for aadhaar-offline, docai/kyc/aadhaar or the fraud checks (their fingerprint is the file's): find those by reference_id"""
     reference_id: NotRequired[str]
     job_id: NotRequired[str]
     """A batch's rows"""
@@ -1025,6 +1025,90 @@ class KYCResult(TypedDict):
     validation: list[ValidationIssue]
     voter_id: NotRequired[KYCVoterID]
     warnings: NotRequired[list[str]]
+
+class KYCVerifyResult(TypedDict):
+    """verify/kyc: the document read, its online check and the face match in one answer"""
+    document: KYCVerifyResultDocument
+    """docai/kyc's reading"""
+    face_match: Optional[KYCVerifyResultFaceMatch]
+    """The selfie against the document; null without a selfie"""
+    kyc_result: Literal["verified", "review", "rejected"]
+    """verified: every check passed; review: something could not be checked; rejected: a check failed"""
+    online_check: Optional[KYCVerifyResultOnlineCheck]
+    """The lookup that matches the document (verify/pan, driving-licence, voter-id or passport); null when none ran"""
+    reasons: list[KYCVerifyResultReason]
+    """Rejections first, then what needs review"""
+    reference_id: str
+    request_id: str
+
+class KYCVerifyResultDocument(TypedDict):
+    """docai/kyc's reading"""
+    document_confidence: float
+    document_type: Literal["pan_card", "aadhaar", "driving_licence", "passport", "voter_id"]
+    fields: dict[str, Any]
+    """The document type's fields, each a Field (as docai/kyc answers them); a value only the back carries has source.side back"""
+    page_count: int
+    """Pages read, the back's included"""
+    validation: list[ValidationIssue]
+    """Issues on the back carry side: back"""
+
+class KYCVerifyResultFaceMatch(TypedDict):
+    """The selfie against the document; null without a selfie"""
+    checked_at: str
+    details: dict[str, Any]
+    """The check's details"""
+    name_match: Optional[KYCVerifyResultFaceMatchNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class KYCVerifyResultFaceMatchNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class KYCVerifyResultOnlineCheck(TypedDict):
+    """The lookup that matches the document (verify/pan, driving-licence, voter-id or passport); null when none ran"""
+    checked_at: str
+    details: dict[str, Any]
+    """The check's details"""
+    name_match: Optional[KYCVerifyResultOnlineCheckNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]
+    """valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free)"""
+    source: str
+    """The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...)"""
+    verified: bool
+    """true only for result valid"""
+
+class KYCVerifyResultOnlineCheckNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class KYCVerifyResultReason(TypedDict):
+    """Why it is not simply verified"""
+    code: str
+    """online_not_found, face_mismatch, pan_invalid, expired, no_online_check, ..."""
+    message: str
 
 class KYCVoterID(TypedDict):
     address: Field
@@ -2324,6 +2408,8 @@ class Settings(TypedDict):
     docai_labels: Optional[list[str]]
     """The org's docai/classify taxonomy; empty means the standard labels"""
     environment: Literal["live", "test"]
+    face_match_threshold: float
+    """verify/face-match's and verify/kyc's default threshold (0.8)"""
     max_jobs_in_flight: int
     """From the plan; read-only"""
     monthly_credit_cap: Optional[str]
@@ -2342,6 +2428,8 @@ class SettingsPatch(TypedDict):
     default_webhook_ids: NotRequired[list[str]]
     docai_labels: NotRequired[list[str]]
     """docai/classify labels used when a call sends none; [] restores the standard labels"""
+    face_match_threshold: NotRequired[float]
+    """The similarity a face match needs when a call names no threshold"""
     monthly_credit_cap: NotRequired[str]
     """Decimal string. In live it may not exceed the plan's ceiling (each priced meter's hard cap times its price; 422 on monthly_credit_cap)"""
     retention_input_hours: NotRequired[int]
@@ -2387,6 +2475,16 @@ class TablesResultTable(TypedDict):
     headers: list[str]
     page: int
     rows: list[list[str]]
+
+class TamperIndicator(TypedDict):
+    """A sign of tampering, with where it was seen"""
+    bbox: NotRequired[BBox]
+    confidence: float
+    detail: str
+    """What was seen"""
+    page: NotRequired[int]
+    type: Literal["copy_move", "font_inconsistency", "metadata_edits", "resaved_image"]
+    """copy_move: a region repeats elsewhere; font_inconsistency: a figure in another font; metadata_edits: saved by an editor or after it was made; resaved_image: a photo recompressed"""
 
 class TemplateVersion(TypedDict):
     created_at: str
@@ -2819,6 +2917,78 @@ class VerifyCinResultNameMatch(TypedDict):
     source: str
     """The name at the source (a vehicle owner's masked without consent_owner)"""
 
+class VerifyDocumentTamperParams(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    file: FileInput
+    """The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyDocumentTamperRequest(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    file_base64: NotRequired[str]
+    """Base64, URL-safe base64 or a data: URL"""
+    file_id: NotRequired[str]
+    """A stored file of this org and environment (POST /v1/files)"""
+    file_url: NotRequired[str]
+    """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
+    filename: NotRequired[str]
+    """Name for the stored input"""
+    password: NotRequired[str]
+    """Opens a protected PDF; never stored or logged"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyDocumentTamperResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyDocumentTamperResultDetails
+    """The analysis (local in both environments)"""
+    name_match: Optional[VerifyDocumentTamperResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "mismatch", "unavailable"]
+    """valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free)"""
+    source: str
+    """Who answered: the provider, the Lowco sandbox, or Lowco's own analysis"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyDocumentTamperResultDetails(TypedDict):
+    """The analysis (local in both environments)"""
+    format: NotRequired[Literal["pdf", "jpeg", "image"]]
+    indicators: list[TamperIndicator]
+    """Most confident first; empty when nothing was found"""
+    pages: NotRequired[int]
+    """Pages read"""
+    tamper_score: float
+    """1 minus the product of the indicators' complements"""
+    tampered: bool
+    """tamper_score is 0.5 or more"""
+
+class VerifyDocumentTamperResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
 class VerifyDrivingLicenceParams(TypedDict):
     """The operation's options."""
     consent: bool
@@ -2888,6 +3058,93 @@ class VerifyDrivingLicenceResultNameMatch(TypedDict):
     source: str
     """The name at the source (a vehicle owner's masked without consent_owner)"""
 
+class VerifyDuplicateDocumentParams(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    file: FileInput
+    """The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+    scope: NotRequired[Literal["org"]]
+    """Where to look: org (the default and only scope)"""
+
+class VerifyDuplicateDocumentRequest(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    file_base64: NotRequired[str]
+    """Base64, URL-safe base64 or a data: URL"""
+    file_id: NotRequired[str]
+    """A stored file of this org and environment (POST /v1/files)"""
+    file_url: NotRequired[str]
+    """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
+    filename: NotRequired[str]
+    """Name for the stored input"""
+    password: NotRequired[str]
+    """Opens a protected PDF; never stored or logged"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+    scope: NotRequired[Literal["org"]]
+    """Where to look: org (the default and only scope)"""
+
+class VerifyDuplicateDocumentResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyDuplicateDocumentResultDetails
+    """The org's earlier documents like this one"""
+    name_match: Optional[VerifyDuplicateDocumentResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "mismatch", "unavailable"]
+    """valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free)"""
+    source: str
+    """Who answered: the provider, the Lowco sandbox, or Lowco's own analysis"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyDuplicateDocumentResultDetails(TypedDict):
+    """The org's earlier documents like this one"""
+    document_id: str
+    """This document's index entry, kept 365 days"""
+    duplicate: bool
+    """At least one match"""
+    hash_kind: Literal["image", "text"]
+    """image: the dHash of the image or a scan's page; text: the SimHash of a PDF's text layer"""
+    matches: list[VerifyDuplicateDocumentResultDetailsMatche]
+    """Most similar first, at most 10"""
+
+class VerifyDuplicateDocumentResultDetailsMatche(TypedDict):
+    """An earlier document"""
+    first_seen_at: str
+    id: str
+    """The index entry (ddh_…)"""
+    reference_id: str
+    """The reference_id it was checked with"""
+    same_file: bool
+    """Byte for byte the same file"""
+    similarity: float
+    """How alike (0.9 or more)"""
+
+class VerifyDuplicateDocumentResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
 class VerifyEmailParams(TypedDict):
     """The operation's options."""
     consent: bool
@@ -2946,6 +3203,75 @@ class VerifyEmailResultDetails(TypedDict):
     syntax_valid: NotRequired[bool]
 
 class VerifyEmailResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyFaceMatchParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    face: NotRequired[FileInput]
+    """An extra file input (face)"""
+    reference: NotRequired[FileInput]
+    """An extra file input (reference)"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+    threshold: NotRequired[float]
+    """Similarity a match needs, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)"""
+
+class VerifyFaceMatchRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    face: NotRequired[FileRef]
+    """An extra file input (face); in multipart, a part named face"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference: NotRequired[FileRef]
+    """An extra file input (reference); in multipart, a part named reference"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+    threshold: NotRequired[float]
+    """Similarity a match needs, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)"""
+
+class VerifyFaceMatchResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyFaceMatchResultDetails
+    """The match; empty when unavailable"""
+    name_match: Optional[VerifyFaceMatchResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "mismatch", "unavailable"]
+    """valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free)"""
+    source: str
+    """Who answered: the provider, the Lowco sandbox, or Lowco's own analysis"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyFaceMatchResultDetails(TypedDict):
+    """The match; empty when unavailable"""
+    match: NotRequired[bool]
+    """similarity reached the threshold"""
+    similarity: NotRequired[float]
+    """How alike the two faces are (the sandbox: how alike the two images are)"""
+    threshold: NotRequired[float]
+    """The threshold applied: the call's, else the org's face_match_threshold"""
+
+class VerifyFaceMatchResultNameMatch(TypedDict):
     """With name in the request and a name at the source"""
     input: str
     """The name you sent"""
@@ -3231,6 +3557,135 @@ class VerifyIfscResultDetailsChannels(TypedDict):
     upi: NotRequired[bool]
 
 class VerifyIfscResultNameMatch(TypedDict):
+    """With name in the request and a name at the source"""
+    input: str
+    """The name you sent"""
+    score: float
+    """1 is the same name; under 0.8 a valid record is mismatch"""
+    source: str
+    """The name at the source (a vehicle owner's masked without consent_owner)"""
+
+class VerifyKycParams(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    file: FileInput
+    """The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    back: NotRequired[FileInput]
+    """An extra file input (back)"""
+    selfie: NotRequired[FileInput]
+    """An extra file input (selfie)"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    document_type: NotRequired[Literal["pan_card", "aadhaar", "driving_licence", "passport", "voter_id"]]
+    """pan_card, aadhaar, driving_licence, passport or voter_id (detected otherwise)"""
+    online_check: NotRequired[bool]
+    """Look the document up at its source (default true)"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+    threshold: NotRequired[float]
+    """Face match threshold, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)"""
+
+class VerifyKycRequest(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    back: NotRequired[FileRef]
+    """An extra file input (back); in multipart, a part named back"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    document_type: NotRequired[Literal["pan_card", "aadhaar", "driving_licence", "passport", "voter_id"]]
+    """pan_card, aadhaar, driving_licence, passport or voter_id (detected otherwise)"""
+    file_base64: NotRequired[str]
+    """Base64, URL-safe base64 or a data: URL"""
+    file_id: NotRequired[str]
+    """A stored file of this org and environment (POST /v1/files)"""
+    file_url: NotRequired[str]
+    """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
+    filename: NotRequired[str]
+    """Name for the stored input"""
+    online_check: NotRequired[bool]
+    """Look the document up at its source (default true)"""
+    password: NotRequired[str]
+    """Opens a protected PDF; never stored or logged"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+    selfie: NotRequired[FileRef]
+    """An extra file input (selfie); in multipart, a part named selfie"""
+    threshold: NotRequired[float]
+    """Face match threshold, 0.5 to 0.99 (default the org's face_match_threshold, 0.8)"""
+
+class VerifyLivenessParams(TypedDict):
+    """The operation's options."""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    video: NotRequired[FileInput]
+    """An extra file input (video)"""
+    frame_1: NotRequired[FileInput]
+    """An extra file input (frame_1)"""
+    frame_2: NotRequired[FileInput]
+    """An extra file input (frame_2)"""
+    frame_3: NotRequired[FileInput]
+    """An extra file input (frame_3)"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+
+class VerifyLivenessRequest(TypedDict):
+    """The operation's options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required."""
+    frame_1: NotRequired[FileRef]
+    """An extra file input (frame_1); in multipart, a part named frame_1"""
+    frame_2: NotRequired[FileRef]
+    """An extra file input (frame_2); in multipart, a part named frame_2"""
+    frame_3: NotRequired[FileRef]
+    """An extra file input (frame_3); in multipart, a part named frame_3"""
+    purpose: str
+    """Why you are looking this up (kept in the audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the lookup, returned and kept in the audit log"""
+    video: NotRequired[FileRef]
+    """An extra file input (video); in multipart, a part named video"""
+
+class VerifyLivenessResult(TypedDict):
+    """The common verify response"""
+    checked_at: str
+    details: VerifyLivenessResultDetails
+    """The verdict; empty when unavailable"""
+    name_match: Optional[VerifyLivenessResultNameMatch]
+    """With name in the request and a name at the source"""
+    reference_id: str
+    """Your reference_id"""
+    request_id: str
+    result: Literal["valid", "invalid", "mismatch", "unavailable"]
+    """valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free)"""
+    source: str
+    """Who answered: the provider, the Lowco sandbox, or Lowco's own analysis"""
+    verified: bool
+    """true only for result valid"""
+
+class VerifyLivenessResultDetails(TypedDict):
+    """The verdict; empty when unavailable"""
+    frames_checked: NotRequired[int]
+    """Frames compared (0 for a video in the sandbox)"""
+    live: NotRequired[bool]
+    """A live person"""
+    score: NotRequired[float]
+    """How sure"""
+    spoof_indicators: NotRequired[list[Literal["static_frames", "scene_change", "too_few_frames", "screen_replay", "mask", "deepfake"]]]
+    """Why it is not live (the sandbox reports the first three)"""
+
+class VerifyLivenessResultNameMatch(TypedDict):
     """With name in the request and a name at the source"""
     input: str
     """The name you sent"""
@@ -3901,6 +4356,7 @@ DocaiTablesResult = TablesResult
 OcrHandwritingResult = OCRResult
 OcrTextResult = OCRResult
 QrDecodeResult = DecodeResult
+VerifyKycResult = KYCVerifyResult
 
 
 class BarcodeOperations:
@@ -4625,6 +5081,24 @@ class VerifyOperations:
         params = {"consent": consent, "purpose": purpose, "callback_url": callback_url, "cin": cin, "include_directors": include_directors, "llpin": llpin, "name": name, "reference_id": reference_id}
         return self._core.operation("/v1/verify/cin", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
 
+    def document_tamper(
+        self,
+        *,
+        file: FileInput,
+        consent: bool,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyDocumentTamperResult]:
+        """Signs a document image or PDF was altered: tamper score and indicators with where they are. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_tamper; scope api.verify.document_tamper.execute."""
+        params = {"file": file, "consent": consent, "purpose": purpose, "callback_url": callback_url, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/document-tamper", params, input_kind="file", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
     def driving_licence(
         self,
         *,
@@ -4645,6 +5119,25 @@ class VerifyOperations:
         params = {"consent": consent, "date_of_birth": date_of_birth, "dl_number": dl_number, "purpose": purpose, "callback_url": callback_url, "name": name, "reference_id": reference_id}
         return self._core.operation("/v1/verify/driving-licence", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
 
+    def duplicate_document(
+        self,
+        *,
+        file: FileInput,
+        consent: bool,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        scope: Optional[Literal["org"]] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyDuplicateDocumentResult]:
+        """Find the same document among your org's documents of the last 365 days. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_duplicate; scope api.verify.duplicate_document.execute."""
+        params = {"file": file, "consent": consent, "purpose": purpose, "callback_url": callback_url, "reference_id": reference_id, "scope": scope}
+        return self._core.operation("/v1/verify/duplicate-document", params, input_kind="file", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
     def email(
         self,
         *,
@@ -4663,6 +5156,26 @@ class VerifyOperations:
         """An email address: syntax, MX, disposable, role address, deliverable, suggestion. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_email; scope api.verify.email.execute."""
         params = {"consent": consent, "email": email, "purpose": purpose, "callback_url": callback_url, "name": name, "reference_id": reference_id}
         return self._core.operation("/v1/verify/email", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def face_match(
+        self,
+        *,
+        consent: bool,
+        purpose: str,
+        face: Optional[FileInput] = None,
+        reference: Optional[FileInput] = None,
+        callback_url: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        threshold: Optional[float] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyFaceMatchResult]:
+        """Compare two face images: similarity and match at your threshold. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_face_match; scope api.verify.face_match.execute."""
+        params = {"consent": consent, "purpose": purpose, "face": face, "reference": reference, "callback_url": callback_url, "reference_id": reference_id, "threshold": threshold}
+        return self._core.operation("/v1/verify/face-match", params, input_kind="none", extra=["face", "reference"], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
 
     def fssai(
         self,
@@ -4740,6 +5253,50 @@ class VerifyOperations:
         """An IFSC: bank, branch, address and supported channels (free). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_ifsc; scope api.verify.ifsc.execute."""
         params = {"consent": consent, "ifsc": ifsc, "purpose": purpose, "callback_url": callback_url, "name": name, "reference_id": reference_id}
         return self._core.operation("/v1/verify/ifsc", params, input_kind="none", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def kyc(
+        self,
+        *,
+        file: FileInput,
+        consent: bool,
+        purpose: str,
+        back: Optional[FileInput] = None,
+        selfie: Optional[FileInput] = None,
+        callback_url: Optional[str] = None,
+        document_type: Optional[Literal["pan_card", "aadhaar", "driving_licence", "passport", "voter_id"]] = None,
+        online_check: Optional[bool] = None,
+        reference_id: Optional[str] = None,
+        threshold: Optional[float] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyKycResult]:
+        """One-call KYC: the ID document read, its online check, and a face match with a selfie. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.verify.kyc.execute."""
+        params = {"file": file, "consent": consent, "purpose": purpose, "back": back, "selfie": selfie, "callback_url": callback_url, "document_type": document_type, "online_check": online_check, "reference_id": reference_id, "threshold": threshold}
+        return self._core.operation("/v1/verify/kyc", params, input_kind="file", extra=["back", "selfie"], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def liveness(
+        self,
+        *,
+        consent: bool,
+        purpose: str,
+        video: Optional[FileInput] = None,
+        frame_1: Optional[FileInput] = None,
+        frame_2: Optional[FileInput] = None,
+        frame_3: Optional[FileInput] = None,
+        callback_url: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[VerifyLivenessResult]:
+        """Check a short video or 3 frames are of a live person: live, score, spoof indicators. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_liveness; scope api.verify.liveness.execute."""
+        params = {"consent": consent, "purpose": purpose, "video": video, "frame_1": frame_1, "frame_2": frame_2, "frame_3": frame_3, "callback_url": callback_url, "reference_id": reference_id}
+        return self._core.operation("/v1/verify/liveness", params, input_kind="none", extra=["video", "frame_1", "frame_2", "frame_3"], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
 
     def mobile(
         self,
@@ -4914,11 +5471,11 @@ class AuditResource:
         """Every item of list, page after page (follows next_cursor)."""
         return self._core.paginate(f"/v1/audit-logs", {"action": action, "actor_id": actor_id, "object_type": object_type, "object_id": object_id, "created_after": created_after, "created_before": created_before, "limit": limit, "format": format}, request_id=request_id)
 
-    def list_verify(self, *, created_after: Optional[str] = None, created_before: Optional[str] = None, cursor: Optional[str] = None, format: Optional[Literal["json", "csv"]] = None, identifier: Optional[str] = None, job_id: Optional[str] = None, limit: Optional[int] = None, operation: Optional[Literal["aadhaar-offline", "bank-account", "cin", "docai/kyc/aadhaar", "docai/kyc/driving_licence", "docai/kyc/pan_card", "docai/kyc/passport", "docai/kyc/voter_id", "driving-licence", "email", "fssai", "gstin", "iec", "ifsc", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]] = None, reference_id: Optional[str] = None, result: Optional[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> AuditListVerifyData:
+    def list_verify(self, *, created_after: Optional[str] = None, created_before: Optional[str] = None, cursor: Optional[str] = None, format: Optional[Literal["json", "csv"]] = None, identifier: Optional[str] = None, job_id: Optional[str] = None, limit: Optional[int] = None, operation: Optional[Literal["aadhaar-offline", "bank-account", "cin", "docai/kyc/aadhaar", "docai/kyc/driving_licence", "docai/kyc/pan_card", "docai/kyc/passport", "docai/kyc/voter_id", "document-tamper", "driving-licence", "duplicate-document", "email", "face-match", "fssai", "gstin", "iec", "ifsc", "kyc", "liveness", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]] = None, reference_id: Optional[str] = None, result: Optional[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> AuditListVerifyData:
         """The Verify audit log of the calling environment, newest first: one row per lookup, the identifier only as its fingerprint and last 4."""
         return self._core.call("GET", f"/v1/verify/audit", query={"operation": operation, "result": result, "identifier": identifier, "reference_id": reference_id, "job_id": job_id, "created_after": created_after, "created_before": created_before, "limit": limit, "cursor": cursor, "format": format}, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
-    def list_verify_all(self, *, operation: Optional[Literal["aadhaar-offline", "bank-account", "cin", "docai/kyc/aadhaar", "docai/kyc/driving_licence", "docai/kyc/pan_card", "docai/kyc/passport", "docai/kyc/voter_id", "driving-licence", "email", "fssai", "gstin", "iec", "ifsc", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]] = None, result: Optional[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]] = None, identifier: Optional[str] = None, reference_id: Optional[str] = None, job_id: Optional[str] = None, created_after: Optional[str] = None, created_before: Optional[str] = None, limit: Optional[int] = None, format: Optional[Literal["json", "csv"]] = None, request_id: Optional[str] = None) -> Iterator[VerifyAuditRow]:
+    def list_verify_all(self, *, operation: Optional[Literal["aadhaar-offline", "bank-account", "cin", "docai/kyc/aadhaar", "docai/kyc/driving_licence", "docai/kyc/pan_card", "docai/kyc/passport", "docai/kyc/voter_id", "document-tamper", "driving-licence", "duplicate-document", "email", "face-match", "fssai", "gstin", "iec", "ifsc", "kyc", "liveness", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]] = None, result: Optional[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]] = None, identifier: Optional[str] = None, reference_id: Optional[str] = None, job_id: Optional[str] = None, created_after: Optional[str] = None, created_before: Optional[str] = None, limit: Optional[int] = None, format: Optional[Literal["json", "csv"]] = None, request_id: Optional[str] = None) -> Iterator[VerifyAuditRow]:
         """Every item of list_verify, page after page (follows next_cursor)."""
         return self._core.paginate(f"/v1/verify/audit", {"operation": operation, "result": result, "identifier": identifier, "reference_id": reference_id, "job_id": job_id, "created_after": created_after, "created_before": created_before, "limit": limit, "format": format}, request_id=request_id)
 
@@ -5037,9 +5594,9 @@ class SettingsResource:
         """Delete every file, job, webhook and template of this environment and revoke its keys."""
         return self._core.call("DELETE", f"/v1/settings/data", query={"confirm": confirm}, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
-    def update(self, *, alert_emails: Optional[list[str]] = None, allowed_origins: Optional[list[str]] = None, clear_monthly_credit_cap: Optional[bool] = None, default_webhook_ids: Optional[list[str]] = None, docai_labels: Optional[list[str]] = None, monthly_credit_cap: Optional[str] = None, retention_input_hours: Optional[int] = None, retention_output_hours: Optional[int] = None, verify_audit_retention_days: Optional[int] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Settings:
+    def update(self, *, alert_emails: Optional[list[str]] = None, allowed_origins: Optional[list[str]] = None, clear_monthly_credit_cap: Optional[bool] = None, default_webhook_ids: Optional[list[str]] = None, docai_labels: Optional[list[str]] = None, face_match_threshold: Optional[float] = None, monthly_credit_cap: Optional[str] = None, retention_input_hours: Optional[int] = None, retention_output_hours: Optional[int] = None, verify_audit_retention_days: Optional[int] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Settings:
         """Change retention, spend cap, origins, default webhooks, alert emails, docai labels."""
-        return self._core.call("PATCH", f"/v1/settings", query=None, json=_drop_none({"alert_emails": alert_emails, "allowed_origins": allowed_origins, "clear_monthly_credit_cap": clear_monthly_credit_cap, "default_webhook_ids": default_webhook_ids, "docai_labels": docai_labels, "monthly_credit_cap": monthly_credit_cap, "retention_input_hours": retention_input_hours, "retention_output_hours": retention_output_hours, "verify_audit_retention_days": verify_audit_retention_days}), idempotency_key=idempotency_key, request_id=request_id)
+        return self._core.call("PATCH", f"/v1/settings", query=None, json=_drop_none({"alert_emails": alert_emails, "allowed_origins": allowed_origins, "clear_monthly_credit_cap": clear_monthly_credit_cap, "default_webhook_ids": default_webhook_ids, "docai_labels": docai_labels, "face_match_threshold": face_match_threshold, "monthly_credit_cap": monthly_credit_cap, "retention_input_hours": retention_input_hours, "retention_output_hours": retention_output_hours, "verify_audit_retention_days": verify_audit_retention_days}), idempotency_key=idempotency_key, request_id=request_id)
 
 
 class TemplatesResource:

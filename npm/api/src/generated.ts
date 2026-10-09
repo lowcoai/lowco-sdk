@@ -169,10 +169,10 @@ export interface AuditListVerifyData {
 }
 
 export interface AuditListVerifyQuery {
-  /** Only this operation (a verify lookup, or a document type read by docai/kyc) */
-  operation?: "aadhaar-offline" | "bank-account" | "cin" | "docai/kyc/aadhaar" | "docai/kyc/driving_licence" | "docai/kyc/pan_card" | "docai/kyc/passport" | "docai/kyc/voter_id" | "driving-licence" | "email" | "fssai" | "gstin" | "iec" | "ifsc" | "mobile" | "pan" | "pan-aadhaar-link" | "passport" | "udyam" | "upi" | "vehicle-rc" | "voter-id";
+  /** Only this operation (a verify lookup, a fraud check or verify/kyc, or a document type read by docai/kyc) */
+  operation?: "aadhaar-offline" | "bank-account" | "cin" | "docai/kyc/aadhaar" | "docai/kyc/driving_licence" | "docai/kyc/pan_card" | "docai/kyc/passport" | "docai/kyc/voter_id" | "document-tamper" | "driving-licence" | "duplicate-document" | "email" | "face-match" | "fssai" | "gstin" | "iec" | "ifsc" | "kyc" | "liveness" | "mobile" | "pan" | "pan-aadhaar-link" | "passport" | "udyam" | "upi" | "vehicle-rc" | "voter-id";
   result?: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
-  /** Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged */
+  /** Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged. Not for aadhaar-offline, docai/kyc/aadhaar or the fraud checks (their fingerprint is the file's): find those by reference_id */
   identifier?: string;
   reference_id?: string;
   /** A batch's rows */
@@ -1104,6 +1104,97 @@ export interface KYCResult {
   validation: ValidationIssue[];
   voter_id?: KYCVoterID;
   warnings?: string[];
+}
+
+/** verify/kyc: the document read, its online check and the face match in one answer */
+export interface KYCVerifyResult {
+  /** docai/kyc's reading */
+  document: KYCVerifyResultDocument;
+  /** The selfie against the document; null without a selfie */
+  face_match: KYCVerifyResultFaceMatch | null;
+  /** verified: every check passed; review: something could not be checked; rejected: a check failed */
+  kyc_result: "verified" | "review" | "rejected";
+  /** The lookup that matches the document (verify/pan, driving-licence, voter-id or passport); null when none ran */
+  online_check: KYCVerifyResultOnlineCheck | null;
+  /** Rejections first, then what needs review */
+  reasons: KYCVerifyResultReason[];
+  reference_id: string;
+  request_id: string;
+}
+
+/** docai/kyc's reading */
+export interface KYCVerifyResultDocument {
+  document_confidence: number;
+  document_type: "pan_card" | "aadhaar" | "driving_licence" | "passport" | "voter_id";
+  /** The document type's fields, each a Field (as docai/kyc answers them); a value only the back carries has source.side back */
+  fields: Record<string, unknown>;
+  /** Pages read, the back's included */
+  page_count: number;
+  /** Issues on the back carry side: back */
+  validation: ValidationIssue[];
+}
+
+/** The selfie against the document; null without a selfie */
+export interface KYCVerifyResultFaceMatch {
+  checked_at: string;
+  /** The check's details */
+  details: Record<string, unknown>;
+  /** With name in the request and a name at the source */
+  name_match: KYCVerifyResultFaceMatchNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** With name in the request and a name at the source */
+export interface KYCVerifyResultFaceMatchNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The lookup that matches the document (verify/pan, driving-licence, voter-id or passport); null when none ran */
+export interface KYCVerifyResultOnlineCheck {
+  checked_at: string;
+  /** The check's details */
+  details: Record<string, unknown>;
+  /** With name in the request and a name at the source */
+  name_match: KYCVerifyResultOnlineCheckNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: found and current; invalid: refused by the source or a bad signature; not_found; inactive: cancelled, expired, closed; mismatch: found under another name or another detail; unavailable: the source did not answer (free) */
+  result: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
+  /** The register consulted (GSTN, NSDL, MCA, NPCI, VAHAN, ...) */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** With name in the request and a name at the source */
+export interface KYCVerifyResultOnlineCheckNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** Why it is not simply verified */
+export interface KYCVerifyResultReason {
+  /** online_not_found, face_mismatch, pan_invalid, expired, no_online_check, ... */
+  code: string;
+  message: string;
 }
 
 export interface KYCVoterID {
@@ -2530,6 +2621,8 @@ export interface Settings {
   /** The org's docai/classify taxonomy; empty means the standard labels */
   docai_labels: string[] | null;
   environment: "live" | "test";
+  /** verify/face-match's and verify/kyc's default threshold (0.8) */
+  face_match_threshold: number;
   /** From the plan; read-only */
   max_jobs_in_flight: number;
   /** Decimal string; null is no cap */
@@ -2549,6 +2642,8 @@ export interface SettingsPatch {
   default_webhook_ids?: string[];
   /** docai/classify labels used when a call sends none; [] restores the standard labels */
   docai_labels?: string[];
+  /** The similarity a face match needs when a call names no threshold */
+  face_match_threshold?: number;
   /** Decimal string. In live it may not exceed the plan's ceiling (each priced meter's hard cap times its price; 422 on monthly_credit_cap) */
   monthly_credit_cap?: string;
   retention_input_hours?: number;
@@ -2599,6 +2694,17 @@ export interface TablesResultTable {
   headers: string[];
   page: number;
   rows: string[][];
+}
+
+/** A sign of tampering, with where it was seen */
+export interface TamperIndicator {
+  bbox?: BBox;
+  confidence: number;
+  /** What was seen */
+  detail: string;
+  page?: number;
+  /** copy_move: a region repeats elsewhere; font_inconsistency: a figure in another font; metadata_edits: saved by an editor or after it was made; resaved_image: a photo recompressed */
+  type: "copy_move" | "font_inconsistency" | "metadata_edits" | "resaved_image";
 }
 
 export interface TemplateVersion {
@@ -3108,6 +3214,83 @@ export interface VerifyCinResultNameMatch {
   source: string;
 }
 
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface VerifyDocumentTamperParams {
+  /** The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers) */
+  file: FileInput;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface VerifyDocumentTamperRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Base64, URL-safe base64 or a data: URL */
+  file_base64?: string;
+  /** A stored file of this org and environment (POST /v1/files) */
+  file_id?: string;
+  /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
+  file_url?: string;
+  /** Name for the stored input */
+  filename?: string;
+  /** Opens a protected PDF; never stored or logged */
+  password?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The common verify response */
+export interface VerifyDocumentTamperResult {
+  checked_at: string;
+  /** The analysis (local in both environments) */
+  details: VerifyDocumentTamperResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyDocumentTamperResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free) */
+  result: "valid" | "invalid" | "mismatch" | "unavailable";
+  /** Who answered: the provider, the Lowco sandbox, or Lowco's own analysis */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** The analysis (local in both environments) */
+export interface VerifyDocumentTamperResultDetails {
+  format?: "pdf" | "jpeg" | "image";
+  /** Most confident first; empty when nothing was found */
+  indicators: TamperIndicator[];
+  /** Pages read */
+  pages?: number;
+  /** 1 minus the product of the indicators' complements */
+  tamper_score: number;
+  /** tamper_score is 0.5 or more */
+  tampered: boolean;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyDocumentTamperResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
 /** The operation's options. */
 export interface VerifyDrivingLicenceParams {
   /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
@@ -3182,6 +3365,99 @@ export interface VerifyDrivingLicenceResultNameMatch {
   source: string;
 }
 
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface VerifyDuplicateDocumentParams {
+  /** The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers) */
+  file: FileInput;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+  /** Where to look: org (the default and only scope) */
+  scope?: "org";
+}
+
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface VerifyDuplicateDocumentRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Base64, URL-safe base64 or a data: URL */
+  file_base64?: string;
+  /** A stored file of this org and environment (POST /v1/files) */
+  file_id?: string;
+  /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
+  file_url?: string;
+  /** Name for the stored input */
+  filename?: string;
+  /** Opens a protected PDF; never stored or logged */
+  password?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+  /** Where to look: org (the default and only scope) */
+  scope?: "org";
+}
+
+/** The common verify response */
+export interface VerifyDuplicateDocumentResult {
+  checked_at: string;
+  /** The org's earlier documents like this one */
+  details: VerifyDuplicateDocumentResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyDuplicateDocumentResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free) */
+  result: "valid" | "invalid" | "mismatch" | "unavailable";
+  /** Who answered: the provider, the Lowco sandbox, or Lowco's own analysis */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** The org's earlier documents like this one */
+export interface VerifyDuplicateDocumentResultDetails {
+  /** This document's index entry, kept 365 days */
+  document_id: string;
+  /** At least one match */
+  duplicate: boolean;
+  /** image: the dHash of the image or a scan's page; text: the SimHash of a PDF's text layer */
+  hash_kind: "image" | "text";
+  /** Most similar first, at most 10 */
+  matches: VerifyDuplicateDocumentResultDetailsMatche[];
+}
+
+/** An earlier document */
+export interface VerifyDuplicateDocumentResultDetailsMatche {
+  first_seen_at: string;
+  /** The index entry (ddh_…) */
+  id: string;
+  /** The reference_id it was checked with */
+  reference_id: string;
+  /** Byte for byte the same file */
+  same_file: boolean;
+  /** How alike (0.9 or more) */
+  similarity: number;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyDuplicateDocumentResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
 /** The operation's options. */
 export interface VerifyEmailParams {
   /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
@@ -3245,6 +3521,80 @@ export interface VerifyEmailResultDetails {
 
 /** With name in the request and a name at the source */
 export interface VerifyEmailResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** The operation's options. */
+export interface VerifyFaceMatchParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** An extra file input (face) */
+  face?: FileInput;
+  /** An extra file input (reference) */
+  reference?: FileInput;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+  /** Similarity a match needs, 0.5 to 0.99 (default the org's face_match_threshold, 0.8) */
+  threshold?: number;
+}
+
+/** The operation's options. */
+export interface VerifyFaceMatchRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** An extra file input (face); in multipart, a part named face */
+  face?: FileRef;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** An extra file input (reference); in multipart, a part named reference */
+  reference?: FileRef;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+  /** Similarity a match needs, 0.5 to 0.99 (default the org's face_match_threshold, 0.8) */
+  threshold?: number;
+}
+
+/** The common verify response */
+export interface VerifyFaceMatchResult {
+  checked_at: string;
+  /** The match; empty when unavailable */
+  details: VerifyFaceMatchResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyFaceMatchResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free) */
+  result: "valid" | "invalid" | "mismatch" | "unavailable";
+  /** Who answered: the provider, the Lowco sandbox, or Lowco's own analysis */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** The match; empty when unavailable */
+export interface VerifyFaceMatchResultDetails {
+  /** similarity reached the threshold */
+  match?: boolean;
+  /** How alike the two faces are (the sandbox: how alike the two images are) */
+  similarity?: number;
+  /** The threshold applied: the call's, else the org's face_match_threshold */
+  threshold?: number;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyFaceMatchResultNameMatch {
   /** The name you sent */
   input: string;
   /** 1 is the same name; under 0.8 a valid record is mismatch */
@@ -3553,6 +3903,144 @@ export interface VerifyIfscResultDetailsChannels {
 
 /** With name in the request and a name at the source */
 export interface VerifyIfscResultNameMatch {
+  /** The name you sent */
+  input: string;
+  /** 1 is the same name; under 0.8 a valid record is mismatch */
+  score: number;
+  /** The name at the source (a vehicle owner's masked without consent_owner) */
+  source: string;
+}
+
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface VerifyKycParams {
+  /** The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers) */
+  file: FileInput;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** An extra file input (back) */
+  back?: FileInput;
+  /** An extra file input (selfie) */
+  selfie?: FileInput;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** pan_card, aadhaar, driving_licence, passport or voter_id (detected otherwise) */
+  document_type?: "pan_card" | "aadhaar" | "driving_licence" | "passport" | "voter_id";
+  /** Look the document up at its source (default true) */
+  online_check?: boolean;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+  /** Face match threshold, 0.5 to 0.99 (default the org's face_match_threshold, 0.8) */
+  threshold?: number;
+}
+
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface VerifyKycRequest {
+  /** An extra file input (back); in multipart, a part named back */
+  back?: FileRef;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** pan_card, aadhaar, driving_licence, passport or voter_id (detected otherwise) */
+  document_type?: "pan_card" | "aadhaar" | "driving_licence" | "passport" | "voter_id";
+  /** Base64, URL-safe base64 or a data: URL */
+  file_base64?: string;
+  /** A stored file of this org and environment (POST /v1/files) */
+  file_id?: string;
+  /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
+  file_url?: string;
+  /** Name for the stored input */
+  filename?: string;
+  /** Look the document up at its source (default true) */
+  online_check?: boolean;
+  /** Opens a protected PDF; never stored or logged */
+  password?: string;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+  /** An extra file input (selfie); in multipart, a part named selfie */
+  selfie?: FileRef;
+  /** Face match threshold, 0.5 to 0.99 (default the org's face_match_threshold, 0.8) */
+  threshold?: number;
+}
+
+export type VerifyKycResult = KYCVerifyResult;
+
+/** The operation's options. */
+export interface VerifyLivenessParams {
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** An extra file input (video) */
+  video?: FileInput;
+  /** An extra file input (frame_1) */
+  frame_1?: FileInput;
+  /** An extra file input (frame_2) */
+  frame_2?: FileInput;
+  /** An extra file input (frame_3) */
+  frame_3?: FileInput;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+}
+
+/** The operation's options. */
+export interface VerifyLivenessRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person or business this lookup is about agreed to it. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** An extra file input (frame_1); in multipart, a part named frame_1 */
+  frame_1?: FileRef;
+  /** An extra file input (frame_2); in multipart, a part named frame_2 */
+  frame_2?: FileRef;
+  /** An extra file input (frame_3); in multipart, a part named frame_3 */
+  frame_3?: FileRef;
+  /** Why you are looking this up (kept in the audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the lookup, returned and kept in the audit log */
+  reference_id?: string;
+  /** An extra file input (video); in multipart, a part named video */
+  video?: FileRef;
+}
+
+/** The common verify response */
+export interface VerifyLivenessResult {
+  checked_at: string;
+  /** The verdict; empty when unavailable */
+  details: VerifyLivenessResultDetails;
+  /** With name in the request and a name at the source */
+  name_match: VerifyLivenessResultNameMatch | null;
+  /** Your reference_id */
+  reference_id: string;
+  request_id: string;
+  /** valid: matched, live, untampered or unique; mismatch: no match, a spoof, tampered or a duplicate; invalid: unreadable; unavailable: the provider did not answer (free) */
+  result: "valid" | "invalid" | "mismatch" | "unavailable";
+  /** Who answered: the provider, the Lowco sandbox, or Lowco's own analysis */
+  source: string;
+  /** true only for result valid */
+  verified: boolean;
+}
+
+/** The verdict; empty when unavailable */
+export interface VerifyLivenessResultDetails {
+  /** Frames compared (0 for a video in the sandbox) */
+  frames_checked?: number;
+  /** A live person */
+  live?: boolean;
+  /** How sure */
+  score?: number;
+  /** Why it is not live (the sandbox reports the first three) */
+  spoof_indicators?: Array<"static_frames" | "scene_change" | "too_few_frames" | "screen_replay" | "mask" | "deepfake">;
+}
+
+/** With name in the request and a name at the source */
+export interface VerifyLivenessResultNameMatch {
   /** The name you sent */
   input: string;
   /** 1 is the same name; under 0.8 a valid record is mismatch */
@@ -4477,14 +4965,29 @@ export class VerifyOperations {
     return this.core.operation<VerifyCinResult>("/v1/verify/cin", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
   }
 
+  /** Signs a document image or PDF was altered: tamper score and indicators with where they are. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_tamper; scope api.verify.document_tamper.execute. */
+  documentTamper(params: VerifyDocumentTamperParams, options?: CallOptions): Promise<Answer<VerifyDocumentTamperResult>> {
+    return this.core.operation<VerifyDocumentTamperResult>("/v1/verify/document-tamper", params as unknown as Record<string, unknown>, { input: "file", extra: [] }, options);
+  }
+
   /** A driving licence: holder, validity, classes, issuing RTO. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_dl; scope api.verify.driving_licence.execute. */
   drivingLicence(params: VerifyDrivingLicenceParams, options?: CallOptions): Promise<Answer<VerifyDrivingLicenceResult>> {
     return this.core.operation<VerifyDrivingLicenceResult>("/v1/verify/driving-licence", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
   }
 
+  /** Find the same document among your org's documents of the last 365 days. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_duplicate; scope api.verify.duplicate_document.execute. */
+  duplicateDocument(params: VerifyDuplicateDocumentParams, options?: CallOptions): Promise<Answer<VerifyDuplicateDocumentResult>> {
+    return this.core.operation<VerifyDuplicateDocumentResult>("/v1/verify/duplicate-document", params as unknown as Record<string, unknown>, { input: "file", extra: [] }, options);
+  }
+
   /** An email address: syntax, MX, disposable, role address, deliverable, suggestion. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_email; scope api.verify.email.execute. */
   email(params: VerifyEmailParams, options?: CallOptions): Promise<Answer<VerifyEmailResult>> {
     return this.core.operation<VerifyEmailResult>("/v1/verify/email", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** Compare two face images: similarity and match at your threshold. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_face_match; scope api.verify.face_match.execute. */
+  faceMatch(params: VerifyFaceMatchParams, options?: CallOptions): Promise<Answer<VerifyFaceMatchResult>> {
+    return this.core.operation<VerifyFaceMatchResult>("/v1/verify/face-match", params as unknown as Record<string, unknown>, { input: "none", extra: ["face", "reference"] }, options);
   }
 
   /** An FSSAI licence: business, type, status, validity, premises. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_fssai; scope api.verify.fssai.execute. */
@@ -4505,6 +5008,16 @@ export class VerifyOperations {
   /** An IFSC: bank, branch, address and supported channels (free). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_ifsc; scope api.verify.ifsc.execute. */
   ifsc(params: VerifyIfscParams, options?: CallOptions): Promise<Answer<VerifyIfscResult>> {
     return this.core.operation<VerifyIfscResult>("/v1/verify/ifsc", params as unknown as Record<string, unknown>, { input: "none", extra: [] }, options);
+  }
+
+  /** One-call KYC: the ID document read, its online check, and a face match with a selfie. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.verify.kyc.execute. */
+  kyc(params: VerifyKycParams, options?: CallOptions): Promise<Answer<VerifyKycResult>> {
+    return this.core.operation<VerifyKycResult>("/v1/verify/kyc", params as unknown as Record<string, unknown>, { input: "file", extra: ["back", "selfie"] }, options);
+  }
+
+  /** Check a short video or 3 frames are of a live person: live, score, spoof indicators. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_liveness; scope api.verify.liveness.execute. */
+  liveness(params: VerifyLivenessParams, options?: CallOptions): Promise<Answer<VerifyLivenessResult>> {
+    return this.core.operation<VerifyLivenessResult>("/v1/verify/liveness", params as unknown as Record<string, unknown>, { input: "none", extra: ["video", "frame_1", "frame_2", "frame_3"] }, options);
   }
 
   /** A mobile number: validity, operator, circle, type, ported, DND. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_verify_mobile; scope api.verify.mobile.execute. */
