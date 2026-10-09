@@ -2229,6 +2229,34 @@ export interface WebhookDelivery {
   webhook_id?: string;
 }
 
+/** A delivery with the request it sent */
+export interface WebhookDeliveryDetail {
+  attempt: number;
+  created_at: string;
+  delivered_at: string | null;
+  delivery_id: string;
+  event_id: string;
+  event_type: string;
+  last_error?: string;
+  next_attempt_at: string | null;
+  /** What the delivery sends */
+  request: WebhookDeliveryDetailRequest;
+  response_code: number | null;
+  response_ms: number | null;
+  /** dead_lettered after the last attempt */
+  status: "pending" | "delivering" | "delivered" | "failed" | "dead_lettered";
+  webhook_id?: string;
+}
+
+/** What the delivery sends */
+export interface WebhookDeliveryDetailRequest {
+  /** {id, type, created_at, environment, data} */
+  body: Record<string, unknown>;
+  /** Content-Type, User-Agent, Lowco-Event-Id, Lowco-Event-Type, Lowco-Signature (t=…,v1=[redacted]) */
+  headers: Record<string, string>;
+  url: string;
+}
+
 export interface WebhookEndpoint {
   created_at: string;
   description: string;
@@ -2273,6 +2301,8 @@ export interface WebhooksListDeliveriesData {
 export interface WebhooksListDeliveriesQuery {
   /** failed includes dead_lettered */
   status?: "pending" | "delivering" | "delivered" | "failed" | "dead_lettered";
+  /** An event type, * or <prefix>.* (job.*) */
+  event_type?: string;
   /** Page size */
   limit?: number;
   /** next_cursor of the previous page. */
@@ -2661,6 +2691,11 @@ export class WebhooksResource {
   /** Read an endpoint (never the secret). */
   get(id: string, options?: RequestOptions): Promise<WebhookEndpoint> {
     return this.core.call<WebhookEndpoint>("GET", `/v1/webhooks/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
+  }
+
+  /** A delivery with the request it sent (headers, signature redacted, payload). */
+  getDelivery(id: string, deliveryId: string, options?: RequestOptions): Promise<WebhookDeliveryDetail> {
+    return this.core.call<WebhookDeliveryDetail>("GET", `/v1/webhooks/${encodeURIComponent(id)}/deliveries/${encodeURIComponent(deliveryId)}`, { query: undefined, json: undefined }, options);
   }
 
   /** List endpoints. */

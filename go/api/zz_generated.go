@@ -2425,6 +2425,34 @@ type WebhookDelivery struct {
 	WebhookID *string `json:"webhook_id,omitempty"`
 }
 
+// A delivery with the request it sent
+type WebhookDeliveryDetail struct {
+	Attempt       int     `json:"attempt"`
+	CreatedAt     string  `json:"created_at"`
+	DeliveredAt   *string `json:"delivered_at"`
+	DeliveryID    string  `json:"delivery_id"`
+	EventID       string  `json:"event_id"`
+	EventType     string  `json:"event_type"`
+	LastError     *string `json:"last_error,omitempty"`
+	NextAttemptAt *string `json:"next_attempt_at"`
+	// What the delivery sends
+	Request      WebhookDeliveryDetailRequest `json:"request"`
+	ResponseCode *int                         `json:"response_code"`
+	ResponseMs   *int                         `json:"response_ms"`
+	// dead_lettered after the last attempt One of: pending, delivering, delivered, failed, dead_lettered.
+	Status    string  `json:"status"`
+	WebhookID *string `json:"webhook_id,omitempty"`
+}
+
+// What the delivery sends
+type WebhookDeliveryDetailRequest struct {
+	// {id, type, created_at, environment, data}
+	Body map[string]any `json:"body"`
+	// Content-Type, User-Agent, Lowco-Event-Id, Lowco-Event-Type, Lowco-Signature (t=…,v1=[redacted])
+	Headers map[string]string `json:"headers"`
+	URL     string            `json:"url"`
+}
+
 // WebhookEndpoint is a Lowco API object.
 type WebhookEndpoint struct {
 	CreatedAt   string `json:"created_at"`
@@ -2474,6 +2502,8 @@ type WebhooksListDeliveriesData struct {
 type WebhooksListDeliveriesQuery struct {
 	// failed includes dead_lettered One of: pending, delivering, delivered, failed, dead_lettered.
 	Status *string `json:"status,omitempty"`
+	// An event type, * or <prefix>.* (job.*)
+	EventType *string `json:"event_type,omitempty"`
 	// Page size
 	Limit *int `json:"limit,omitempty"`
 	// next_cursor of the previous page.
@@ -3049,6 +3079,15 @@ func (r *WebhooksResource) Delete(ctx context.Context, id string, opts ...Reques
 func (r *WebhooksResource) Get(ctx context.Context, id string, opts ...RequestOption) (*WebhookEndpoint, error) {
 	var out WebhookEndpoint
 	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/webhooks/%s", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetDelivery: A delivery with the request it sent (headers, signature redacted, payload).
+func (r *WebhooksResource) GetDelivery(ctx context.Context, id string, deliveryId string, opts ...RequestOption) (*WebhookDeliveryDetail, error) {
+	var out WebhookDeliveryDetail
+	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/webhooks/%s/deliveries/%s", url.PathEscape(id), url.PathEscape(deliveryId)), toQuery(nil), nil, &out, opts); err != nil {
 		return nil, err
 	}
 	return &out, nil

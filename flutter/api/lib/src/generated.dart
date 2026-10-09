@@ -7557,6 +7557,116 @@ class WebhookDelivery {
       };
 }
 
+/// A delivery with the request it sent
+class WebhookDeliveryDetail {
+  const WebhookDeliveryDetail({
+    this.attempt,
+    this.createdAt,
+    this.deliveredAt,
+    this.deliveryId,
+    this.eventId,
+    this.eventType,
+    this.lastError,
+    this.nextAttemptAt,
+    this.request,
+    this.responseCode,
+    this.responseMs,
+    this.status,
+    this.webhookId,
+  });
+
+  factory WebhookDeliveryDetail.fromJson(Map<String, dynamic> json) => WebhookDeliveryDetail(
+        attempt: (json['attempt'] as num?)?.toInt(),
+        createdAt: json['created_at'] as String?,
+        deliveredAt: json['delivered_at'] as String?,
+        deliveryId: json['delivery_id'] as String?,
+        eventId: json['event_id'] as String?,
+        eventType: json['event_type'] as String?,
+        lastError: json['last_error'] as String?,
+        nextAttemptAt: json['next_attempt_at'] as String?,
+        request: json['request'] == null ? null : WebhookDeliveryDetailRequest.fromJson(json['request'] as Map<String, dynamic>),
+        responseCode: (json['response_code'] as num?)?.toInt(),
+        responseMs: (json['response_ms'] as num?)?.toInt(),
+        status: json['status'] as String?,
+        webhookId: json['webhook_id'] as String?,
+      );
+
+  final int? attempt;
+
+  final String? createdAt;
+
+  final String? deliveredAt;
+
+  final String? deliveryId;
+
+  final String? eventId;
+
+  final String? eventType;
+
+  final String? lastError;
+
+  final String? nextAttemptAt;
+
+  /// What the delivery sends
+  final WebhookDeliveryDetailRequest? request;
+
+  final int? responseCode;
+
+  final int? responseMs;
+
+  /// dead_lettered after the last attempt
+  final String? status;
+
+  final String? webhookId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (attempt != null) 'attempt': attempt!,
+        if (createdAt != null) 'created_at': createdAt!,
+        if (deliveredAt != null) 'delivered_at': deliveredAt!,
+        if (deliveryId != null) 'delivery_id': deliveryId!,
+        if (eventId != null) 'event_id': eventId!,
+        if (eventType != null) 'event_type': eventType!,
+        if (lastError != null) 'last_error': lastError!,
+        if (nextAttemptAt != null) 'next_attempt_at': nextAttemptAt!,
+        if (request != null) 'request': request!.toJson(),
+        if (responseCode != null) 'response_code': responseCode!,
+        if (responseMs != null) 'response_ms': responseMs!,
+        if (status != null) 'status': status!,
+        if (webhookId != null) 'webhook_id': webhookId!,
+      };
+}
+
+/// What the delivery sends
+class WebhookDeliveryDetailRequest {
+  const WebhookDeliveryDetailRequest({
+    this.body,
+    this.headers,
+    this.url,
+  });
+
+  factory WebhookDeliveryDetailRequest.fromJson(Map<String, dynamic> json) => WebhookDeliveryDetailRequest(
+        body: (json['body'] as Map?)?.map((k, e) => MapEntry(k as String, (e)!)).cast<String, Object>(),
+        headers: (json['headers'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        url: json['url'] as String?,
+      );
+
+  /// {id, type, created_at, environment, data}
+  final Map<String, Object>? body;
+
+  /// Content-Type, User-Agent, Lowco-Event-Id, Lowco-Event-Type, Lowco-Signature (t=…,v1=\[redacted])
+  final Map<String, String>? headers;
+
+  final String? url;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (body != null) 'body': body!,
+        if (headers != null) 'headers': headers!,
+        if (url != null) 'url': url!,
+      };
+}
+
 class WebhookEndpoint {
   const WebhookEndpoint({
     this.createdAt,
@@ -7730,18 +7840,23 @@ class WebhooksListDeliveriesData {
 class WebhooksListDeliveriesQuery {
   const WebhooksListDeliveriesQuery({
     this.status,
+    this.eventType,
     this.limit,
     this.cursor,
   });
 
   factory WebhooksListDeliveriesQuery.fromJson(Map<String, dynamic> json) => WebhooksListDeliveriesQuery(
         status: json['status'] as String?,
+        eventType: json['event_type'] as String?,
         limit: (json['limit'] as num?)?.toInt(),
         cursor: json['cursor'] as String?,
       );
 
   /// failed includes dead_lettered
   final String? status;
+
+  /// An event type, * or <prefix>.* (job.*)
+  final String? eventType;
 
   /// Page size
   final int? limit;
@@ -7752,6 +7867,7 @@ class WebhooksListDeliveriesQuery {
   /// The wire form; null fields are left out (file inputs are sent separately).
   Map<String, dynamic> toJson() => {
         if (status != null) 'status': status!,
+        if (eventType != null) 'event_type': eventType!,
         if (limit != null) 'limit': limit!,
         if (cursor != null) 'cursor': cursor!,
       };
@@ -8054,6 +8170,9 @@ class WebhooksResource {
 
   /// Read an endpoint (never the secret).
   Future<WebhookEndpoint> get(String id, [RequestOptions? options]) => _core.call('GET', '/v1/webhooks/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => WebhookEndpoint.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// A delivery with the request it sent (headers, signature redacted, payload).
+  Future<WebhookDeliveryDetail> getDelivery(String id, String deliveryId, [RequestOptions? options]) => _core.call('GET', '/v1/webhooks/${Uri.encodeComponent(id)}/deliveries/${Uri.encodeComponent(deliveryId)}', query: null, body: null, decode: (j) => WebhookDeliveryDetail.fromJson(j as Map<String, dynamic>), options: options);
 
   /// List endpoints.
   Future<WebhooksListData> list(WebhooksListQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/webhooks', query: query?.toJson(), body: null, decode: (j) => WebhooksListData.fromJson(j as Map<String, dynamic>), options: options);

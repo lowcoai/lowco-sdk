@@ -102,7 +102,7 @@ var resourceNames = map[string][2]string{
 	"jobs_list":     {"jobs", "list"}, "jobs_get": {"jobs", "get"}, "jobs_cancel": {"jobs", "cancel"},
 	"webhooks_create": {"webhooks", "create"}, "webhooks_list": {"webhooks", "list"}, "webhooks_get": {"webhooks", "get"},
 	"webhooks_update": {"webhooks", "update"}, "webhooks_delete": {"webhooks", "delete"}, "webhooks_ping": {"webhooks", "ping"},
-	"webhooks_deliveries": {"webhooks", "listDeliveries"}, "webhooks_retry": {"webhooks", "retryDelivery"},
+	"webhooks_deliveries": {"webhooks", "listDeliveries"}, "webhooks_retry": {"webhooks", "retryDelivery"}, "webhooks_delivery": {"webhooks", "getDelivery"},
 	"webhooks_callback_secret": {"webhooks", "rollCallbackSecret"},
 	"render_templates_create":  {"templates", "create"}, "render_templates_list": {"templates", "list"},
 	"render_templates_get": {"templates", "get"}, "render_templates_update": {"templates", "update"},

@@ -2027,6 +2027,32 @@ class WebhookDelivery(TypedDict):
     """dead_lettered after the last attempt"""
     webhook_id: NotRequired[str]
 
+class WebhookDeliveryDetail(TypedDict):
+    """A delivery with the request it sent"""
+    attempt: int
+    created_at: str
+    delivered_at: Optional[str]
+    delivery_id: str
+    event_id: str
+    event_type: str
+    last_error: NotRequired[str]
+    next_attempt_at: Optional[str]
+    request: WebhookDeliveryDetailRequest
+    """What the delivery sends"""
+    response_code: Optional[int]
+    response_ms: Optional[int]
+    status: Literal["pending", "delivering", "delivered", "failed", "dead_lettered"]
+    """dead_lettered after the last attempt"""
+    webhook_id: NotRequired[str]
+
+class WebhookDeliveryDetailRequest(TypedDict):
+    """What the delivery sends"""
+    body: dict[str, Any]
+    """{id, type, created_at, environment, data}"""
+    headers: dict[str, str]
+    """Content-Type, User-Agent, Lowco-Event-Id, Lowco-Event-Type, Lowco-Signature (t=…,v1=[redacted])"""
+    url: str
+
 class WebhookEndpoint(TypedDict):
     created_at: str
     description: str
@@ -2066,6 +2092,8 @@ class WebhooksListDeliveriesData(TypedDict):
 class WebhooksListDeliveriesQuery(TypedDict):
     status: NotRequired[Literal["pending", "delivering", "delivered", "failed", "dead_lettered"]]
     """failed includes dead_lettered"""
+    event_type: NotRequired[str]
+    """An event type, * or <prefix>.* (job.*)"""
     limit: NotRequired[int]
     """Page size"""
     cursor: NotRequired[str]
@@ -2845,6 +2873,10 @@ class WebhooksResource:
         """Read an endpoint (never the secret)."""
         return self._core.call("GET", f"/v1/webhooks/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
+    def get_delivery(self, id: str, delivery_id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> WebhookDeliveryDetail:
+        """A delivery with the request it sent (headers, signature redacted, payload)."""
+        return self._core.call("GET", f"/v1/webhooks/{_seg(id)}/deliveries/{_seg(delivery_id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
     def list(self, *, cursor: Optional[str] = None, limit: Optional[int] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> WebhooksListData:
         """List endpoints."""
         return self._core.call("GET", f"/v1/webhooks", query={"limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
@@ -2853,13 +2885,13 @@ class WebhooksResource:
         """Every item of list, page after page (follows next_cursor)."""
         return self._core.paginate(f"/v1/webhooks", {"limit": limit}, request_id=request_id)
 
-    def list_deliveries(self, id: str, *, cursor: Optional[str] = None, limit: Optional[int] = None, status: Optional[Literal["pending", "delivering", "delivered", "failed", "dead_lettered"]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> WebhooksListDeliveriesData:
+    def list_deliveries(self, id: str, *, cursor: Optional[str] = None, event_type: Optional[str] = None, limit: Optional[int] = None, status: Optional[Literal["pending", "delivering", "delivered", "failed", "dead_lettered"]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> WebhooksListDeliveriesData:
         """List deliveries, newest first (status=failed includes dead-lettered)."""
-        return self._core.call("GET", f"/v1/webhooks/{_seg(id)}/deliveries", query={"status": status, "limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+        return self._core.call("GET", f"/v1/webhooks/{_seg(id)}/deliveries", query={"status": status, "event_type": event_type, "limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
-    def list_deliveries_all(self, id: str, *, status: Optional[Literal["pending", "delivering", "delivered", "failed", "dead_lettered"]] = None, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[WebhookDelivery]:
+    def list_deliveries_all(self, id: str, *, status: Optional[Literal["pending", "delivering", "delivered", "failed", "dead_lettered"]] = None, event_type: Optional[str] = None, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[WebhookDelivery]:
         """Every item of list_deliveries, page after page (follows next_cursor)."""
-        return self._core.paginate(f"/v1/webhooks/{_seg(id)}/deliveries", {"status": status, "limit": limit}, request_id=request_id)
+        return self._core.paginate(f"/v1/webhooks/{_seg(id)}/deliveries", {"status": status, "event_type": event_type, "limit": limit}, request_id=request_id)
 
     def ping(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> WebhookPing:
         """Send a ping event."""
