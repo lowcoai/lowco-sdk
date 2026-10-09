@@ -2031,6 +2031,49 @@
         ],
         "type": "object"
       },
+      "FailedDelivery": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "type": "integer"
+          },
+          "delivery_id": {
+            "type": "string"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "response_status": {
+            "description": "The endpoint's last HTTP status",
+            "nullable": true,
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "failed",
+              "dead_lettered"
+            ],
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "webhook_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "attempts",
+          "delivery_id",
+          "event_type",
+          "response_status",
+          "status",
+          "updated_at",
+          "webhook_id"
+        ],
+        "type": "object"
+      },
       "Field": {
         "additionalProperties": false,
         "description": "An extracted value with its provenance; raw values are never returned without one.",
@@ -3209,6 +3252,40 @@
       "OcrTextResult": {
         "$ref": "#/components/schemas/OCRResult"
       },
+      "Onboarding": {
+        "additionalProperties": false,
+        "description": "The first-call funnel, from real data",
+        "properties": {
+          "complete": {
+            "description": "All four",
+            "type": "boolean"
+          },
+          "live_call": {
+            "description": "A live call succeeded",
+            "type": "boolean"
+          },
+          "test_call": {
+            "description": "A test call was made",
+            "type": "boolean"
+          },
+          "test_key": {
+            "description": "A test key exists",
+            "type": "boolean"
+          },
+          "webhook": {
+            "description": "A webhook endpoint exists",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "complete",
+          "live_call",
+          "test_call",
+          "test_key",
+          "webhook"
+        ],
+        "type": "object"
+      },
       "Output": {
         "additionalProperties": false,
         "description": "A file the call produced, with a signed link valid 1 hour.",
@@ -3246,6 +3323,145 @@
         "required": [
           "file_id",
           "url"
+        ],
+        "type": "object"
+      },
+      "Overview": {
+        "additionalProperties": false,
+        "description": "The console's Overview (UI-09)",
+        "properties": {
+          "date": {
+            "description": "The UTC day",
+            "type": "string"
+          },
+          "environments": {
+            "additionalProperties": false,
+            "description": "live and test",
+            "properties": {
+              "live": {
+                "$ref": "#/components/schemas/OverviewEnvironment"
+              },
+              "test": {
+                "$ref": "#/components/schemas/OverviewEnvironment"
+              }
+            },
+            "required": [
+              "live",
+              "test"
+            ],
+            "type": "object"
+          },
+          "from": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "onboarding": {
+            "$ref": "#/components/schemas/Onboarding"
+          },
+          "request_log": {
+            "description": "Whether the request-log counts could be read",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "to": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "environments",
+          "from",
+          "onboarding",
+          "request_log",
+          "to"
+        ],
+        "type": "object"
+      },
+      "OverviewEnvironment": {
+        "additionalProperties": false,
+        "properties": {
+          "calls": {
+            "description": "Metered calls (the usage ledger, as GET /v1/usage)",
+            "type": "integer"
+          },
+          "credits": {
+            "description": "Decimal string, the day's credits",
+            "type": "string"
+          },
+          "errors": {
+            "description": "Of which 4xx and 5xx",
+            "nullable": true,
+            "type": "integer"
+          },
+          "failed_deliveries": {
+            "description": "The latest ten failed or dead-lettered deliveries",
+            "items": {
+              "$ref": "#/components/schemas/FailedDelivery"
+            },
+            "type": "array"
+          },
+          "jobs": {
+            "additionalProperties": false,
+            "description": "Queued and processing now; failed in the day",
+            "properties": {
+              "failed": {
+                "type": "integer"
+              },
+              "processing": {
+                "type": "integer"
+              },
+              "queued": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "failed",
+              "processing",
+              "queued"
+            ],
+            "type": "object"
+          },
+          "rate_limited": {
+            "description": "Of which 429 rate_limited",
+            "nullable": true,
+            "type": "integer"
+          },
+          "requests": {
+            "description": "Answers in the day (request log); null when it cannot be read",
+            "nullable": true,
+            "type": "integer"
+          },
+          "webhooks": {
+            "additionalProperties": false,
+            "properties": {
+              "dead_lettered": {
+                "description": "Deliveries that gave up",
+                "type": "integer"
+              },
+              "endpoints": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "dead_lettered",
+              "endpoints"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "calls",
+          "credits",
+          "errors",
+          "failed_deliveries",
+          "jobs",
+          "rate_limited",
+          "requests",
+          "webhooks"
         ],
         "type": "object"
       },
@@ -12654,6 +12870,183 @@
           "billed": false,
           "notes": "engine fast runs Tesseract for real; accurate (and handwriting) is answered by the OCR fixture, which reads with the local Tesseract, so no paid provider is called."
         }
+      }
+    },
+    "/v1/overview": {
+      "get": {
+        "operationId": "overview",
+        "parameters": [
+          {
+            "description": "A UTC day (default today)",
+            "in": "query",
+            "name": "date",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "day": {
+                    "summary": "A day with live traffic and one dead-lettered delivery",
+                    "value": {
+                      "data": {
+                        "date": "2026-10-09",
+                        "environments": {
+                          "live": {
+                            "calls": 398,
+                            "credits": "184.2500",
+                            "errors": 9,
+                            "failed_deliveries": [
+                              {
+                                "attempts": 8,
+                                "delivery_id": "dlv_01JA9F2K5M8P1R4T7W0Y3A6C9E",
+                                "event_type": "job.succeeded",
+                                "response_status": 500,
+                                "status": "dead_lettered",
+                                "updated_at": "2026-10-09T10:15:00Z",
+                                "webhook_id": "whk_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                              }
+                            ],
+                            "jobs": {
+                              "failed": 1,
+                              "processing": 3,
+                              "queued": 1
+                            },
+                            "rate_limited": 2,
+                            "requests": 412,
+                            "webhooks": {
+                              "dead_lettered": 1,
+                              "endpoints": 2
+                            }
+                          },
+                          "test": {
+                            "calls": 51,
+                            "credits": "0.0000",
+                            "errors": 4,
+                            "failed_deliveries": [],
+                            "jobs": {
+                              "failed": 0,
+                              "processing": 0,
+                              "queued": 0
+                            },
+                            "rate_limited": 0,
+                            "requests": 57,
+                            "webhooks": {
+                              "dead_lettered": 0,
+                              "endpoints": 1
+                            }
+                          }
+                        },
+                        "from": "2026-10-09T00:00:00Z",
+                        "onboarding": {
+                          "complete": true,
+                          "live_call": true,
+                          "test_call": true,
+                          "test_key": true,
+                          "webhook": true
+                        },
+                        "request_log": "ok",
+                        "to": "2026-10-10T00:00:00Z"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Overview"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The day",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "bad-date": {
+                    "summary": "Not a UTC day",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_param",
+                        "message": "date is a UTC day, YYYY-MM-DD.",
+                        "param": "date",
+                        "reason": "invalid_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Today at a glance: calls, errors and rate-limit refusals, credits, jobs by state, webhook health and the onboarding steps, for both environments",
+        "tags": [
+          "usage"
+        ],
+        "x-lowco-scope": "api.platform.usage.read"
       }
     },
     "/v1/pdf": {

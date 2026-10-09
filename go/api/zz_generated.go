@@ -716,6 +716,19 @@ type ExtractResult struct {
 	Warnings     []string `json:"warnings,omitempty"`
 }
 
+// FailedDelivery is a Lowco API object.
+type FailedDelivery struct {
+	Attempts   int    `json:"attempts"`
+	DeliveryID string `json:"delivery_id"`
+	EventType  string `json:"event_type"`
+	// The endpoint's last HTTP status
+	ResponseStatus *int `json:"response_status"`
+	// One of: failed, dead_lettered.
+	Status    string `json:"status"`
+	UpdatedAt string `json:"updated_at"`
+	WebhookID string `json:"webhook_id"`
+}
+
 // An extracted value with its provenance; raw values are never returned without one.
 type Field struct {
 	Confidence float64 `json:"confidence"`
@@ -1111,6 +1124,20 @@ type OcrTextRequest struct {
 // OcrTextResult is a Lowco API value.
 type OcrTextResult = OCRResult
 
+// The first-call funnel, from real data
+type Onboarding struct {
+	// All four
+	Complete bool `json:"complete"`
+	// A live call succeeded
+	LiveCall bool `json:"live_call"`
+	// A test call was made
+	TestCall bool `json:"test_call"`
+	// A test key exists
+	TestKey bool `json:"test_key"`
+	// A webhook endpoint exists
+	Webhook bool `json:"webhook"`
+}
+
 // A file the call produced, with a signed link valid 1 hour.
 type Output struct {
 	Bytes *int `json:"bytes,omitempty"`
@@ -1124,6 +1151,58 @@ type Output struct {
 	Pages *int `json:"pages,omitempty"`
 	// Signed link valid 1 hour; null once the file expired
 	URL *string `json:"url"`
+}
+
+// The console's Overview (UI-09)
+type Overview struct {
+	// The UTC day
+	Date string `json:"date"`
+	// live and test
+	Environments OverviewEnvironments `json:"environments"`
+	From         string               `json:"from"`
+	Onboarding   Onboarding           `json:"onboarding"`
+	// Whether the request-log counts could be read One of: ok, unavailable.
+	RequestLog string `json:"request_log"`
+	To         string `json:"to"`
+}
+
+// OverviewEnvironment is a Lowco API object.
+type OverviewEnvironment struct {
+	// Metered calls (the usage ledger, as GET /v1/usage)
+	Calls int `json:"calls"`
+	// Decimal string, the day's credits
+	Credits string `json:"credits"`
+	// Of which 4xx and 5xx
+	Errors *int `json:"errors"`
+	// The latest ten failed or dead-lettered deliveries
+	FailedDeliveries []FailedDelivery `json:"failed_deliveries"`
+	// Queued and processing now; failed in the day
+	Jobs OverviewEnvironmentJobs `json:"jobs"`
+	// Of which 429 rate_limited
+	RateLimited *int `json:"rate_limited"`
+	// Answers in the day (request log); null when it cannot be read
+	Requests *int                        `json:"requests"`
+	Webhooks OverviewEnvironmentWebhooks `json:"webhooks"`
+}
+
+// Queued and processing now; failed in the day
+type OverviewEnvironmentJobs struct {
+	Failed     int `json:"failed"`
+	Processing int `json:"processing"`
+	Queued     int `json:"queued"`
+}
+
+// OverviewEnvironmentWebhooks is a Lowco API object.
+type OverviewEnvironmentWebhooks struct {
+	// Deliveries that gave up
+	DeadLettered int `json:"dead_lettered"`
+	Endpoints    int `json:"endpoints"`
+}
+
+// live and test
+type OverviewEnvironments struct {
+	Live OverviewEnvironment `json:"live"`
+	Test OverviewEnvironment `json:"test"`
 }
 
 // A stored template's layout; the same fields render/template takes
@@ -2536,6 +2615,12 @@ type UsageItem struct {
 	Quantity  int     `json:"quantity"`
 }
 
+// UsageOverviewQuery is a Lowco API object.
+type UsageOverviewQuery struct {
+	// A UTC day (default today)
+	Date *string `json:"date,omitempty"`
+}
+
 // UsageTotals is a Lowco API object.
 type UsageTotals struct {
 	Credits  string `json:"credits"`
@@ -3251,6 +3336,15 @@ func (r *UsageResource) AlertsAll(ctx context.Context, query *UsageAlertsQuery, 
 func (r *UsageResource) Get(ctx context.Context, query *UsageGetQuery, opts ...RequestOption) (*Usage, error) {
 	var out Usage
 	if err := r.c.call(ctx, http.MethodGet, "/v1/usage", toQuery(query), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Overview: Today at a glance: calls, errors and rate-limit refusals, credits, jobs by state, webhook health and the onboarding steps, for both environments.
+func (r *UsageResource) Overview(ctx context.Context, query *UsageOverviewQuery, opts ...RequestOption) (*Overview, error) {
+	var out Overview
+	if err := r.c.call(ctx, http.MethodGet, "/v1/overview", toQuery(query), nil, &out, opts); err != nil {
 		return nil, err
 	}
 	return &out, nil

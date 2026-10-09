@@ -1827,6 +1827,54 @@ class ExtractResult {
       };
 }
 
+class FailedDelivery {
+  const FailedDelivery({
+    this.attempts,
+    this.deliveryId,
+    this.eventType,
+    this.responseStatus,
+    this.status,
+    this.updatedAt,
+    this.webhookId,
+  });
+
+  factory FailedDelivery.fromJson(Map<String, dynamic> json) => FailedDelivery(
+        attempts: (json['attempts'] as num?)?.toInt(),
+        deliveryId: json['delivery_id'] as String?,
+        eventType: json['event_type'] as String?,
+        responseStatus: (json['response_status'] as num?)?.toInt(),
+        status: json['status'] as String?,
+        updatedAt: json['updated_at'] as String?,
+        webhookId: json['webhook_id'] as String?,
+      );
+
+  final int? attempts;
+
+  final String? deliveryId;
+
+  final String? eventType;
+
+  /// The endpoint's last HTTP status
+  final int? responseStatus;
+
+  final String? status;
+
+  final String? updatedAt;
+
+  final String? webhookId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (attempts != null) 'attempts': attempts!,
+        if (deliveryId != null) 'delivery_id': deliveryId!,
+        if (eventType != null) 'event_type': eventType!,
+        if (responseStatus != null) 'response_status': responseStatus!,
+        if (status != null) 'status': status!,
+        if (updatedAt != null) 'updated_at': updatedAt!,
+        if (webhookId != null) 'webhook_id': webhookId!,
+      };
+}
+
 /// An extracted value with its provenance; raw values are never returned without one.
 class Field {
   const Field({
@@ -3242,6 +3290,49 @@ class OcrTextRequest {
 
 typedef OcrTextResult = OCRResult;
 
+/// The first-call funnel, from real data
+class Onboarding {
+  const Onboarding({
+    this.complete,
+    this.liveCall,
+    this.testCall,
+    this.testKey,
+    this.webhook,
+  });
+
+  factory Onboarding.fromJson(Map<String, dynamic> json) => Onboarding(
+        complete: json['complete'] as bool?,
+        liveCall: json['live_call'] as bool?,
+        testCall: json['test_call'] as bool?,
+        testKey: json['test_key'] as bool?,
+        webhook: json['webhook'] as bool?,
+      );
+
+  /// All four
+  final bool? complete;
+
+  /// A live call succeeded
+  final bool? liveCall;
+
+  /// A test call was made
+  final bool? testCall;
+
+  /// A test key exists
+  final bool? testKey;
+
+  /// A webhook endpoint exists
+  final bool? webhook;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (complete != null) 'complete': complete!,
+        if (liveCall != null) 'live_call': liveCall!,
+        if (testCall != null) 'test_call': testCall!,
+        if (testKey != null) 'test_key': testKey!,
+        if (webhook != null) 'webhook': webhook!,
+      };
+}
+
 /// A file the call produced, with a signed link valid 1 hour.
 class Output {
   const Output({
@@ -3291,6 +3382,185 @@ class Output {
         if (mimeType != null) 'mime_type': mimeType!,
         if (pages != null) 'pages': pages!,
         if (url != null) 'url': url!,
+      };
+}
+
+/// The console's Overview (UI-09)
+class Overview {
+  const Overview({
+    this.date,
+    this.environments,
+    this.from,
+    this.onboarding,
+    this.requestLog,
+    this.to,
+  });
+
+  factory Overview.fromJson(Map<String, dynamic> json) => Overview(
+        date: json['date'] as String?,
+        environments: json['environments'] == null ? null : OverviewEnvironments.fromJson(json['environments'] as Map<String, dynamic>),
+        from: json['from'] as String?,
+        onboarding: json['onboarding'] == null ? null : Onboarding.fromJson(json['onboarding'] as Map<String, dynamic>),
+        requestLog: json['request_log'] as String?,
+        to: json['to'] as String?,
+      );
+
+  /// The UTC day
+  final String? date;
+
+  /// live and test
+  final OverviewEnvironments? environments;
+
+  final String? from;
+
+  final Onboarding? onboarding;
+
+  /// Whether the request-log counts could be read
+  final String? requestLog;
+
+  final String? to;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (date != null) 'date': date!,
+        if (environments != null) 'environments': environments!.toJson(),
+        if (from != null) 'from': from!,
+        if (onboarding != null) 'onboarding': onboarding!.toJson(),
+        if (requestLog != null) 'request_log': requestLog!,
+        if (to != null) 'to': to!,
+      };
+}
+
+class OverviewEnvironment {
+  const OverviewEnvironment({
+    this.calls,
+    this.credits,
+    this.errors,
+    this.failedDeliveries,
+    this.jobs,
+    this.rateLimited,
+    this.requests,
+    this.webhooks,
+  });
+
+  factory OverviewEnvironment.fromJson(Map<String, dynamic> json) => OverviewEnvironment(
+        calls: (json['calls'] as num?)?.toInt(),
+        credits: json['credits'] as String?,
+        errors: (json['errors'] as num?)?.toInt(),
+        failedDeliveries: (json['failed_deliveries'] as List?)?.map((e) => (e == null ? null : FailedDelivery.fromJson(e as Map<String, dynamic>))!).toList().cast<FailedDelivery>(),
+        jobs: json['jobs'] == null ? null : OverviewEnvironmentJobs.fromJson(json['jobs'] as Map<String, dynamic>),
+        rateLimited: (json['rate_limited'] as num?)?.toInt(),
+        requests: (json['requests'] as num?)?.toInt(),
+        webhooks: json['webhooks'] == null ? null : OverviewEnvironmentWebhooks.fromJson(json['webhooks'] as Map<String, dynamic>),
+      );
+
+  /// Metered calls (the usage ledger, as GET /v1/usage)
+  final int? calls;
+
+  /// Decimal string, the day's credits
+  final String? credits;
+
+  /// Of which 4xx and 5xx
+  final int? errors;
+
+  /// The latest ten failed or dead-lettered deliveries
+  final List<FailedDelivery>? failedDeliveries;
+
+  /// Queued and processing now; failed in the day
+  final OverviewEnvironmentJobs? jobs;
+
+  /// Of which 429 rate_limited
+  final int? rateLimited;
+
+  /// Answers in the day (request log); null when it cannot be read
+  final int? requests;
+
+  final OverviewEnvironmentWebhooks? webhooks;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (calls != null) 'calls': calls!,
+        if (credits != null) 'credits': credits!,
+        if (errors != null) 'errors': errors!,
+        if (failedDeliveries != null) 'failed_deliveries': failedDeliveries!.map((e) => e.toJson()).toList(),
+        if (jobs != null) 'jobs': jobs!.toJson(),
+        if (rateLimited != null) 'rate_limited': rateLimited!,
+        if (requests != null) 'requests': requests!,
+        if (webhooks != null) 'webhooks': webhooks!.toJson(),
+      };
+}
+
+/// Queued and processing now; failed in the day
+class OverviewEnvironmentJobs {
+  const OverviewEnvironmentJobs({
+    this.failed,
+    this.processing,
+    this.queued,
+  });
+
+  factory OverviewEnvironmentJobs.fromJson(Map<String, dynamic> json) => OverviewEnvironmentJobs(
+        failed: (json['failed'] as num?)?.toInt(),
+        processing: (json['processing'] as num?)?.toInt(),
+        queued: (json['queued'] as num?)?.toInt(),
+      );
+
+  final int? failed;
+
+  final int? processing;
+
+  final int? queued;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (failed != null) 'failed': failed!,
+        if (processing != null) 'processing': processing!,
+        if (queued != null) 'queued': queued!,
+      };
+}
+
+class OverviewEnvironmentWebhooks {
+  const OverviewEnvironmentWebhooks({
+    this.deadLettered,
+    this.endpoints,
+  });
+
+  factory OverviewEnvironmentWebhooks.fromJson(Map<String, dynamic> json) => OverviewEnvironmentWebhooks(
+        deadLettered: (json['dead_lettered'] as num?)?.toInt(),
+        endpoints: (json['endpoints'] as num?)?.toInt(),
+      );
+
+  /// Deliveries that gave up
+  final int? deadLettered;
+
+  final int? endpoints;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (deadLettered != null) 'dead_lettered': deadLettered!,
+        if (endpoints != null) 'endpoints': endpoints!,
+      };
+}
+
+/// live and test
+class OverviewEnvironments {
+  const OverviewEnvironments({
+    this.live,
+    this.test,
+  });
+
+  factory OverviewEnvironments.fromJson(Map<String, dynamic> json) => OverviewEnvironments(
+        live: json['live'] == null ? null : OverviewEnvironment.fromJson(json['live'] as Map<String, dynamic>),
+        test: json['test'] == null ? null : OverviewEnvironment.fromJson(json['test'] as Map<String, dynamic>),
+      );
+
+  final OverviewEnvironment? live;
+
+  final OverviewEnvironment? test;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (live != null) 'live': live!.toJson(),
+        if (test != null) 'test': test!.toJson(),
       };
 }
 
@@ -7934,6 +8204,24 @@ class UsageItem {
       };
 }
 
+class UsageOverviewQuery {
+  const UsageOverviewQuery({
+    this.date,
+  });
+
+  factory UsageOverviewQuery.fromJson(Map<String, dynamic> json) => UsageOverviewQuery(
+        date: json['date'] as String?,
+      );
+
+  /// A UTC day (default today)
+  final String? date;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (date != null) 'date': date!,
+      };
+}
+
 class UsageTotals {
   const UsageTotals({
     this.credits,
@@ -8713,6 +9001,9 @@ class UsageResource {
 
   /// Usage of the calling environment by day, meter, key or operation, with totals and the month's balance.
   Future<Usage> get(UsageGetQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/usage', query: query?.toJson(), body: null, decode: (j) => Usage.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Today at a glance: calls, errors and rate-limit refusals, credits, jobs by state, webhook health and the onboarding steps, for both environments.
+  Future<Overview> overview(UsageOverviewQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/overview', query: query?.toJson(), body: null, decode: (j) => Overview.fromJson(j as Map<String, dynamic>), options: options);
 
 }
 

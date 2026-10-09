@@ -580,6 +580,16 @@ class ExtractResult(TypedDict):
     """Lines no value came from"""
     warnings: NotRequired[list[str]]
 
+class FailedDelivery(TypedDict):
+    attempts: int
+    delivery_id: str
+    event_type: str
+    response_status: Optional[int]
+    """The endpoint's last HTTP status"""
+    status: Literal["failed", "dead_lettered"]
+    updated_at: str
+    webhook_id: str
+
 class Field(TypedDict):
     """An extracted value with its provenance; raw values are never returned without one."""
     confidence: float
@@ -913,6 +923,19 @@ class OcrTextRequest(TypedDict):
     password: NotRequired[str]
     """Opens a protected PDF; never stored or logged"""
 
+class Onboarding(TypedDict):
+    """The first-call funnel, from real data"""
+    complete: bool
+    """All four"""
+    live_call: bool
+    """A live call succeeded"""
+    test_call: bool
+    """A test call was made"""
+    test_key: bool
+    """A test key exists"""
+    webhook: bool
+    """A webhook endpoint exists"""
+
 class Output(TypedDict):
     """A file the call produced, with a signed link valid 1 hour."""
     bytes: NotRequired[int]
@@ -926,6 +949,42 @@ class Output(TypedDict):
     """PDF outputs"""
     url: Optional[str]
     """Signed link valid 1 hour; null once the file expired"""
+
+Overview = TypedDict("Overview", {"date": "str", "environments": "OverviewEnvironments", "from": "str", "onboarding": "Onboarding", "request_log": "Literal[\"ok\", \"unavailable\"]", "to": "str"})
+"""The console's Overview (UI-09)"""
+
+class OverviewEnvironment(TypedDict):
+    calls: int
+    """Metered calls (the usage ledger, as GET /v1/usage)"""
+    credits: str
+    """Decimal string, the day's credits"""
+    errors: Optional[int]
+    """Of which 4xx and 5xx"""
+    failed_deliveries: list[FailedDelivery]
+    """The latest ten failed or dead-lettered deliveries"""
+    jobs: OverviewEnvironmentJobs
+    """Queued and processing now; failed in the day"""
+    rate_limited: Optional[int]
+    """Of which 429 rate_limited"""
+    requests: Optional[int]
+    """Answers in the day (request log); null when it cannot be read"""
+    webhooks: OverviewEnvironmentWebhooks
+
+class OverviewEnvironmentJobs(TypedDict):
+    """Queued and processing now; failed in the day"""
+    failed: int
+    processing: int
+    queued: int
+
+class OverviewEnvironmentWebhooks(TypedDict):
+    dead_lettered: int
+    """Deliveries that gave up"""
+    endpoints: int
+
+class OverviewEnvironments(TypedDict):
+    """live and test"""
+    live: OverviewEnvironment
+    test: OverviewEnvironment
 
 class PageOptions(TypedDict):
     """A stored template's layout; the same fields render/template takes"""
@@ -2128,6 +2187,10 @@ class UsageItem(TypedDict):
     """Set with group_by=operation"""
     quantity: int
 
+class UsageOverviewQuery(TypedDict):
+    date: NotRequired[str]
+    """A UTC day (default today)"""
+
 class UsageTotals(TypedDict):
     credits: str
     events: int
@@ -3018,6 +3081,10 @@ class UsageResource:
     def get(self, *, cursor: Optional[str] = None, format: Optional[Literal["json", "csv"]] = None, from_: Optional[str] = None, group_by: Optional[Literal["day", "meter", "key", "operation"]] = None, key_id: Optional[str] = None, limit: Optional[int] = None, meter: Optional[str] = None, to: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Usage:
         """Usage of the calling environment by day, meter, key or operation, with totals and the month's balance."""
         return self._core.call("GET", f"/v1/usage", query={"from": from_, "to": to, "group_by": group_by, "key_id": key_id, "meter": meter, "limit": limit, "cursor": cursor, "format": format}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def overview(self, *, date: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Overview:
+        """Today at a glance: calls, errors and rate-limit refusals, credits, jobs by state, webhook health and the onboarding steps, for both environments."""
+        return self._core.call("GET", f"/v1/overview", query={"date": date}, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
 
 class WebhooksResource:

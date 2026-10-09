@@ -617,6 +617,17 @@ export interface ExtractResult {
   warnings?: string[];
 }
 
+export interface FailedDelivery {
+  attempts: number;
+  delivery_id: string;
+  event_type: string;
+  /** The endpoint's last HTTP status */
+  response_status: number | null;
+  status: "failed" | "dead_lettered";
+  updated_at: string;
+  webhook_id: string;
+}
+
 /** An extracted value with its provenance; raw values are never returned without one. */
 export interface Field {
   confidence: number;
@@ -983,6 +994,20 @@ export interface OcrTextRequest {
 
 export type OcrTextResult = OCRResult;
 
+/** The first-call funnel, from real data */
+export interface Onboarding {
+  /** All four */
+  complete: boolean;
+  /** A live call succeeded */
+  live_call: boolean;
+  /** A test call was made */
+  test_call: boolean;
+  /** A test key exists */
+  test_key: boolean;
+  /** A webhook endpoint exists */
+  webhook: boolean;
+}
+
 /** A file the call produced, with a signed link valid 1 hour. */
 export interface Output {
   bytes?: number;
@@ -996,6 +1021,56 @@ export interface Output {
   pages?: number;
   /** Signed link valid 1 hour; null once the file expired */
   url: string | null;
+}
+
+/** The console's Overview (UI-09) */
+export interface Overview {
+  /** The UTC day */
+  date: string;
+  /** live and test */
+  environments: OverviewEnvironments;
+  from: string;
+  onboarding: Onboarding;
+  /** Whether the request-log counts could be read */
+  request_log: "ok" | "unavailable";
+  to: string;
+}
+
+export interface OverviewEnvironment {
+  /** Metered calls (the usage ledger, as GET /v1/usage) */
+  calls: number;
+  /** Decimal string, the day's credits */
+  credits: string;
+  /** Of which 4xx and 5xx */
+  errors: number | null;
+  /** The latest ten failed or dead-lettered deliveries */
+  failed_deliveries: FailedDelivery[];
+  /** Queued and processing now; failed in the day */
+  jobs: OverviewEnvironmentJobs;
+  /** Of which 429 rate_limited */
+  rate_limited: number | null;
+  /** Answers in the day (request log); null when it cannot be read */
+  requests: number | null;
+  webhooks: OverviewEnvironmentWebhooks;
+}
+
+/** Queued and processing now; failed in the day */
+export interface OverviewEnvironmentJobs {
+  failed: number;
+  processing: number;
+  queued: number;
+}
+
+export interface OverviewEnvironmentWebhooks {
+  /** Deliveries that gave up */
+  dead_lettered: number;
+  endpoints: number;
+}
+
+/** live and test */
+export interface OverviewEnvironments {
+  live: OverviewEnvironment;
+  test: OverviewEnvironment;
 }
 
 /** A stored template's layout; the same fields render/template takes */
@@ -2338,6 +2413,11 @@ export interface UsageItem {
   quantity: number;
 }
 
+export interface UsageOverviewQuery {
+  /** A UTC day (default today) */
+  date?: string;
+}
+
 export interface UsageTotals {
   credits: string;
   events: number;
@@ -2852,6 +2932,11 @@ export class UsageResource {
   /** Usage of the calling environment by day, meter, key or operation, with totals and the month's balance. */
   get(query?: UsageGetQuery, options?: RequestOptions): Promise<Usage> {
     return this.core.call<Usage>("GET", `/v1/usage`, { query: query as unknown as Record<string, unknown> | undefined, json: undefined }, options);
+  }
+
+  /** Today at a glance: calls, errors and rate-limit refusals, credits, jobs by state, webhook health and the onboarding steps, for both environments. */
+  overview(query?: UsageOverviewQuery, options?: RequestOptions): Promise<Overview> {
+    return this.core.call<Overview>("GET", `/v1/overview`, { query: query as unknown as Record<string, unknown> | undefined, json: undefined }, options);
   }
 
 }
