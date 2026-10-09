@@ -104,7 +104,7 @@ ERROR_REASONS: Dict[str, Dict[str, Any]] = {
     "ip_not_allowed": {"status": 403, "when": "The calling IP is outside the key's allow-list.", "action": "Call from an allowed address, or update the key's allowed_ips."},
     "job_not_found": {"status": 404, "when": "No job with this id exists in this org and environment (or it expired).", "action": "Check the id and the environment of the key."},
     "key_expired": {"status": 401, "when": "The key passed its expiry, or the old key's overlap window after a rotation ended.", "action": "Use the new key from the rotation, or create a key."},
-    "key_not_found": {"status": 404, "when": "The key has no Lowco API binding.", "action": "Create the key in the console's API keys page."},
+    "key_not_found": {"status": 404, "when": "The key has no Lowco API binding, or (key sync) no such key exists in this organisation.", "action": "Create the key in the console's API keys page, or check the key id and the organisation."},
     "key_revoked": {"status": 401, "when": "The key was revoked.", "action": "Create a new key in the console."},
     "message_not_found": {"status": 404, "when": "No message with this id exists in this environment.", "action": "Check the id and the environment of the key."},
     "method_not_allowed": {"status": 405, "when": "The route exists, but not for this HTTP method.", "action": "Use the method the API reference shows."},
@@ -694,6 +694,59 @@ class JobsListQuery(TypedDict):
     operation: NotRequired[str]
     created_after: NotRequired[str]
     created_before: NotRequired[str]
+    limit: NotRequired[int]
+    """Page size"""
+    cursor: NotRequired[str]
+    """next_cursor of the previous page."""
+
+class KeyBinding(TypedDict):
+    """Lowco API's view of a lowco-auth key; never key material"""
+    allowed_ips: list[str]
+    """Addresses or CIDR ranges; empty: any address"""
+    created_at: NotRequired[str]
+    """When Lowco API first bound the key (lists)"""
+    created_by: str
+    display_prefix: str
+    """lc_test_ab12…"""
+    environment: Literal["live", "test"]
+    expires_at: NotRequired[Optional[str]]
+    key_id: str
+    label: str
+    last_used_at: NotRequired[Optional[str]]
+    org_id: str
+    revoked_at: NotRequired[Optional[str]]
+    rotated_from_key_id: NotRequired[str]
+    """The key this one replaced"""
+    rotation_ends_at: NotRequired[Optional[str]]
+    """Until then the replaced key still works"""
+    scopes: list[str]
+    """Empty: the creator's roles decide"""
+
+class KeyValidate(TypedDict):
+    allowed_ips: NotRequired[list[str]]
+    environment: NotRequired[Literal["live", "test"]]
+    """Default: the calling environment"""
+    expires_at: NotRequired[str]
+    """RFC 3339, or YYYY-MM-DD for the end of that UTC day; within 3 years"""
+    label: str
+    scopes: NotRequired[list[str]]
+
+class KeyValidated(TypedDict):
+    allowed_ips: list[str]
+    """Canonical: CIDRs masked"""
+    environment: Literal["live", "test"]
+    expires_at: Optional[str]
+    label: str
+    scopes: list[str]
+    """Duplicates dropped"""
+    valid: bool
+
+class KeysListData(TypedDict):
+    """A page; pass next_cursor as cursor for the next one (null at the end)."""
+    items: list[KeyBinding]
+    next_cursor: Optional[str]
+
+class KeysListQuery(TypedDict):
     limit: NotRequired[int]
     """Page size"""
     cursor: NotRequired[str]
@@ -2682,6 +2735,29 @@ class JobsResource:
         return self._core.wait_for_job(job_id, timeout=timeout, max_interval=max_interval)
 
 
+class KeysResource:
+    """."""
+
+    def __init__(self, core: Core) -> None:
+        self._core = core
+
+    def list(self, *, cursor: Optional[str] = None, limit: Optional[int] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> KeysListData:
+        """Key bindings of the calling environment, newest first."""
+        return self._core.call("GET", f"/v1/keys", query={"limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list_all(self, *, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[KeyBinding]:
+        """Every item of list, page after page (follows next_cursor)."""
+        return self._core.paginate(f"/v1/keys", {"limit": limit}, request_id=request_id)
+
+    def sync(self, key_id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> KeyBinding:
+        """Copy a key from lowco-auth into its Lowco API binding."""
+        return self._core.call("POST", f"/v1/keys/{_seg(key_id)}/sync", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def validate(self, *, label: str, allowed_ips: Optional[list[str]] = None, environment: Optional[Literal["live", "test"]] = None, expires_at: Optional[str] = None, scopes: Optional[list[str]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> KeyValidated:
+        """Check a key's label, scopes, allowed IPs and expiry before minting it."""
+        return self._core.call("POST", f"/v1/keys/validate", query=None, json=_drop_none({"allowed_ips": allowed_ips, "environment": environment, "expires_at": expires_at, "label": label, "scopes": scopes}), idempotency_key=idempotency_key, request_id=request_id)
+
+
 class SettingsResource:
     """Environment settings."""
 
@@ -2835,6 +2911,8 @@ class GeneratedClient:
         """Uploaded and produced files."""
         self.jobs = JobsResource(core)
         """Asynchronous jobs."""
+        self.keys = KeysResource(core)
+        """."""
         self.settings = SettingsResource(core)
         """Environment settings."""
         self.templates = TemplatesResource(core)

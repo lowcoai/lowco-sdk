@@ -66,7 +66,7 @@ const (
 	ReasonJobNotFound ErrorReason = "job_not_found"
 	// ReasonKeyExpired (HTTP 401): The key passed its expiry, or the old key's overlap window after a rotation ended.
 	ReasonKeyExpired ErrorReason = "key_expired"
-	// ReasonKeyNotFound (HTTP 404): The key has no Lowco API binding.
+	// ReasonKeyNotFound (HTTP 404): The key has no Lowco API binding, or (key sync) no such key exists in this organisation.
 	ReasonKeyNotFound ErrorReason = "key_not_found"
 	// ReasonKeyRevoked (HTTP 401): The key was revoked.
 	ReasonKeyRevoked ErrorReason = "key_revoked"
@@ -164,7 +164,7 @@ var ErrorReasons = map[ErrorReason]ReasonInfo{
 	ReasonIPNotAllowed:          {403, "The calling IP is outside the key's allow-list.", "Call from an allowed address, or update the key's allowed_ips."},
 	ReasonJobNotFound:           {404, "No job with this id exists in this org and environment (or it expired).", "Check the id and the environment of the key."},
 	ReasonKeyExpired:            {401, "The key passed its expiry, or the old key's overlap window after a rotation ended.", "Use the new key from the rotation, or create a key."},
-	ReasonKeyNotFound:           {404, "The key has no Lowco API binding.", "Create the key in the console's API keys page."},
+	ReasonKeyNotFound:           {404, "The key has no Lowco API binding, or (key sync) no such key exists in this organisation.", "Create the key in the console's API keys page, or check the key id and the organisation."},
 	ReasonKeyRevoked:            {401, "The key was revoked.", "Create a new key in the console."},
 	ReasonMessageNotFound:       {404, "No message with this id exists in this environment.", "Check the id and the environment of the key."},
 	ReasonMethodNotAllowed:      {405, "The route exists, but not for this HTTP method.", "Use the method the API reference shows."},
@@ -852,6 +852,69 @@ type JobsListQuery struct {
 	Operation     *string `json:"operation,omitempty"`
 	CreatedAfter  *string `json:"created_after,omitempty"`
 	CreatedBefore *string `json:"created_before,omitempty"`
+	// Page size
+	Limit *int `json:"limit,omitempty"`
+	// next_cursor of the previous page.
+	Cursor *string `json:"cursor,omitempty"`
+}
+
+// Lowco API's view of a lowco-auth key; never key material
+type KeyBinding struct {
+	// Addresses or CIDR ranges; empty: any address
+	AllowedIPs []string `json:"allowed_ips"`
+	// When Lowco API first bound the key (lists)
+	CreatedAt *string `json:"created_at,omitempty"`
+	CreatedBy string  `json:"created_by"`
+	// lc_test_ab12…
+	DisplayPrefix string `json:"display_prefix"`
+	// One of: live, test.
+	Environment string  `json:"environment"`
+	ExpiresAt   *string `json:"expires_at,omitempty"`
+	KeyID       string  `json:"key_id"`
+	Label       string  `json:"label"`
+	LastUsedAt  *string `json:"last_used_at,omitempty"`
+	OrgID       string  `json:"org_id"`
+	RevokedAt   *string `json:"revoked_at,omitempty"`
+	// The key this one replaced
+	RotatedFromKeyID *string `json:"rotated_from_key_id,omitempty"`
+	// Until then the replaced key still works
+	RotationEndsAt *string `json:"rotation_ends_at,omitempty"`
+	// Empty: the creator's roles decide
+	Scopes []string `json:"scopes"`
+}
+
+// KeyValidate is a Lowco API object.
+type KeyValidate struct {
+	AllowedIPs []string `json:"allowed_ips,omitempty"`
+	// Default: the calling environment One of: live, test.
+	Environment *string `json:"environment,omitempty"`
+	// RFC 3339, or YYYY-MM-DD for the end of that UTC day; within 3 years
+	ExpiresAt *string  `json:"expires_at,omitempty"`
+	Label     string   `json:"label"`
+	Scopes    []string `json:"scopes,omitempty"`
+}
+
+// KeyValidated is a Lowco API object.
+type KeyValidated struct {
+	// Canonical: CIDRs masked
+	AllowedIPs []string `json:"allowed_ips"`
+	// One of: live, test.
+	Environment string  `json:"environment"`
+	ExpiresAt   *string `json:"expires_at"`
+	Label       string  `json:"label"`
+	// Duplicates dropped
+	Scopes []string `json:"scopes"`
+	Valid  bool     `json:"valid"`
+}
+
+// A page; pass next_cursor as cursor for the next one (null at the end).
+type KeysListData struct {
+	Items      []KeyBinding `json:"items"`
+	NextCursor *string      `json:"next_cursor"`
+}
+
+// KeysListQuery is a Lowco API object.
+type KeysListQuery struct {
 	// Page size
 	Limit *int `json:"limit,omitempty"`
 	// next_cursor of the previous page.
@@ -2817,6 +2880,41 @@ func (r *JobsResource) Wait(ctx context.Context, jobID string, opts ...WaitOptio
 	return r.c.waitForJob(ctx, jobID, opts)
 }
 
+// KeysResource: .
+type KeysResource struct{ c *core }
+
+// List: Key bindings of the calling environment, newest first.
+func (r *KeysResource) List(ctx context.Context, query *KeysListQuery, opts ...RequestOption) (*KeysListData, error) {
+	var out KeysListData
+	if err := r.c.call(ctx, http.MethodGet, "/v1/keys", toQuery(query), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListAll pages through List, following next_cursor.
+func (r *KeysResource) ListAll(ctx context.Context, query *KeysListQuery, opts ...RequestOption) *Pager[KeyBinding] {
+	return newPager[KeyBinding](r.c, "/v1/keys", toQuery(query), opts)
+}
+
+// Sync: Copy a key from lowco-auth into its Lowco API binding.
+func (r *KeysResource) Sync(ctx context.Context, keyId string, opts ...RequestOption) (*KeyBinding, error) {
+	var out KeyBinding
+	if err := r.c.call(ctx, http.MethodPost, sprintf("/v1/keys/%s/sync", url.PathEscape(keyId)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Validate: Check a key's label, scopes, allowed IPs and expiry before minting it.
+func (r *KeysResource) Validate(ctx context.Context, body KeyValidate, opts ...RequestOption) (*KeyValidated, error) {
+	var out KeyValidated
+	if err := r.c.call(ctx, http.MethodPost, "/v1/keys/validate", toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // SettingsResource: Environment settings.
 type SettingsResource struct{ c *core }
 
@@ -3040,6 +3138,8 @@ type services struct {
 	Files *FilesResource
 	// Jobs: Asynchronous jobs.
 	Jobs *JobsResource
+	// Keys: .
+	Keys *KeysResource
 	// Settings: Environment settings.
 	Settings *SettingsResource
 	// Templates: Stored render templates.
@@ -3061,6 +3161,7 @@ func newServices(c *core) services {
 		Audit:     &AuditResource{c},
 		Files:     &FilesResource{c},
 		Jobs:      &JobsResource{c},
+		Keys:      &KeysResource{c},
 		Settings:  &SettingsResource{c},
 		Templates: &TemplatesResource{c},
 		Usage:     &UsageResource{c},

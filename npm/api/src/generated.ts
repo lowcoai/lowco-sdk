@@ -91,7 +91,7 @@ export const ERROR_REASONS: Record<ErrorReason, { status: number; when: string; 
   ip_not_allowed: { status: 403, when: "The calling IP is outside the key's allow-list.", action: "Call from an allowed address, or update the key's allowed_ips." },
   job_not_found: { status: 404, when: "No job with this id exists in this org and environment (or it expired).", action: "Check the id and the environment of the key." },
   key_expired: { status: 401, when: "The key passed its expiry, or the old key's overlap window after a rotation ended.", action: "Use the new key from the rotation, or create a key." },
-  key_not_found: { status: 404, when: "The key has no Lowco API binding.", action: "Create the key in the console's API keys page." },
+  key_not_found: { status: 404, when: "The key has no Lowco API binding, or (key sync) no such key exists in this organisation.", action: "Create the key in the console's API keys page, or check the key id and the organisation." },
   key_revoked: { status: 401, when: "The key was revoked.", action: "Create a new key in the console." },
   message_not_found: { status: 404, when: "No message with this id exists in this environment.", action: "Check the id and the environment of the key." },
   method_not_allowed: { status: 405, when: "The route exists, but not for this HTTP method.", action: "Use the method the API reference shows." },
@@ -742,6 +742,64 @@ export interface JobsListQuery {
   operation?: string;
   created_after?: string;
   created_before?: string;
+  /** Page size */
+  limit?: number;
+  /** next_cursor of the previous page. */
+  cursor?: string;
+}
+
+/** Lowco API's view of a lowco-auth key; never key material */
+export interface KeyBinding {
+  /** Addresses or CIDR ranges; empty: any address */
+  allowed_ips: string[];
+  /** When Lowco API first bound the key (lists) */
+  created_at?: string;
+  created_by: string;
+  /** lc_test_ab12… */
+  display_prefix: string;
+  environment: "live" | "test";
+  expires_at?: string | null;
+  key_id: string;
+  label: string;
+  last_used_at?: string | null;
+  org_id: string;
+  revoked_at?: string | null;
+  /** The key this one replaced */
+  rotated_from_key_id?: string;
+  /** Until then the replaced key still works */
+  rotation_ends_at?: string | null;
+  /** Empty: the creator's roles decide */
+  scopes: string[];
+}
+
+export interface KeyValidate {
+  allowed_ips?: string[];
+  /** Default: the calling environment */
+  environment?: "live" | "test";
+  /** RFC 3339, or YYYY-MM-DD for the end of that UTC day; within 3 years */
+  expires_at?: string;
+  label: string;
+  scopes?: string[];
+}
+
+export interface KeyValidated {
+  /** Canonical: CIDRs masked */
+  allowed_ips: string[];
+  environment: "live" | "test";
+  expires_at: string | null;
+  label: string;
+  /** Duplicates dropped */
+  scopes: string[];
+  valid: boolean;
+}
+
+/** A page; pass next_cursor as cursor for the next one (null at the end). */
+export interface KeysListData {
+  items: KeyBinding[];
+  next_cursor: string | null;
+}
+
+export interface KeysListQuery {
   /** Page size */
   limit?: number;
   /** next_cursor of the previous page. */
@@ -2482,6 +2540,32 @@ export class JobsResource {
 
 }
 
+/** . */
+export class KeysResource {
+  constructor(private readonly core: Core) {}
+
+  /** Key bindings of the calling environment, newest first. */
+  list(query?: KeysListQuery, options?: RequestOptions): Promise<KeysListData> {
+    return this.core.call<KeysListData>("GET", `/v1/keys`, { query: query as unknown as Record<string, unknown> | undefined, json: undefined }, options);
+  }
+
+  /** Every item of list, page after page (follows next_cursor). */
+  listAll(query?: Omit<KeysListQuery, "cursor">, options?: RequestOptions): AsyncIterable<KeyBinding> {
+    return this.core.paginate<KeyBinding>(`/v1/keys`, query as unknown as Record<string, unknown> | undefined, options);
+  }
+
+  /** Copy a key from lowco-auth into its Lowco API binding. */
+  sync(keyId: string, options?: RequestOptions): Promise<KeyBinding> {
+    return this.core.call<KeyBinding>("POST", `/v1/keys/${encodeURIComponent(keyId)}/sync`, { query: undefined, json: undefined }, options);
+  }
+
+  /** Check a key's label, scopes, allowed IPs and expiry before minting it. */
+  validate(body: KeyValidate, options?: RequestOptions): Promise<KeyValidated> {
+    return this.core.call<KeyValidated>("POST", `/v1/keys/validate`, { query: undefined, json: body }, options);
+  }
+
+}
+
 /** Environment settings. */
 export class SettingsResource {
   constructor(private readonly core: Core) {}
@@ -2641,6 +2725,8 @@ export class GeneratedClient {
   readonly files: FilesResource;
   /** Asynchronous jobs. */
   readonly jobs: JobsResource;
+  /** . */
+  readonly keys: KeysResource;
   /** Environment settings. */
   readonly settings: SettingsResource;
   /** Stored render templates. */
@@ -2660,6 +2746,7 @@ export class GeneratedClient {
     this.audit = new AuditResource(core);
     this.files = new FilesResource(core);
     this.jobs = new JobsResource(core);
+    this.keys = new KeysResource(core);
     this.settings = new SettingsResource(core);
     this.templates = new TemplatesResource(core);
     this.usage = new UsageResource(core);

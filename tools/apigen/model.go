@@ -110,6 +110,7 @@ var resourceNames = map[string][2]string{
 	"settings_get": {"settings", "get"}, "settings_update": {"settings", "update"}, "settings_purge": {"settings", "purge"},
 	"usage_get":  {"usage", "get"},
 	"audit_list": {"audit", "list"},
+	"keys_list":  {"keys", "list"}, "keys_validate": {"keys", "validate"}, "keys_sync": {"keys", "sync"},
 }
 
 // skipped operationIds: the signed download is a plain URL (Client.download).

@@ -58,7 +58,7 @@ abstract final class ErrorReason {
   static const jobNotFound = 'job_not_found';
   /// HTTP 401: The key passed its expiry, or the old key's overlap window after a rotation ended.
   static const keyExpired = 'key_expired';
-  /// HTTP 404: The key has no Lowco API binding.
+  /// HTTP 404: The key has no Lowco API binding, or (key sync) no such key exists in this organisation.
   static const keyNotFound = 'key_not_found';
   /// HTTP 401: The key was revoked.
   static const keyRevoked = 'key_revoked';
@@ -149,7 +149,7 @@ const errorReasons = <String, ({int status, String when, String action})>{
   'ip_not_allowed': (status: 403, when: 'The calling IP is outside the key\'s allow-list.', action: 'Call from an allowed address, or update the key\'s allowed_ips.'),
   'job_not_found': (status: 404, when: 'No job with this id exists in this org and environment (or it expired).', action: 'Check the id and the environment of the key.'),
   'key_expired': (status: 401, when: 'The key passed its expiry, or the old key\'s overlap window after a rotation ended.', action: 'Use the new key from the rotation, or create a key.'),
-  'key_not_found': (status: 404, when: 'The key has no Lowco API binding.', action: 'Create the key in the console\'s API keys page.'),
+  'key_not_found': (status: 404, when: 'The key has no Lowco API binding, or (key sync) no such key exists in this organisation.', action: 'Create the key in the console\'s API keys page, or check the key id and the organisation.'),
   'key_revoked': (status: 401, when: 'The key was revoked.', action: 'Create a new key in the console.'),
   'message_not_found': (status: 404, when: 'No message with this id exists in this environment.', action: 'Check the id and the environment of the key.'),
   'method_not_allowed': (status: 405, when: 'The route exists, but not for this HTTP method.', action: 'Use the method the API reference shows.'),
@@ -2401,6 +2401,225 @@ class JobsListQuery {
         if (operation != null) 'operation': operation!,
         if (createdAfter != null) 'created_after': createdAfter!,
         if (createdBefore != null) 'created_before': createdBefore!,
+        if (limit != null) 'limit': limit!,
+        if (cursor != null) 'cursor': cursor!,
+      };
+}
+
+/// Lowco API's view of a lowco-auth key; never key material
+class KeyBinding {
+  const KeyBinding({
+    this.allowedIps,
+    this.createdAt,
+    this.createdBy,
+    this.displayPrefix,
+    this.environment,
+    this.expiresAt,
+    this.keyId,
+    this.label,
+    this.lastUsedAt,
+    this.orgId,
+    this.revokedAt,
+    this.rotatedFromKeyId,
+    this.rotationEndsAt,
+    this.scopes,
+  });
+
+  factory KeyBinding.fromJson(Map<String, dynamic> json) => KeyBinding(
+        allowedIps: (json['allowed_ips'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        createdAt: json['created_at'] as String?,
+        createdBy: json['created_by'] as String?,
+        displayPrefix: json['display_prefix'] as String?,
+        environment: json['environment'] as String?,
+        expiresAt: json['expires_at'] as String?,
+        keyId: json['key_id'] as String?,
+        label: json['label'] as String?,
+        lastUsedAt: json['last_used_at'] as String?,
+        orgId: json['org_id'] as String?,
+        revokedAt: json['revoked_at'] as String?,
+        rotatedFromKeyId: json['rotated_from_key_id'] as String?,
+        rotationEndsAt: json['rotation_ends_at'] as String?,
+        scopes: (json['scopes'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+      );
+
+  /// Addresses or CIDR ranges; empty: any address
+  final List<String>? allowedIps;
+
+  /// When Lowco API first bound the key (lists)
+  final String? createdAt;
+
+  final String? createdBy;
+
+  /// lc_test_ab12…
+  final String? displayPrefix;
+
+  final String? environment;
+
+  final String? expiresAt;
+
+  final String? keyId;
+
+  final String? label;
+
+  final String? lastUsedAt;
+
+  final String? orgId;
+
+  final String? revokedAt;
+
+  /// The key this one replaced
+  final String? rotatedFromKeyId;
+
+  /// Until then the replaced key still works
+  final String? rotationEndsAt;
+
+  /// Empty: the creator's roles decide
+  final List<String>? scopes;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (allowedIps != null) 'allowed_ips': allowedIps!,
+        if (createdAt != null) 'created_at': createdAt!,
+        if (createdBy != null) 'created_by': createdBy!,
+        if (displayPrefix != null) 'display_prefix': displayPrefix!,
+        if (environment != null) 'environment': environment!,
+        if (expiresAt != null) 'expires_at': expiresAt!,
+        if (keyId != null) 'key_id': keyId!,
+        if (label != null) 'label': label!,
+        if (lastUsedAt != null) 'last_used_at': lastUsedAt!,
+        if (orgId != null) 'org_id': orgId!,
+        if (revokedAt != null) 'revoked_at': revokedAt!,
+        if (rotatedFromKeyId != null) 'rotated_from_key_id': rotatedFromKeyId!,
+        if (rotationEndsAt != null) 'rotation_ends_at': rotationEndsAt!,
+        if (scopes != null) 'scopes': scopes!,
+      };
+}
+
+class KeyValidate {
+  const KeyValidate({
+    this.allowedIps,
+    this.environment,
+    this.expiresAt,
+    this.label,
+    this.scopes,
+  });
+
+  factory KeyValidate.fromJson(Map<String, dynamic> json) => KeyValidate(
+        allowedIps: (json['allowed_ips'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        environment: json['environment'] as String?,
+        expiresAt: json['expires_at'] as String?,
+        label: json['label'] as String?,
+        scopes: (json['scopes'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+      );
+
+  final List<String>? allowedIps;
+
+  /// Default: the calling environment
+  final String? environment;
+
+  /// RFC 3339, or YYYY-MM-DD for the end of that UTC day; within 3 years
+  final String? expiresAt;
+
+  final String? label;
+
+  final List<String>? scopes;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (allowedIps != null) 'allowed_ips': allowedIps!,
+        if (environment != null) 'environment': environment!,
+        if (expiresAt != null) 'expires_at': expiresAt!,
+        if (label != null) 'label': label!,
+        if (scopes != null) 'scopes': scopes!,
+      };
+}
+
+class KeyValidated {
+  const KeyValidated({
+    this.allowedIps,
+    this.environment,
+    this.expiresAt,
+    this.label,
+    this.scopes,
+    this.valid,
+  });
+
+  factory KeyValidated.fromJson(Map<String, dynamic> json) => KeyValidated(
+        allowedIps: (json['allowed_ips'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        environment: json['environment'] as String?,
+        expiresAt: json['expires_at'] as String?,
+        label: json['label'] as String?,
+        scopes: (json['scopes'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        valid: json['valid'] as bool?,
+      );
+
+  /// Canonical: CIDRs masked
+  final List<String>? allowedIps;
+
+  final String? environment;
+
+  final String? expiresAt;
+
+  final String? label;
+
+  /// Duplicates dropped
+  final List<String>? scopes;
+
+  final bool? valid;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (allowedIps != null) 'allowed_ips': allowedIps!,
+        if (environment != null) 'environment': environment!,
+        if (expiresAt != null) 'expires_at': expiresAt!,
+        if (label != null) 'label': label!,
+        if (scopes != null) 'scopes': scopes!,
+        if (valid != null) 'valid': valid!,
+      };
+}
+
+/// A page; pass next_cursor as cursor for the next one (null at the end).
+class KeysListData {
+  const KeysListData({
+    this.items,
+    this.nextCursor,
+  });
+
+  factory KeysListData.fromJson(Map<String, dynamic> json) => KeysListData(
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : KeyBinding.fromJson(e as Map<String, dynamic>))!).toList().cast<KeyBinding>(),
+        nextCursor: json['next_cursor'] as String?,
+      );
+
+  final List<KeyBinding>? items;
+
+  final String? nextCursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+        if (nextCursor != null) 'next_cursor': nextCursor!,
+      };
+}
+
+class KeysListQuery {
+  const KeysListQuery({
+    this.limit,
+    this.cursor,
+  });
+
+  factory KeysListQuery.fromJson(Map<String, dynamic> json) => KeysListQuery(
+        limit: (json['limit'] as num?)?.toInt(),
+        cursor: json['cursor'] as String?,
+      );
+
+  /// Page size
+  final int? limit;
+
+  /// next_cursor of the previous page.
+  final String? cursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
         if (limit != null) 'limit': limit!,
         if (cursor != null) 'cursor': cursor!,
       };
@@ -7746,6 +7965,25 @@ class JobsResource {
 
 }
 
+/// .
+class KeysResource {
+  KeysResource(this._core);
+  final Core _core;
+
+  /// Key bindings of the calling environment, newest first.
+  Future<KeysListData> list(KeysListQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/keys', query: query?.toJson(), body: null, decode: (j) => KeysListData.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Every item of list, page after page (follows next_cursor).
+  Stream<KeyBinding> listAll(KeysListQuery? query, [RequestOptions? options]) => _core.paginate('/v1/keys', query?.toJson(), (j) => KeyBinding.fromJson(j as Map<String, dynamic>), options);
+
+  /// Copy a key from lowco-auth into its Lowco API binding.
+  Future<KeyBinding> sync(String keyId, [RequestOptions? options]) => _core.call('POST', '/v1/keys/${Uri.encodeComponent(keyId)}/sync', query: null, body: null, decode: (j) => KeyBinding.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Check a key's label, scopes, allowed IPs and expiry before minting it.
+  Future<KeyValidated> validate(KeyValidate body, [RequestOptions? options]) => _core.call('POST', '/v1/keys/validate', query: null, body: body.toJson(), decode: (j) => KeyValidated.fromJson(j as Map<String, dynamic>), options: options);
+
+}
+
 /// Environment settings.
 class SettingsResource {
   SettingsResource(this._core);
@@ -7855,6 +8093,7 @@ class GeneratedClient {
         audit = AuditResource(core),
         files = FilesResource(core),
         jobs = JobsResource(core),
+        keys = KeysResource(core),
         settings = SettingsResource(core),
         templates = TemplatesResource(core),
         usage = UsageResource(core),
@@ -7886,6 +8125,9 @@ class GeneratedClient {
 
   /// Asynchronous jobs.
   final JobsResource jobs;
+
+  /// .
+  final KeysResource keys;
 
   /// Environment settings.
   final SettingsResource settings;

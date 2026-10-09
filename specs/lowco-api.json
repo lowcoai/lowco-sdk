@@ -1646,9 +1646,9 @@
             "when": "The key passed its expiry, or the old key's overlap window after a rotation ended."
           },
           "key_not_found": {
-            "action": "Create the key in the console's API keys page.",
+            "action": "Create the key in the console's API keys page, or check the key id and the organisation.",
             "status": 404,
-            "when": "The key has no Lowco API binding."
+            "when": "The key has no Lowco API binding, or (key sync) no such key exists in this organisation."
           },
           "key_revoked": {
             "action": "Create a new key in the console.",
@@ -2547,6 +2547,178 @@
           "doc_url",
           "message",
           "reason"
+        ],
+        "type": "object"
+      },
+      "KeyBinding": {
+        "additionalProperties": false,
+        "description": "Lowco API's view of a lowco-auth key; never key material",
+        "properties": {
+          "allowed_ips": {
+            "description": "Addresses or CIDR ranges; empty: any address",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "created_at": {
+            "description": "When Lowco API first bound the key (lists)",
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "display_prefix": {
+            "description": "lc_test_ab12…",
+            "type": "string"
+          },
+          "environment": {
+            "enum": [
+              "live",
+              "test"
+            ],
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "key_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "last_used_at": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "org_id": {
+            "type": "string"
+          },
+          "revoked_at": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "rotated_from_key_id": {
+            "description": "The key this one replaced",
+            "type": "string"
+          },
+          "rotation_ends_at": {
+            "description": "Until then the replaced key still works",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "scopes": {
+            "description": "Empty: the creator's roles decide",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "allowed_ips",
+          "created_by",
+          "display_prefix",
+          "environment",
+          "key_id",
+          "label",
+          "org_id",
+          "scopes"
+        ],
+        "type": "object"
+      },
+      "KeyValidate": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_ips": {
+            "items": {
+              "description": "Address or CIDR range",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "environment": {
+            "description": "Default: the calling environment",
+            "enum": [
+              "live",
+              "test"
+            ],
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "RFC 3339, or YYYY-MM-DD for the end of that UTC day; within 3 years",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "description": "api.pdf.merge.execute, api.pdf.*, api.platform.jobs.read, ...",
+              "type": "string"
+            },
+            "maxItems": 200,
+            "type": "array"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "KeyValidated": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_ips": {
+            "description": "Canonical: CIDRs masked",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "environment": {
+            "enum": [
+              "live",
+              "test"
+            ],
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "scopes": {
+            "description": "Duplicates dropped",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "allowed_ips",
+          "environment",
+          "expires_at",
+          "label",
+          "scopes",
+          "valid"
         ],
         "type": "object"
       },
@@ -10537,6 +10709,484 @@
           "jobs"
         ],
         "x-lowco-scope": "api.platform.jobs.write"
+      }
+    },
+    "/v1/keys": {
+      "get": {
+        "operationId": "keys_list",
+        "parameters": [
+          {
+            "description": "Page size",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "page": {
+                    "summary": "The environment's bindings",
+                    "value": {
+                      "data": {
+                        "items": [
+                          {
+                            "allowed_ips": [
+                              "203.0.113.0/24"
+                            ],
+                            "created_at": "2026-10-09T08:00:00Z",
+                            "created_by": "usr_01JA9A1C4E7G0J3M6P9R2T5W8Y",
+                            "display_prefix": "lc_test_cd34",
+                            "environment": "test",
+                            "expires_at": "2027-04-01T23:59:59Z",
+                            "key_id": "9a8b7c6d-1e2f-4a3b-8c4d-5e6f7a8b9c0d",
+                            "label": "CI pipeline",
+                            "org_id": "7412",
+                            "rotated_from_key_id": "6f1d2c3b-5a4e-4f00-8a11-2b3c4d5e6f70",
+                            "rotation_ends_at": "2026-10-10T08:00:00Z",
+                            "scopes": [
+                              "api.pdf.*",
+                              "api.platform.jobs.read"
+                            ]
+                          },
+                          {
+                            "allowed_ips": [
+                              "203.0.113.0/24"
+                            ],
+                            "created_at": "2026-10-09T08:00:00Z",
+                            "created_by": "usr_01JA9A1C4E7G0J3M6P9R2T5W8Y",
+                            "display_prefix": "lc_test_ab12",
+                            "environment": "test",
+                            "expires_at": "2027-04-01T23:59:59Z",
+                            "key_id": "6f1d2c3b-5a4e-4f00-8a11-2b3c4d5e6f70",
+                            "label": "CI pipeline",
+                            "org_id": "7412",
+                            "scopes": [
+                              "api.pdf.*",
+                              "api.platform.jobs.read"
+                            ]
+                          }
+                        ],
+                        "next_cursor": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "description": "A page; pass next_cursor as cursor for the next one (null at the end).",
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "$ref": "#/components/schemas/KeyBinding"
+                          },
+                          "type": "array"
+                        },
+                        "next_cursor": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "next_cursor"
+                      ],
+                      "type": "object"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "A page",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "bad-cursor": {
+                    "summary": "A cursor from another list",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_param",
+                        "message": "cursor is not a cursor returned by this endpoint.",
+                        "param": "cursor",
+                        "reason": "invalid_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Key bindings of the calling environment, newest first",
+        "tags": [
+          "keys"
+        ],
+        "x-lowco-scope": "api.platform.settings.read"
+      }
+    },
+    "/v1/keys/validate": {
+      "post": {
+        "description": "Applies lowco-auth's rules (and refuses an api.* scope that names no Lowco API permission) and names every failing entry in details[], e.g. allowed_ips[1]. Keys are minted through kavach POST /v1/auth/api-keys; nothing is stored here.",
+        "operationId": "keys_validate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "ci": {
+                  "summary": "A CI key for PDF operations from one office network",
+                  "value": {
+                    "allowed_ips": [
+                      "203.0.113.7/24"
+                    ],
+                    "environment": "test",
+                    "expires_at": "2027-04-01",
+                    "label": "CI pipeline",
+                    "scopes": [
+                      "api.pdf.*",
+                      "api.platform.jobs.read"
+                    ]
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/KeyValidate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "valid": {
+                    "summary": "The access lowco-auth will store (CIDR masked)",
+                    "value": {
+                      "data": {
+                        "allowed_ips": [
+                          "203.0.113.0/24"
+                        ],
+                        "environment": "test",
+                        "expires_at": "2027-04-01T23:59:59Z",
+                        "label": "CI pipeline",
+                        "scopes": [
+                          "api.pdf.*",
+                          "api.platform.jobs.read"
+                        ],
+                        "valid": true
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/KeyValidated"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The access lowco-auth will store",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "bad-cidr": {
+                    "summary": "An address that is not an IP or CIDR range",
+                    "value": {
+                      "error": {
+                        "code": 422,
+                        "details": [
+                          {
+                            "message": "\"10.0.0.300/8\" is not an IP address or CIDR range",
+                            "param": "allowed_ips[1]",
+                            "reason": "invalid_param"
+                          }
+                        ],
+                        "doc_url": "https://docs.lowco.ai/api/errors#validation_failed",
+                        "message": "1 parameter is invalid. See details.",
+                        "param": "allowed_ips[1]",
+                        "reason": "validation_failed",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: consent_required, document_not_recognised, file_corrupt, file_rejected, file_url_forbidden, file_url_unreachable, idempotency_key_reused, invalid_identifier, invalid_password, password_required, schema_invalid, sender_not_verified, suppressed, template_not_approved, too_many_files, too_many_pages, validation_failed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Check a key's label, scopes, allowed IPs and expiry before minting it",
+        "tags": [
+          "keys"
+        ],
+        "x-lowco-scope": "api.platform.settings.write"
+      }
+    },
+    "/v1/keys/{key_id}/sync": {
+      "post": {
+        "description": "Call after creating, rotating, editing or revoking a key. The key is read from lowco-auth within the calling organization; a key of another organization is 404 key_not_found. A rotated key's rotation_ends_at is its predecessor's expiry.",
+        "operationId": "keys_sync",
+        "parameters": [
+          {
+            "description": "The lowco-auth key id",
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "rotated": {
+                    "summary": "A rotated key: the replaced key works until rotation_ends_at",
+                    "value": {
+                      "data": {
+                        "allowed_ips": [
+                          "203.0.113.0/24"
+                        ],
+                        "created_at": "2026-10-09T08:00:00Z",
+                        "created_by": "usr_01JA9A1C4E7G0J3M6P9R2T5W8Y",
+                        "display_prefix": "lc_test_cd34",
+                        "environment": "test",
+                        "expires_at": "2027-04-01T23:59:59Z",
+                        "key_id": "9a8b7c6d-1e2f-4a3b-8c4d-5e6f7a8b9c0d",
+                        "label": "CI pipeline",
+                        "org_id": "7412",
+                        "rotated_from_key_id": "6f1d2c3b-5a4e-4f00-8a11-2b3c4d5e6f70",
+                        "rotation_ends_at": "2026-10-10T08:00:00Z",
+                        "scopes": [
+                          "api.pdf.*",
+                          "api.platform.jobs.read"
+                        ]
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/KeyBinding"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The binding",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "foreign": {
+                    "summary": "No such key in this organization",
+                    "value": {
+                      "error": {
+                        "code": 404,
+                        "doc_url": "https://docs.lowco.ai/api/errors#key_not_found",
+                        "message": "No API key 6f1d2c3b-5a4e-4f00-8a11-2b3c4d5e6f70 in this organisation.",
+                        "param": "key_id",
+                        "reason": "key_not_found",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: delivery_not_found, file_not_found, job_not_found, key_not_found, message_not_found, request_not_found, route_not_found, template_not_found, webhook_not_found.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Copy a key from lowco-auth into its Lowco API binding",
+        "tags": [
+          "keys"
+        ],
+        "x-lowco-scope": "api.platform.settings.write"
       }
     },
     "/v1/ocr/handwriting": {
@@ -20432,6 +21082,10 @@
     {
       "description": "Environment settings and data deletion.",
       "name": "settings"
+    },
+    {
+      "description": "Lowco API key bindings: list, validate access before minting, and sync from lowco-auth after a change.",
+      "name": "keys"
     },
     {
       "description": "Usage and the month's balance.",
