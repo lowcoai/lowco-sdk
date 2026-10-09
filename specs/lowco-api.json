@@ -6224,6 +6224,47 @@
         ],
         "type": "object"
       },
+      "UsageAlert": {
+        "additionalProperties": false,
+        "description": "A usage.threshold event",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "credits_used": {
+            "description": "Decimal, the month's live credits then",
+            "type": "string"
+          },
+          "event_id": {
+            "type": "string"
+          },
+          "monthly_credit_cap": {
+            "description": "Decimal, the cap when it was crossed",
+            "type": "string"
+          },
+          "percent": {
+            "enum": [
+              80,
+              100
+            ],
+            "type": "integer"
+          },
+          "period": {
+            "example": "2026-10",
+            "type": "string"
+          }
+        },
+        "required": [
+          "created_at",
+          "credits_used",
+          "event_id",
+          "monthly_credit_cap",
+          "percent",
+          "period"
+        ],
+        "type": "object"
+      },
       "ValidationIssue": {
         "properties": {
           "code": {
@@ -20326,6 +20367,168 @@
           }
         },
         "summary": "Usage of the calling environment by day, meter, key or operation, with totals and the month's balance",
+        "tags": [
+          "usage"
+        ],
+        "x-lowco-scope": "api.platform.usage.read"
+      }
+    },
+    "/v1/usage/alerts": {
+      "get": {
+        "operationId": "usage_alerts",
+        "parameters": [
+          {
+            "description": "Page size",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "two": {
+                    "summary": "The month reached 80 and then 100 percent of a 50-credit cap",
+                    "value": {
+                      "data": {
+                        "items": [
+                          {
+                            "created_at": "2026-10-09T11:20:00Z",
+                            "credits_used": "50.2500",
+                            "event_id": "evt_01JA9F2K5M8P1R4T7W0Y3A6C9E",
+                            "monthly_credit_cap": "50.0000",
+                            "percent": 100,
+                            "period": "2026-10"
+                          },
+                          {
+                            "created_at": "2026-10-08T10:00:00Z",
+                            "credits_used": "40.1000",
+                            "event_id": "evt_01JA9E8H1K4M7P0R3T6W9Y2B5D",
+                            "monthly_credit_cap": "50.0000",
+                            "percent": 80,
+                            "period": "2026-10"
+                          }
+                        ],
+                        "next_cursor": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "description": "A page; pass next_cursor as cursor for the next one (null at the end).",
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "$ref": "#/components/schemas/UsageAlert"
+                          },
+                          "type": "array"
+                        },
+                        "next_cursor": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "next_cursor"
+                      ],
+                      "type": "object"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "A page",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "bad-cursor": {
+                    "summary": "A cursor from another list",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_param",
+                        "message": "cursor is not a cursor returned by this endpoint.",
+                        "param": "cursor",
+                        "reason": "invalid_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Spend alerts: live usage reached 80 or 100 percent of the monthly credit cap, newest first",
         "tags": [
           "usage"
         ],

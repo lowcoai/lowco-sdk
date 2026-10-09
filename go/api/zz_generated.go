@@ -2387,6 +2387,33 @@ type Usage struct {
 	Totals      UsageTotals `json:"totals"`
 }
 
+// A usage.threshold event
+type UsageAlert struct {
+	CreatedAt string `json:"created_at"`
+	// Decimal, the month's live credits then
+	CreditsUsed string `json:"credits_used"`
+	EventID     string `json:"event_id"`
+	// Decimal, the cap when it was crossed
+	MonthlyCreditCap string `json:"monthly_credit_cap"`
+	// One of: 80, 100.
+	Percent int    `json:"percent"`
+	Period  string `json:"period"`
+}
+
+// A page; pass next_cursor as cursor for the next one (null at the end).
+type UsageAlertsData struct {
+	Items      []UsageAlert `json:"items"`
+	NextCursor *string      `json:"next_cursor"`
+}
+
+// UsageAlertsQuery is a Lowco API object.
+type UsageAlertsQuery struct {
+	// Page size
+	Limit *int `json:"limit,omitempty"`
+	// next_cursor of the previous page.
+	Cursor *string `json:"cursor,omitempty"`
+}
+
 // UsageBalance is a Lowco API object.
 type UsageBalance struct {
 	AsOf             *string                `json:"as_of,omitempty"`
@@ -3132,6 +3159,20 @@ func (r *TemplatesResource) Update(ctx context.Context, id string, body RenderTe
 
 // UsageResource: Usage and balance.
 type UsageResource struct{ c *core }
+
+// Alerts: Spend alerts: live usage reached 80 or 100 percent of the monthly credit cap, newest first.
+func (r *UsageResource) Alerts(ctx context.Context, query *UsageAlertsQuery, opts ...RequestOption) (*UsageAlertsData, error) {
+	var out UsageAlertsData
+	if err := r.c.call(ctx, http.MethodGet, "/v1/usage/alerts", toQuery(query), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// AlertsAll pages through Alerts, following next_cursor.
+func (r *UsageResource) AlertsAll(ctx context.Context, query *UsageAlertsQuery, opts ...RequestOption) *Pager[UsageAlert] {
+	return newPager[UsageAlert](r.c, "/v1/usage/alerts", toQuery(query), opts)
+}
 
 // Get: Usage of the calling environment by day, meter, key or operation, with totals and the month's balance.
 func (r *UsageResource) Get(ctx context.Context, query *UsageGetQuery, opts ...RequestOption) (*Usage, error) {

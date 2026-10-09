@@ -7418,6 +7418,98 @@ class Usage {
       };
 }
 
+/// A usage.threshold event
+class UsageAlert {
+  const UsageAlert({
+    this.createdAt,
+    this.creditsUsed,
+    this.eventId,
+    this.monthlyCreditCap,
+    this.percent,
+    this.period,
+  });
+
+  factory UsageAlert.fromJson(Map<String, dynamic> json) => UsageAlert(
+        createdAt: json['created_at'] as String?,
+        creditsUsed: json['credits_used'] as String?,
+        eventId: json['event_id'] as String?,
+        monthlyCreditCap: json['monthly_credit_cap'] as String?,
+        percent: (json['percent'] as num?)?.toInt(),
+        period: json['period'] as String?,
+      );
+
+  final String? createdAt;
+
+  /// Decimal, the month's live credits then
+  final String? creditsUsed;
+
+  final String? eventId;
+
+  /// Decimal, the cap when it was crossed
+  final String? monthlyCreditCap;
+
+  final int? percent;
+
+  final String? period;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (createdAt != null) 'created_at': createdAt!,
+        if (creditsUsed != null) 'credits_used': creditsUsed!,
+        if (eventId != null) 'event_id': eventId!,
+        if (monthlyCreditCap != null) 'monthly_credit_cap': monthlyCreditCap!,
+        if (percent != null) 'percent': percent!,
+        if (period != null) 'period': period!,
+      };
+}
+
+/// A page; pass next_cursor as cursor for the next one (null at the end).
+class UsageAlertsData {
+  const UsageAlertsData({
+    this.items,
+    this.nextCursor,
+  });
+
+  factory UsageAlertsData.fromJson(Map<String, dynamic> json) => UsageAlertsData(
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : UsageAlert.fromJson(e as Map<String, dynamic>))!).toList().cast<UsageAlert>(),
+        nextCursor: json['next_cursor'] as String?,
+      );
+
+  final List<UsageAlert>? items;
+
+  final String? nextCursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+        if (nextCursor != null) 'next_cursor': nextCursor!,
+      };
+}
+
+class UsageAlertsQuery {
+  const UsageAlertsQuery({
+    this.limit,
+    this.cursor,
+  });
+
+  factory UsageAlertsQuery.fromJson(Map<String, dynamic> json) => UsageAlertsQuery(
+        limit: (json['limit'] as num?)?.toInt(),
+        cursor: json['cursor'] as String?,
+      );
+
+  /// Page size
+  final int? limit;
+
+  /// next_cursor of the previous page.
+  final String? cursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (limit != null) 'limit': limit!,
+        if (cursor != null) 'cursor': cursor!,
+      };
+}
+
 class UsageBalance {
   const UsageBalance({
     this.asOf,
@@ -8394,6 +8486,12 @@ class TemplatesResource {
 class UsageResource {
   UsageResource(this._core);
   final Core _core;
+
+  /// Spend alerts: live usage reached 80 or 100 percent of the monthly credit cap, newest first.
+  Future<UsageAlertsData> alerts(UsageAlertsQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/usage/alerts', query: query?.toJson(), body: null, decode: (j) => UsageAlertsData.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Every item of alerts, page after page (follows next_cursor).
+  Stream<UsageAlert> alertsAll(UsageAlertsQuery? query, [RequestOptions? options]) => _core.paginate('/v1/usage/alerts', query?.toJson(), (j) => UsageAlert.fromJson(j as Map<String, dynamic>), options);
 
   /// Usage of the calling environment by day, meter, key or operation, with totals and the month's balance.
   Future<Usage> get(UsageGetQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/usage', query: query?.toJson(), body: null, decode: (j) => Usage.fromJson(j as Map<String, dynamic>), options: options);

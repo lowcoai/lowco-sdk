@@ -2016,6 +2016,28 @@ class TemplatesListVersionsQuery(TypedDict):
 
 Usage = TypedDict("Usage", {"balance": "NotRequired[UsageBalance]", "billable": "bool", "environment": "Literal[\"live\", \"test\"]", "from": "str", "group_by": "str", "items": "list[UsageItem]", "next_cursor": "Optional[str]", "to": "str", "totals": "UsageTotals"})
 
+class UsageAlert(TypedDict):
+    """A usage.threshold event"""
+    created_at: str
+    credits_used: str
+    """Decimal, the month's live credits then"""
+    event_id: str
+    monthly_credit_cap: str
+    """Decimal, the cap when it was crossed"""
+    percent: int
+    period: str
+
+class UsageAlertsData(TypedDict):
+    """A page; pass next_cursor as cursor for the next one (null at the end)."""
+    items: list[UsageAlert]
+    next_cursor: Optional[str]
+
+class UsageAlertsQuery(TypedDict):
+    limit: NotRequired[int]
+    """Page size"""
+    cursor: NotRequired[str]
+    """next_cursor of the previous page."""
+
 class UsageBalance(TypedDict):
     as_of: NotRequired[str]
     cap_remaining: NotRequired[Optional[str]]
@@ -2923,6 +2945,14 @@ class UsageResource:
 
     def __init__(self, core: Core) -> None:
         self._core = core
+
+    def alerts(self, *, cursor: Optional[str] = None, limit: Optional[int] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> UsageAlertsData:
+        """Spend alerts: live usage reached 80 or 100 percent of the monthly credit cap, newest first."""
+        return self._core.call("GET", f"/v1/usage/alerts", query={"limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def alerts_all(self, *, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[UsageAlert]:
+        """Every item of alerts, page after page (follows next_cursor)."""
+        return self._core.paginate(f"/v1/usage/alerts", {"limit": limit}, request_id=request_id)
 
     def get(self, *, cursor: Optional[str] = None, format: Optional[Literal["json", "csv"]] = None, from_: Optional[str] = None, group_by: Optional[Literal["day", "meter", "key", "operation"]] = None, key_id: Optional[str] = None, limit: Optional[int] = None, meter: Optional[str] = None, to: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Usage:
         """Usage of the calling environment by day, meter, key or operation, with totals and the month's balance."""

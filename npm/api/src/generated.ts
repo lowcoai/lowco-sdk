@@ -2198,6 +2198,31 @@ export interface Usage {
   totals: UsageTotals;
 }
 
+/** A usage.threshold event */
+export interface UsageAlert {
+  created_at: string;
+  /** Decimal, the month's live credits then */
+  credits_used: string;
+  event_id: string;
+  /** Decimal, the cap when it was crossed */
+  monthly_credit_cap: string;
+  percent: 80 | 100;
+  period: string;
+}
+
+/** A page; pass next_cursor as cursor for the next one (null at the end). */
+export interface UsageAlertsData {
+  items: UsageAlert[];
+  next_cursor: string | null;
+}
+
+export interface UsageAlertsQuery {
+  /** Page size */
+  limit?: number;
+  /** next_cursor of the previous page. */
+  cursor?: string;
+}
+
 export interface UsageBalance {
   as_of?: string;
   cap_remaining?: string | null;
@@ -2746,6 +2771,16 @@ export class TemplatesResource {
 /** Usage and balance. */
 export class UsageResource {
   constructor(private readonly core: Core) {}
+
+  /** Spend alerts: live usage reached 80 or 100 percent of the monthly credit cap, newest first. */
+  alerts(query?: UsageAlertsQuery, options?: RequestOptions): Promise<UsageAlertsData> {
+    return this.core.call<UsageAlertsData>("GET", `/v1/usage/alerts`, { query: query as unknown as Record<string, unknown> | undefined, json: undefined }, options);
+  }
+
+  /** Every item of alerts, page after page (follows next_cursor). */
+  alertsAll(query?: Omit<UsageAlertsQuery, "cursor">, options?: RequestOptions): AsyncIterable<UsageAlert> {
+    return this.core.paginate<UsageAlert>(`/v1/usage/alerts`, query as unknown as Record<string, unknown> | undefined, options);
+  }
 
   /** Usage of the calling environment by day, meter, key or operation, with totals and the month's balance. */
   get(query?: UsageGetQuery, options?: RequestOptions): Promise<Usage> {
