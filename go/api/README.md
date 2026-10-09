@@ -49,6 +49,20 @@ if errors.As(err, &e) && e.Reason == api.ReasonFileTooLarge { … } // *api.JobF
 ev, err := api.ConstructEvent(rawBody, r.Header.Get(api.SignatureHeader), secret) // api.ErrSignature when it does not verify
 ```
 
+## Calls by path
+
+Tools that build calls from the API document (`lowco api` in lowco-cli) use the two untyped entry points, which share the typed services' file handling, retries, errors and job waiting:
+
+```go
+ans, err := client.Operation(ctx, "/v1/pdf/merge", api.OperationInput{
+	Files:  []api.FileInput{api.FilePath("a.pdf"), api.FilePath("b.pdf")},
+	Params: map[string]any{"bookmarks": true},
+})
+raw, err := client.Request(ctx, http.MethodGet, "/v1/jobs", url.Values{"status": {"failed"}}, nil)
+```
+
+`ans.Data` is the result as `json.RawMessage`; `ans.Result(ctx)` waits for a job. Applications should prefer the typed services.
+
 ## Configuration
 
 `api.Config{APIKey, BaseURL, HTTPClient, Timeout, MaxRetries}`; the key defaults to `LOWCO_API_KEY` and the base URL to `LOWCO_API_BASE_URL`, else `https://api.lowco.ai`. Reference: https://docs.lowco.ai/api/

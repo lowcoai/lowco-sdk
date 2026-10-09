@@ -129,6 +129,13 @@ func newMock(t *testing.T) *mock {
 		case "GET /v1/files/file_x/content":
 			w.Header().Set("Location", m.srv.URL+"/v1/downloads/tok_x")
 			w.WriteHeader(307)
+		case "GET /v1/usage":
+			if q["format"] == "csv" {
+				w.Header().Set("Content-Type", "text/csv")
+				_, _ = w.Write([]byte("day,credits\n2026-10-09,1.50\n"))
+				return
+			}
+			send(200, env(map[string]any{"rows": []any{}}))
 		case "GET /v1/downloads/tok_x":
 			w.Header().Set("Content-Type", "application/pdf")
 			_, _ = w.Write([]byte("%PDF-1.7"))
