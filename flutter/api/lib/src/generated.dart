@@ -389,7 +389,7 @@ class AuditListVerifyQuery {
         format: json['format'] as String?,
       );
 
-  /// Only this operation
+  /// Only this operation (a verify lookup, or a document type read by docai/kyc)
   final String? operation;
 
   final String? result;
@@ -460,6 +460,202 @@ class BBox {
         if (w != null) 'w': w!,
         if (x != null) 'x': x!,
         if (y != null) 'y': y!,
+      };
+}
+
+class BankStatementResult {
+  const BankStatementResult({
+    this.account,
+    this.balanceReconciled,
+    this.closingBalance,
+    this.openingBalance,
+    this.pageCount,
+    this.periodFrom,
+    this.periodTo,
+    this.summary,
+    this.transactions,
+    this.validation,
+    this.warnings,
+  });
+
+  factory BankStatementResult.fromJson(Map<String, dynamic> json) => BankStatementResult(
+        account: json['account'] == null ? null : BankStatementResultAccount.fromJson(json['account'] as Map<String, dynamic>),
+        balanceReconciled: json['balance_reconciled'] as bool?,
+        closingBalance: json['closing_balance'] == null ? null : Field.fromJson(json['closing_balance'] as Map<String, dynamic>),
+        openingBalance: json['opening_balance'] == null ? null : Field.fromJson(json['opening_balance'] as Map<String, dynamic>),
+        pageCount: (json['page_count'] as num?)?.toInt(),
+        periodFrom: json['period_from'] == null ? null : Field.fromJson(json['period_from'] as Map<String, dynamic>),
+        periodTo: json['period_to'] == null ? null : Field.fromJson(json['period_to'] as Map<String, dynamic>),
+        summary: json['summary'] == null ? null : BankStatementResultSummary.fromJson(json['summary'] as Map<String, dynamic>),
+        transactions: (json['transactions'] as List?)?.map((e) => (e == null ? null : BankTransaction.fromJson(e as Map<String, dynamic>))!).toList().cast<BankTransaction>(),
+        validation: (json['validation'] as List?)?.map((e) => (e == null ? null : ValidationIssue.fromJson(e as Map<String, dynamic>))!).toList().cast<ValidationIssue>(),
+        warnings: (json['warnings'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+      );
+
+  final BankStatementResultAccount? account;
+
+  /// At least one balance could be checked and every one equals the previous balance plus the credit minus the debit (and the closing balance the last); mismatches are in validation, never corrected
+  final bool? balanceReconciled;
+
+  final Field? closingBalance;
+
+  final Field? openingBalance;
+
+  final int? pageCount;
+
+  final Field? periodFrom;
+
+  final Field? periodTo;
+
+  final BankStatementResultSummary? summary;
+
+  /// In the statement's order, every value with the box of the words it was read from
+  final List<BankTransaction>? transactions;
+
+  final List<ValidationIssue>? validation;
+
+  final List<String>? warnings;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (account != null) 'account': account!.toJson(),
+        if (balanceReconciled != null) 'balance_reconciled': balanceReconciled!,
+        if (closingBalance != null) 'closing_balance': closingBalance!.toJson(),
+        if (openingBalance != null) 'opening_balance': openingBalance!.toJson(),
+        if (pageCount != null) 'page_count': pageCount!,
+        if (periodFrom != null) 'period_from': periodFrom!.toJson(),
+        if (periodTo != null) 'period_to': periodTo!.toJson(),
+        if (summary != null) 'summary': summary!.toJson(),
+        if (transactions != null) 'transactions': transactions!.map((e) => e.toJson()).toList(),
+        if (validation != null) 'validation': validation!.map((e) => e.toJson()).toList(),
+        if (warnings != null) 'warnings': warnings!,
+      };
+}
+
+class BankStatementResultAccount {
+  const BankStatementResultAccount({
+    this.accountNumber,
+    this.accountType,
+    this.bankName,
+    this.branch,
+    this.currency,
+    this.holderName,
+    this.ifsc,
+  });
+
+  factory BankStatementResultAccount.fromJson(Map<String, dynamic> json) => BankStatementResultAccount(
+        accountNumber: json['account_number'] == null ? null : Field.fromJson(json['account_number'] as Map<String, dynamic>),
+        accountType: json['account_type'] == null ? null : Field.fromJson(json['account_type'] as Map<String, dynamic>),
+        bankName: json['bank_name'] == null ? null : Field.fromJson(json['bank_name'] as Map<String, dynamic>),
+        branch: json['branch'] == null ? null : Field.fromJson(json['branch'] as Map<String, dynamic>),
+        currency: json['currency'] == null ? null : Field.fromJson(json['currency'] as Map<String, dynamic>),
+        holderName: json['holder_name'] == null ? null : Field.fromJson(json['holder_name'] as Map<String, dynamic>),
+        ifsc: json['ifsc'] == null ? null : Field.fromJson(json['ifsc'] as Map<String, dynamic>),
+      );
+
+  final Field? accountNumber;
+
+  final Field? accountType;
+
+  final Field? bankName;
+
+  final Field? branch;
+
+  final Field? currency;
+
+  final Field? holderName;
+
+  final Field? ifsc;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (accountNumber != null) 'account_number': accountNumber!.toJson(),
+        if (accountType != null) 'account_type': accountType!.toJson(),
+        if (bankName != null) 'bank_name': bankName!.toJson(),
+        if (branch != null) 'branch': branch!.toJson(),
+        if (currency != null) 'currency': currency!.toJson(),
+        if (holderName != null) 'holder_name': holderName!.toJson(),
+        if (ifsc != null) 'ifsc': ifsc!.toJson(),
+      };
+}
+
+class BankStatementResultSummary {
+  const BankStatementResultSummary({
+    this.totalCredits,
+    this.totalDebits,
+    this.transactionCount,
+  });
+
+  factory BankStatementResultSummary.fromJson(Map<String, dynamic> json) => BankStatementResultSummary(
+        totalCredits: json['total_credits'] as num?,
+        totalDebits: json['total_debits'] as num?,
+        transactionCount: (json['transaction_count'] as num?)?.toInt(),
+      );
+
+  final num? totalCredits;
+
+  final num? totalDebits;
+
+  final int? transactionCount;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (totalCredits != null) 'total_credits': totalCredits!,
+        if (totalDebits != null) 'total_debits': totalDebits!,
+        if (transactionCount != null) 'transaction_count': transactionCount!,
+      };
+}
+
+class BankTransaction {
+  const BankTransaction({
+    this.balance,
+    this.category,
+    this.credit,
+    this.date,
+    this.debit,
+    this.description,
+    this.reference,
+    this.valueDate,
+  });
+
+  factory BankTransaction.fromJson(Map<String, dynamic> json) => BankTransaction(
+        balance: json['balance'] == null ? null : Field.fromJson(json['balance'] as Map<String, dynamic>),
+        category: json['category'] == null ? null : Field.fromJson(json['category'] as Map<String, dynamic>),
+        credit: json['credit'] == null ? null : Field.fromJson(json['credit'] as Map<String, dynamic>),
+        date: json['date'] == null ? null : Field.fromJson(json['date'] as Map<String, dynamic>),
+        debit: json['debit'] == null ? null : Field.fromJson(json['debit'] as Map<String, dynamic>),
+        description: json['description'] == null ? null : Field.fromJson(json['description'] as Map<String, dynamic>),
+        reference: json['reference'] == null ? null : Field.fromJson(json['reference'] as Map<String, dynamic>),
+        valueDate: json['value_date'] == null ? null : Field.fromJson(json['value_date'] as Map<String, dynamic>),
+      );
+
+  final Field? balance;
+
+  /// One of salary, upi, card, cash, transfer, cheque, loan_emi, interest, bank_charges, tax, refund, investment, utilities, other (rules over the narration)
+  final Field? category;
+
+  final Field? credit;
+
+  final Field? date;
+
+  final Field? debit;
+
+  final Field? description;
+
+  final Field? reference;
+
+  final Field? valueDate;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (balance != null) 'balance': balance!.toJson(),
+        if (category != null) 'category': category!.toJson(),
+        if (credit != null) 'credit': credit!.toJson(),
+        if (date != null) 'date': date!.toJson(),
+        if (debit != null) 'debit': debit!.toJson(),
+        if (description != null) 'description': description!.toJson(),
+        if (reference != null) 'reference': reference!.toJson(),
+        if (valueDate != null) 'value_date': valueDate!.toJson(),
       };
 }
 
@@ -800,6 +996,135 @@ class CapabilityHandling {
         if (label != null) 'label': label!,
         if (operations != null) 'operations': operations!,
         if (providers != null) 'providers': providers!.map((e) => e.toJson()).toList(),
+      };
+}
+
+class ChequeResult {
+  const ChequeResult({
+    this.accountHolder,
+    this.accountNumber,
+    this.amountFigures,
+    this.amountWords,
+    this.amountsConsistent,
+    this.bankName,
+    this.branch,
+    this.chequeNumber,
+    this.date,
+    this.ifsc,
+    this.micr,
+    this.pageCount,
+    this.payee,
+    this.signaturePresent,
+    this.validation,
+    this.warnings,
+  });
+
+  factory ChequeResult.fromJson(Map<String, dynamic> json) => ChequeResult(
+        accountHolder: json['account_holder'] == null ? null : Field.fromJson(json['account_holder'] as Map<String, dynamic>),
+        accountNumber: json['account_number'] == null ? null : Field.fromJson(json['account_number'] as Map<String, dynamic>),
+        amountFigures: json['amount_figures'] == null ? null : Field.fromJson(json['amount_figures'] as Map<String, dynamic>),
+        amountWords: json['amount_words'] == null ? null : Field.fromJson(json['amount_words'] as Map<String, dynamic>),
+        amountsConsistent: json['amounts_consistent'] as bool?,
+        bankName: json['bank_name'] == null ? null : Field.fromJson(json['bank_name'] as Map<String, dynamic>),
+        branch: json['branch'] == null ? null : Field.fromJson(json['branch'] as Map<String, dynamic>),
+        chequeNumber: json['cheque_number'] == null ? null : Field.fromJson(json['cheque_number'] as Map<String, dynamic>),
+        date: json['date'] == null ? null : Field.fromJson(json['date'] as Map<String, dynamic>),
+        ifsc: json['ifsc'] == null ? null : Field.fromJson(json['ifsc'] as Map<String, dynamic>),
+        micr: json['micr'] == null ? null : ChequeResultMicr.fromJson(json['micr'] as Map<String, dynamic>),
+        pageCount: (json['page_count'] as num?)?.toInt(),
+        payee: json['payee'] == null ? null : Field.fromJson(json['payee'] as Map<String, dynamic>),
+        signaturePresent: json['signature_present'] == null ? null : Field.fromJson(json['signature_present'] as Map<String, dynamic>),
+        validation: (json['validation'] as List?)?.map((e) => (e == null ? null : ValidationIssue.fromJson(e as Map<String, dynamic>))!).toList().cast<ValidationIssue>(),
+        warnings: (json['warnings'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+      );
+
+  final Field? accountHolder;
+
+  final Field? accountNumber;
+
+  final Field? amountFigures;
+
+  final Field? amountWords;
+
+  /// The amount in words equals the figures (null when either is missing)
+  final bool? amountsConsistent;
+
+  final Field? bankName;
+
+  final Field? branch;
+
+  final Field? chequeNumber;
+
+  final Field? date;
+
+  final Field? ifsc;
+
+  /// The MICR band (CTS-2010) read from the bottom of the cheque
+  final ChequeResultMicr? micr;
+
+  final int? pageCount;
+
+  final Field? payee;
+
+  /// Ink where the drawer signs (true or false; null when no image of the page could be looked at)
+  final Field? signaturePresent;
+
+  final List<ValidationIssue>? validation;
+
+  final List<String>? warnings;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (accountHolder != null) 'account_holder': accountHolder!.toJson(),
+        if (accountNumber != null) 'account_number': accountNumber!.toJson(),
+        if (amountFigures != null) 'amount_figures': amountFigures!.toJson(),
+        if (amountWords != null) 'amount_words': amountWords!.toJson(),
+        if (amountsConsistent != null) 'amounts_consistent': amountsConsistent!,
+        if (bankName != null) 'bank_name': bankName!.toJson(),
+        if (branch != null) 'branch': branch!.toJson(),
+        if (chequeNumber != null) 'cheque_number': chequeNumber!.toJson(),
+        if (date != null) 'date': date!.toJson(),
+        if (ifsc != null) 'ifsc': ifsc!.toJson(),
+        if (micr != null) 'micr': micr!.toJson(),
+        if (pageCount != null) 'page_count': pageCount!,
+        if (payee != null) 'payee': payee!.toJson(),
+        if (signaturePresent != null) 'signature_present': signaturePresent!.toJson(),
+        if (validation != null) 'validation': validation!.map((e) => e.toJson()).toList(),
+        if (warnings != null) 'warnings': warnings!,
+      };
+}
+
+/// The MICR band (CTS-2010) read from the bottom of the cheque
+class ChequeResultMicr {
+  const ChequeResultMicr({
+    this.accountId,
+    this.chequeNumber,
+    this.sortCode,
+    this.transactionCode,
+  });
+
+  factory ChequeResultMicr.fromJson(Map<String, dynamic> json) => ChequeResultMicr(
+        accountId: json['account_id'] == null ? null : Field.fromJson(json['account_id'] as Map<String, dynamic>),
+        chequeNumber: json['cheque_number'] == null ? null : Field.fromJson(json['cheque_number'] as Map<String, dynamic>),
+        sortCode: json['sort_code'] == null ? null : Field.fromJson(json['sort_code'] as Map<String, dynamic>),
+        transactionCode: json['transaction_code'] == null ? null : Field.fromJson(json['transaction_code'] as Map<String, dynamic>),
+      );
+
+  final Field? accountId;
+
+  final Field? chequeNumber;
+
+  /// 9-digit MICR code: city, bank and branch
+  final Field? sortCode;
+
+  final Field? transactionCode;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (accountId != null) 'account_id': accountId!.toJson(),
+        if (chequeNumber != null) 'cheque_number': chequeNumber!.toJson(),
+        if (sortCode != null) 'sort_code': sortCode!.toJson(),
+        if (transactionCode != null) 'transaction_code': transactionCode!.toJson(),
       };
 }
 
@@ -1184,6 +1509,224 @@ class Deleted {
 }
 
 /// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class DocaiBankStatementParams {
+  const DocaiBankStatementParams({
+    required this.file,
+    this.callbackUrl,
+    this.engine,
+    this.languages,
+    this.pages,
+  });
+
+  /// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+  final FileInput file;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// OCR engine for pages without a text layer
+  final String? engine;
+
+  /// OCR languages for pages without a text layer (default eng, hin)
+  final List<String>? languages;
+
+  /// Pages to read, e.g. 1-3,7
+  final String? pages;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (engine != null) 'engine': engine!,
+        if (languages != null) 'languages': languages!,
+        if (pages != null) 'pages': pages!,
+      };
+
+  /// The named file inputs.
+  Map<String, FileInput?> get fileInputs => {'file': file};
+
+  /// The files, in order.
+  List<FileInput>? get manyFiles => null;
+}
+
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class DocaiBankStatementRequest {
+  const DocaiBankStatementRequest({
+    this.callbackUrl,
+    this.engine,
+    this.fileBase64,
+    this.fileId,
+    this.fileUrl,
+    this.filename,
+    this.languages,
+    this.pages,
+    this.password,
+  });
+
+  factory DocaiBankStatementRequest.fromJson(Map<String, dynamic> json) => DocaiBankStatementRequest(
+        callbackUrl: json['callback_url'] as String?,
+        engine: json['engine'] as String?,
+        fileBase64: json['file_base64'] as String?,
+        fileId: json['file_id'] as String?,
+        fileUrl: json['file_url'] as String?,
+        filename: json['filename'] as String?,
+        languages: (json['languages'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        pages: json['pages'] as String?,
+        password: json['password'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// OCR engine for pages without a text layer
+  final String? engine;
+
+  /// Base64, URL-safe base64 or a data: URL
+  final String? fileBase64;
+
+  /// A stored file of this org and environment (POST /v1/files)
+  final String? fileId;
+
+  /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+  final String? fileUrl;
+
+  /// Name for the stored input
+  final String? filename;
+
+  /// OCR languages for pages without a text layer (default eng, hin)
+  final List<String>? languages;
+
+  /// Pages to read, e.g. 1-3,7
+  final String? pages;
+
+  /// Opens a protected PDF; never stored or logged
+  final String? password;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (engine != null) 'engine': engine!,
+        if (fileBase64 != null) 'file_base64': fileBase64!,
+        if (fileId != null) 'file_id': fileId!,
+        if (fileUrl != null) 'file_url': fileUrl!,
+        if (filename != null) 'filename': filename!,
+        if (languages != null) 'languages': languages!,
+        if (pages != null) 'pages': pages!,
+        if (password != null) 'password': password!,
+      };
+}
+
+typedef DocaiBankStatementResult = BankStatementResult;
+
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class DocaiChequeParams {
+  const DocaiChequeParams({
+    required this.file,
+    this.callbackUrl,
+    this.engine,
+    this.languages,
+    this.pages,
+  });
+
+  /// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+  final FileInput file;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// OCR engine for pages without a text layer
+  final String? engine;
+
+  /// OCR languages for pages without a text layer (default eng, hin)
+  final List<String>? languages;
+
+  /// Pages to read, e.g. 1-3,7
+  final String? pages;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (engine != null) 'engine': engine!,
+        if (languages != null) 'languages': languages!,
+        if (pages != null) 'pages': pages!,
+      };
+
+  /// The named file inputs.
+  Map<String, FileInput?> get fileInputs => {'file': file};
+
+  /// The files, in order.
+  List<FileInput>? get manyFiles => null;
+}
+
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class DocaiChequeRequest {
+  const DocaiChequeRequest({
+    this.callbackUrl,
+    this.engine,
+    this.fileBase64,
+    this.fileId,
+    this.fileUrl,
+    this.filename,
+    this.languages,
+    this.pages,
+    this.password,
+  });
+
+  factory DocaiChequeRequest.fromJson(Map<String, dynamic> json) => DocaiChequeRequest(
+        callbackUrl: json['callback_url'] as String?,
+        engine: json['engine'] as String?,
+        fileBase64: json['file_base64'] as String?,
+        fileId: json['file_id'] as String?,
+        fileUrl: json['file_url'] as String?,
+        filename: json['filename'] as String?,
+        languages: (json['languages'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        pages: json['pages'] as String?,
+        password: json['password'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// OCR engine for pages without a text layer
+  final String? engine;
+
+  /// Base64, URL-safe base64 or a data: URL
+  final String? fileBase64;
+
+  /// A stored file of this org and environment (POST /v1/files)
+  final String? fileId;
+
+  /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+  final String? fileUrl;
+
+  /// Name for the stored input
+  final String? filename;
+
+  /// OCR languages for pages without a text layer (default eng, hin)
+  final List<String>? languages;
+
+  /// Pages to read, e.g. 1-3,7
+  final String? pages;
+
+  /// Opens a protected PDF; never stored or logged
+  final String? password;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (engine != null) 'engine': engine!,
+        if (fileBase64 != null) 'file_base64': fileBase64!,
+        if (fileId != null) 'file_id': fileId!,
+        if (fileUrl != null) 'file_url': fileUrl!,
+        if (filename != null) 'filename': filename!,
+        if (languages != null) 'languages': languages!,
+        if (pages != null) 'pages': pages!,
+        if (password != null) 'password': password!,
+      };
+}
+
+typedef DocaiChequeResult = ChequeResult;
+
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
 class DocaiClassifyParams {
   const DocaiClassifyParams({
     required this.file,
@@ -1542,6 +2085,159 @@ class DocaiInvoiceRequest {
 }
 
 typedef DocaiInvoiceResult = InvoiceResult;
+
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class DocaiKycParams {
+  const DocaiKycParams({
+    required this.file,
+    this.consent,
+    this.purpose,
+    this.callbackUrl,
+    this.documentType,
+    this.engine,
+    this.languages,
+    this.pages,
+    this.referenceId,
+  });
+
+  /// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+  final FileInput file;
+
+  /// Must be true: the person this document belongs to agreed to it being read. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// Why you are reading it (kept in the Verify audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// The document, when you know it (detected otherwise)
+  final String? documentType;
+
+  /// OCR engine for pages without a text layer
+  final String? engine;
+
+  /// OCR languages for pages without a text layer (default eng, hin)
+  final List<String>? languages;
+
+  /// Pages to read, e.g. 1-3,7
+  final String? pages;
+
+  /// Your id for the person or case, kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (consent != null) 'consent': consent!,
+        if (purpose != null) 'purpose': purpose!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (documentType != null) 'document_type': documentType!,
+        if (engine != null) 'engine': engine!,
+        if (languages != null) 'languages': languages!,
+        if (pages != null) 'pages': pages!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+
+  /// The named file inputs.
+  Map<String, FileInput?> get fileInputs => {'file': file};
+
+  /// The files, in order.
+  List<FileInput>? get manyFiles => null;
+}
+
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class DocaiKycRequest {
+  const DocaiKycRequest({
+    this.callbackUrl,
+    this.consent,
+    this.documentType,
+    this.engine,
+    this.fileBase64,
+    this.fileId,
+    this.fileUrl,
+    this.filename,
+    this.languages,
+    this.pages,
+    this.password,
+    this.purpose,
+    this.referenceId,
+  });
+
+  factory DocaiKycRequest.fromJson(Map<String, dynamic> json) => DocaiKycRequest(
+        callbackUrl: json['callback_url'] as String?,
+        consent: json['consent'] as bool?,
+        documentType: json['document_type'] as String?,
+        engine: json['engine'] as String?,
+        fileBase64: json['file_base64'] as String?,
+        fileId: json['file_id'] as String?,
+        fileUrl: json['file_url'] as String?,
+        filename: json['filename'] as String?,
+        languages: (json['languages'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        pages: json['pages'] as String?,
+        password: json['password'] as String?,
+        purpose: json['purpose'] as String?,
+        referenceId: json['reference_id'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Must be true: the person this document belongs to agreed to it being read. Missing or false is 422 consent_required.
+  final bool? consent;
+
+  /// The document, when you know it (detected otherwise)
+  final String? documentType;
+
+  /// OCR engine for pages without a text layer
+  final String? engine;
+
+  /// Base64, URL-safe base64 or a data: URL
+  final String? fileBase64;
+
+  /// A stored file of this org and environment (POST /v1/files)
+  final String? fileId;
+
+  /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+  final String? fileUrl;
+
+  /// Name for the stored input
+  final String? filename;
+
+  /// OCR languages for pages without a text layer (default eng, hin)
+  final List<String>? languages;
+
+  /// Pages to read, e.g. 1-3,7
+  final String? pages;
+
+  /// Opens a protected PDF; never stored or logged
+  final String? password;
+
+  /// Why you are reading it (kept in the Verify audit log). Missing is 422 consent_required.
+  final String? purpose;
+
+  /// Your id for the person or case, kept in the audit log
+  final String? referenceId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (consent != null) 'consent': consent!,
+        if (documentType != null) 'document_type': documentType!,
+        if (engine != null) 'engine': engine!,
+        if (fileBase64 != null) 'file_base64': fileBase64!,
+        if (fileId != null) 'file_id': fileId!,
+        if (fileUrl != null) 'file_url': fileUrl!,
+        if (filename != null) 'filename': filename!,
+        if (languages != null) 'languages': languages!,
+        if (pages != null) 'pages': pages!,
+        if (password != null) 'password': password!,
+        if (purpose != null) 'purpose': purpose!,
+        if (referenceId != null) 'reference_id': referenceId!,
+      };
+}
+
+typedef DocaiKycResult = KYCResult;
 
 /// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
 class DocaiReceiptParams {
@@ -2729,6 +3425,329 @@ class JobsListQuery {
         if (createdBefore != null) 'created_before': createdBefore!,
         if (limit != null) 'limit': limit!,
         if (cursor != null) 'cursor': cursor!,
+      };
+}
+
+/// The number and VID are always masked to their last 4 (XXXX XXXX 1234), in the answer and anything stored
+class KYCAadhaar {
+  const KYCAadhaar({
+    this.address,
+    this.dateOfBirth,
+    this.gender,
+    this.name,
+    this.number,
+    this.vid,
+    this.yearOfBirth,
+  });
+
+  factory KYCAadhaar.fromJson(Map<String, dynamic> json) => KYCAadhaar(
+        address: json['address'] == null ? null : Field.fromJson(json['address'] as Map<String, dynamic>),
+        dateOfBirth: json['date_of_birth'] == null ? null : Field.fromJson(json['date_of_birth'] as Map<String, dynamic>),
+        gender: json['gender'] == null ? null : Field.fromJson(json['gender'] as Map<String, dynamic>),
+        name: json['name'] == null ? null : Field.fromJson(json['name'] as Map<String, dynamic>),
+        number: json['number'] == null ? null : Field.fromJson(json['number'] as Map<String, dynamic>),
+        vid: json['vid'] == null ? null : Field.fromJson(json['vid'] as Map<String, dynamic>),
+        yearOfBirth: json['year_of_birth'] == null ? null : Field.fromJson(json['year_of_birth'] as Map<String, dynamic>),
+      );
+
+  final Field? address;
+
+  final Field? dateOfBirth;
+
+  final Field? gender;
+
+  final Field? name;
+
+  final Field? number;
+
+  final Field? vid;
+
+  final Field? yearOfBirth;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (address != null) 'address': address!.toJson(),
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!.toJson(),
+        if (gender != null) 'gender': gender!.toJson(),
+        if (name != null) 'name': name!.toJson(),
+        if (number != null) 'number': number!.toJson(),
+        if (vid != null) 'vid': vid!.toJson(),
+        if (yearOfBirth != null) 'year_of_birth': yearOfBirth!.toJson(),
+      };
+}
+
+class KYCDrivingLicence {
+  const KYCDrivingLicence({
+    this.address,
+    this.classes,
+    this.dateOfBirth,
+    this.issueDate,
+    this.name,
+    this.number,
+    this.relationName,
+    this.validUntil,
+  });
+
+  factory KYCDrivingLicence.fromJson(Map<String, dynamic> json) => KYCDrivingLicence(
+        address: json['address'] == null ? null : Field.fromJson(json['address'] as Map<String, dynamic>),
+        classes: (json['classes'] as List?)?.map((e) => (e == null ? null : Field.fromJson(e as Map<String, dynamic>))!).toList().cast<Field>(),
+        dateOfBirth: json['date_of_birth'] == null ? null : Field.fromJson(json['date_of_birth'] as Map<String, dynamic>),
+        issueDate: json['issue_date'] == null ? null : Field.fromJson(json['issue_date'] as Map<String, dynamic>),
+        name: json['name'] == null ? null : Field.fromJson(json['name'] as Map<String, dynamic>),
+        number: json['number'] == null ? null : Field.fromJson(json['number'] as Map<String, dynamic>),
+        relationName: json['relation_name'] == null ? null : Field.fromJson(json['relation_name'] as Map<String, dynamic>),
+        validUntil: json['valid_until'] == null ? null : Field.fromJson(json['valid_until'] as Map<String, dynamic>),
+      );
+
+  final Field? address;
+
+  final List<Field>? classes;
+
+  final Field? dateOfBirth;
+
+  final Field? issueDate;
+
+  final Field? name;
+
+  final Field? number;
+
+  final Field? relationName;
+
+  final Field? validUntil;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (address != null) 'address': address!.toJson(),
+        if (classes != null) 'classes': classes!.map((e) => e.toJson()).toList(),
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!.toJson(),
+        if (issueDate != null) 'issue_date': issueDate!.toJson(),
+        if (name != null) 'name': name!.toJson(),
+        if (number != null) 'number': number!.toJson(),
+        if (relationName != null) 'relation_name': relationName!.toJson(),
+        if (validUntil != null) 'valid_until': validUntil!.toJson(),
+      };
+}
+
+class KYCPANCard {
+  const KYCPANCard({
+    this.dateOfBirth,
+    this.fatherName,
+    this.name,
+    this.number,
+  });
+
+  factory KYCPANCard.fromJson(Map<String, dynamic> json) => KYCPANCard(
+        dateOfBirth: json['date_of_birth'] == null ? null : Field.fromJson(json['date_of_birth'] as Map<String, dynamic>),
+        fatherName: json['father_name'] == null ? null : Field.fromJson(json['father_name'] as Map<String, dynamic>),
+        name: json['name'] == null ? null : Field.fromJson(json['name'] as Map<String, dynamic>),
+        number: json['number'] == null ? null : Field.fromJson(json['number'] as Map<String, dynamic>),
+      );
+
+  final Field? dateOfBirth;
+
+  final Field? fatherName;
+
+  final Field? name;
+
+  final Field? number;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!.toJson(),
+        if (fatherName != null) 'father_name': fatherName!.toJson(),
+        if (name != null) 'name': name!.toJson(),
+        if (number != null) 'number': number!.toJson(),
+      };
+}
+
+class KYCPassport {
+  const KYCPassport({
+    this.dateOfBirth,
+    this.expiryDate,
+    this.fileNumber,
+    this.givenNames,
+    this.issueDate,
+    this.mrz,
+    this.mrzValid,
+    this.nationality,
+    this.passportNumber,
+    this.placeOfBirth,
+    this.placeOfIssue,
+    this.sex,
+    this.surname,
+  });
+
+  factory KYCPassport.fromJson(Map<String, dynamic> json) => KYCPassport(
+        dateOfBirth: json['date_of_birth'] == null ? null : Field.fromJson(json['date_of_birth'] as Map<String, dynamic>),
+        expiryDate: json['expiry_date'] == null ? null : Field.fromJson(json['expiry_date'] as Map<String, dynamic>),
+        fileNumber: json['file_number'] == null ? null : Field.fromJson(json['file_number'] as Map<String, dynamic>),
+        givenNames: json['given_names'] == null ? null : Field.fromJson(json['given_names'] as Map<String, dynamic>),
+        issueDate: json['issue_date'] == null ? null : Field.fromJson(json['issue_date'] as Map<String, dynamic>),
+        mrz: json['mrz'] == null ? null : Field.fromJson(json['mrz'] as Map<String, dynamic>),
+        mrzValid: json['mrz_valid'] as bool?,
+        nationality: json['nationality'] == null ? null : Field.fromJson(json['nationality'] as Map<String, dynamic>),
+        passportNumber: json['passport_number'] == null ? null : Field.fromJson(json['passport_number'] as Map<String, dynamic>),
+        placeOfBirth: json['place_of_birth'] == null ? null : Field.fromJson(json['place_of_birth'] as Map<String, dynamic>),
+        placeOfIssue: json['place_of_issue'] == null ? null : Field.fromJson(json['place_of_issue'] as Map<String, dynamic>),
+        sex: json['sex'] == null ? null : Field.fromJson(json['sex'] as Map<String, dynamic>),
+        surname: json['surname'] == null ? null : Field.fromJson(json['surname'] as Map<String, dynamic>),
+      );
+
+  final Field? dateOfBirth;
+
+  final Field? expiryDate;
+
+  final Field? fileNumber;
+
+  final Field? givenNames;
+
+  final Field? issueDate;
+
+  /// The machine-readable zone: value {line1, line2} and, when its check digits pass, what it says (passport_number, surname, given_names, nationality, issuing_country, sex, date_of_birth, expiry_date)
+  final Field? mrz;
+
+  /// Every ICAO 9303 check digit of the MRZ passes
+  final bool? mrzValid;
+
+  final Field? nationality;
+
+  final Field? passportNumber;
+
+  final Field? placeOfBirth;
+
+  final Field? placeOfIssue;
+
+  final Field? sex;
+
+  final Field? surname;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!.toJson(),
+        if (expiryDate != null) 'expiry_date': expiryDate!.toJson(),
+        if (fileNumber != null) 'file_number': fileNumber!.toJson(),
+        if (givenNames != null) 'given_names': givenNames!.toJson(),
+        if (issueDate != null) 'issue_date': issueDate!.toJson(),
+        if (mrz != null) 'mrz': mrz!.toJson(),
+        if (mrzValid != null) 'mrz_valid': mrzValid!,
+        if (nationality != null) 'nationality': nationality!.toJson(),
+        if (passportNumber != null) 'passport_number': passportNumber!.toJson(),
+        if (placeOfBirth != null) 'place_of_birth': placeOfBirth!.toJson(),
+        if (placeOfIssue != null) 'place_of_issue': placeOfIssue!.toJson(),
+        if (sex != null) 'sex': sex!.toJson(),
+        if (surname != null) 'surname': surname!.toJson(),
+      };
+}
+
+/// Exactly one of pan_card, aadhaar, driving_licence, passport and voter_id is present: the one document_type names
+class KYCResult {
+  const KYCResult({
+    this.aadhaar,
+    this.documentConfidence,
+    this.documentType,
+    this.drivingLicence,
+    this.pageCount,
+    this.panCard,
+    this.passport,
+    this.validation,
+    this.voterId,
+    this.warnings,
+  });
+
+  factory KYCResult.fromJson(Map<String, dynamic> json) => KYCResult(
+        aadhaar: json['aadhaar'] == null ? null : KYCAadhaar.fromJson(json['aadhaar'] as Map<String, dynamic>),
+        documentConfidence: json['document_confidence'] as num?,
+        documentType: json['document_type'] as String?,
+        drivingLicence: json['driving_licence'] == null ? null : KYCDrivingLicence.fromJson(json['driving_licence'] as Map<String, dynamic>),
+        pageCount: (json['page_count'] as num?)?.toInt(),
+        panCard: json['pan_card'] == null ? null : KYCPANCard.fromJson(json['pan_card'] as Map<String, dynamic>),
+        passport: json['passport'] == null ? null : KYCPassport.fromJson(json['passport'] as Map<String, dynamic>),
+        validation: (json['validation'] as List?)?.map((e) => (e == null ? null : ValidationIssue.fromJson(e as Map<String, dynamic>))!).toList().cast<ValidationIssue>(),
+        voterId: json['voter_id'] == null ? null : KYCVoterID.fromJson(json['voter_id'] as Map<String, dynamic>),
+        warnings: (json['warnings'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+      );
+
+  final KYCAadhaar? aadhaar;
+
+  /// How sure the type is (1 when named in the request)
+  final num? documentConfidence;
+
+  /// The document read (detected, or as named in document_type); its fields are under the property of the same name
+  final String? documentType;
+
+  final KYCDrivingLicence? drivingLicence;
+
+  final int? pageCount;
+
+  final KYCPANCard? panCard;
+
+  final KYCPassport? passport;
+
+  final List<ValidationIssue>? validation;
+
+  final KYCVoterID? voterId;
+
+  final List<String>? warnings;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (aadhaar != null) 'aadhaar': aadhaar!.toJson(),
+        if (documentConfidence != null) 'document_confidence': documentConfidence!,
+        if (documentType != null) 'document_type': documentType!,
+        if (drivingLicence != null) 'driving_licence': drivingLicence!.toJson(),
+        if (pageCount != null) 'page_count': pageCount!,
+        if (panCard != null) 'pan_card': panCard!.toJson(),
+        if (passport != null) 'passport': passport!.toJson(),
+        if (validation != null) 'validation': validation!.map((e) => e.toJson()).toList(),
+        if (voterId != null) 'voter_id': voterId!.toJson(),
+        if (warnings != null) 'warnings': warnings!,
+      };
+}
+
+class KYCVoterID {
+  const KYCVoterID({
+    this.address,
+    this.dateOfBirth,
+    this.epicNumber,
+    this.gender,
+    this.name,
+    this.relationName,
+    this.relationType,
+  });
+
+  factory KYCVoterID.fromJson(Map<String, dynamic> json) => KYCVoterID(
+        address: json['address'] == null ? null : Field.fromJson(json['address'] as Map<String, dynamic>),
+        dateOfBirth: json['date_of_birth'] == null ? null : Field.fromJson(json['date_of_birth'] as Map<String, dynamic>),
+        epicNumber: json['epic_number'] == null ? null : Field.fromJson(json['epic_number'] as Map<String, dynamic>),
+        gender: json['gender'] == null ? null : Field.fromJson(json['gender'] as Map<String, dynamic>),
+        name: json['name'] == null ? null : Field.fromJson(json['name'] as Map<String, dynamic>),
+        relationName: json['relation_name'] == null ? null : Field.fromJson(json['relation_name'] as Map<String, dynamic>),
+        relationType: json['relation_type'] == null ? null : Field.fromJson(json['relation_type'] as Map<String, dynamic>),
+      );
+
+  final Field? address;
+
+  final Field? dateOfBirth;
+
+  final Field? epicNumber;
+
+  final Field? gender;
+
+  final Field? name;
+
+  final Field? relationName;
+
+  final Field? relationType;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (address != null) 'address': address!.toJson(),
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth!.toJson(),
+        if (epicNumber != null) 'epic_number': epicNumber!.toJson(),
+        if (gender != null) 'gender': gender!.toJson(),
+        if (name != null) 'name': name!.toJson(),
+        if (relationName != null) 'relation_name': relationName!.toJson(),
+        if (relationType != null) 'relation_type': relationType!.toJson(),
       };
 }
 
@@ -13406,6 +14425,12 @@ class DocaiOperations {
   DocaiOperations(this._core);
   final Core _core;
 
+  /// Extract a bank statement's account and reconciled transactions. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.bank_statement.execute.
+  Future<Answer<DocaiBankStatementResult>> bankStatement(DocaiBankStatementParams params, [CallOptions? options]) => _core.operation('/v1/docai/bank-statement', params.toJson(), params.fileInputs, null, BankStatementResult.fromJson, options);
+
+  /// Extract a cheque: MICR, IFSC, payee, amounts cross-checked, signature. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.cheque.execute.
+  Future<Answer<DocaiChequeResult>> cheque(DocaiChequeParams params, [CallOptions? options]) => _core.operation('/v1/docai/cheque', params.toJson(), params.fileInputs, null, ChequeResult.fromJson, options);
+
   /// Classify a document and split multi-document files. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.classify.execute.
   Future<Answer<DocaiClassifyResult>> classify(DocaiClassifyParams params, [CallOptions? options]) => _core.operation('/v1/docai/classify', params.toJson(), params.fileInputs, null, ClassifyResult.fromJson, options);
 
@@ -13414,6 +14439,9 @@ class DocaiOperations {
 
   /// Extract a GST invoice. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.invoice.execute.
   Future<Answer<DocaiInvoiceResult>> invoice(DocaiInvoiceParams params, [CallOptions? options]) => _core.operation('/v1/docai/invoice', params.toJson(), params.fileInputs, null, InvoiceResult.fromJson, options);
+
+  /// Extract a PAN card, Aadhaar, driving licence, passport or voter ID (consent required). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.kyc.execute.
+  Future<Answer<DocaiKycResult>> kyc(DocaiKycParams params, [CallOptions? options]) => _core.operation('/v1/docai/kyc', params.toJson(), params.fileInputs, null, KYCResult.fromJson, options);
 
   /// Extract a receipt. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.receipt.execute.
   Future<Answer<DocaiReceiptResult>> receipt(DocaiReceiptParams params, [CallOptions? options]) => _core.operation('/v1/docai/receipt', params.toJson(), params.fileInputs, null, ReceiptResult.fromJson, options);

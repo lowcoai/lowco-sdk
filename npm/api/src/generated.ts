@@ -169,8 +169,8 @@ export interface AuditListVerifyData {
 }
 
 export interface AuditListVerifyQuery {
-  /** Only this operation */
-  operation?: "aadhaar-offline" | "bank-account" | "cin" | "driving-licence" | "email" | "fssai" | "gstin" | "iec" | "ifsc" | "mobile" | "pan" | "pan-aadhaar-link" | "passport" | "udyam" | "upi" | "vehicle-rc" | "voter-id";
+  /** Only this operation (a verify lookup, or a document type read by docai/kyc) */
+  operation?: "aadhaar-offline" | "bank-account" | "cin" | "docai/kyc/aadhaar" | "docai/kyc/driving_licence" | "docai/kyc/pan_card" | "docai/kyc/passport" | "docai/kyc/voter_id" | "driving-licence" | "email" | "fssai" | "gstin" | "iec" | "ifsc" | "mobile" | "pan" | "pan-aadhaar-link" | "passport" | "udyam" | "upi" | "vehicle-rc" | "voter-id";
   result?: "valid" | "invalid" | "not_found" | "inactive" | "mismatch" | "unavailable";
   /** Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged */
   identifier?: string;
@@ -193,6 +193,50 @@ export interface BBox {
   w: number;
   x: number;
   y: number;
+}
+
+export interface BankStatementResult {
+  account: BankStatementResultAccount;
+  /** At least one balance could be checked and every one equals the previous balance plus the credit minus the debit (and the closing balance the last); mismatches are in validation, never corrected */
+  balance_reconciled: boolean;
+  closing_balance: Field;
+  opening_balance: Field;
+  page_count: number;
+  period_from: Field;
+  period_to: Field;
+  summary: BankStatementResultSummary;
+  /** In the statement's order, every value with the box of the words it was read from */
+  transactions: BankTransaction[];
+  validation: ValidationIssue[];
+  warnings?: string[];
+}
+
+export interface BankStatementResultAccount {
+  account_number: Field;
+  account_type: Field;
+  bank_name: Field;
+  branch: Field;
+  currency: Field;
+  holder_name: Field;
+  ifsc: Field;
+}
+
+export interface BankStatementResultSummary {
+  total_credits: number;
+  total_debits: number;
+  transaction_count: number;
+}
+
+export interface BankTransaction {
+  balance: Field;
+  /** One of salary, upi, card, cash, transfer, cheque, loan_emi, interest, bank_charges, tax, refund, investment, utilities, other (rules over the narration) */
+  category: Field;
+  credit: Field;
+  date: Field;
+  debit: Field;
+  description: Field;
+  reference: Field;
+  value_date: Field;
 }
 
 /** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
@@ -298,6 +342,37 @@ export interface CapabilityHandling {
   providers: ProviderHandling[];
 }
 
+export interface ChequeResult {
+  account_holder: Field;
+  account_number: Field;
+  amount_figures: Field;
+  amount_words: Field;
+  /** The amount in words equals the figures (null when either is missing) */
+  amounts_consistent: boolean | null;
+  bank_name: Field;
+  branch: Field;
+  cheque_number: Field;
+  date: Field;
+  ifsc: Field;
+  /** The MICR band (CTS-2010) read from the bottom of the cheque */
+  micr: ChequeResultMicr;
+  page_count: number;
+  payee: Field;
+  /** Ink where the drawer signs (true or false; null when no image of the page could be looked at) */
+  signature_present: Field;
+  validation: ValidationIssue[];
+  warnings?: string[];
+}
+
+/** The MICR band (CTS-2010) read from the bottom of the cheque */
+export interface ChequeResultMicr {
+  account_id: Field;
+  cheque_number: Field;
+  /** 9-digit MICR code: city, bank and branch */
+  sort_code: Field;
+  transaction_code: Field;
+}
+
 export interface ClassifyResult {
   /** The label covering the most pages */
   label: string;
@@ -394,6 +469,82 @@ export interface Deleted {
   template_id?: string;
   webhook_id?: string;
 }
+
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface DocaiBankStatementParams {
+  /** The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers) */
+  file: FileInput;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** OCR engine for pages without a text layer */
+  engine?: "auto" | "fast" | "accurate";
+  /** OCR languages for pages without a text layer (default eng, hin) */
+  languages?: Array<"eng" | "hin" | "mar" | "ben" | "tam" | "tel" | "kan" | "mal" | "guj" | "pan" | "ori" | "urd">;
+  /** Pages to read, e.g. 1-3,7 */
+  pages?: string;
+}
+
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface DocaiBankStatementRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** OCR engine for pages without a text layer */
+  engine?: "auto" | "fast" | "accurate";
+  /** Base64, URL-safe base64 or a data: URL */
+  file_base64?: string;
+  /** A stored file of this org and environment (POST /v1/files) */
+  file_id?: string;
+  /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
+  file_url?: string;
+  /** Name for the stored input */
+  filename?: string;
+  /** OCR languages for pages without a text layer (default eng, hin) */
+  languages?: Array<"eng" | "hin" | "mar" | "ben" | "tam" | "tel" | "kan" | "mal" | "guj" | "pan" | "ori" | "urd">;
+  /** Pages to read, e.g. 1-3,7 */
+  pages?: string;
+  /** Opens a protected PDF; never stored or logged */
+  password?: string;
+}
+
+export type DocaiBankStatementResult = BankStatementResult;
+
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface DocaiChequeParams {
+  /** The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers) */
+  file: FileInput;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** OCR engine for pages without a text layer */
+  engine?: "auto" | "fast" | "accurate";
+  /** OCR languages for pages without a text layer (default eng, hin) */
+  languages?: Array<"eng" | "hin" | "mar" | "ben" | "tam" | "tel" | "kan" | "mal" | "guj" | "pan" | "ori" | "urd">;
+  /** Pages to read, e.g. 1-3,7 */
+  pages?: string;
+}
+
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface DocaiChequeRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** OCR engine for pages without a text layer */
+  engine?: "auto" | "fast" | "accurate";
+  /** Base64, URL-safe base64 or a data: URL */
+  file_base64?: string;
+  /** A stored file of this org and environment (POST /v1/files) */
+  file_id?: string;
+  /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
+  file_url?: string;
+  /** Name for the stored input */
+  filename?: string;
+  /** OCR languages for pages without a text layer (default eng, hin) */
+  languages?: Array<"eng" | "hin" | "mar" | "ben" | "tam" | "tel" | "kan" | "mal" | "guj" | "pan" | "ori" | "urd">;
+  /** Pages to read, e.g. 1-3,7 */
+  pages?: string;
+  /** Opens a protected PDF; never stored or logged */
+  password?: string;
+}
+
+export type DocaiChequeResult = ChequeResult;
 
 /** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
 export interface DocaiClassifyParams {
@@ -520,6 +671,60 @@ export interface DocaiInvoiceRequest {
 }
 
 export type DocaiInvoiceResult = InvoiceResult;
+
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface DocaiKycParams {
+  /** The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers) */
+  file: FileInput;
+  /** Must be true: the person this document belongs to agreed to it being read. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** Why you are reading it (kept in the Verify audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** The document, when you know it (detected otherwise) */
+  document_type?: "pan_card" | "aadhaar" | "driving_licence" | "passport" | "voter_id";
+  /** OCR engine for pages without a text layer */
+  engine?: "auto" | "fast" | "accurate";
+  /** OCR languages for pages without a text layer (default eng, hin) */
+  languages?: Array<"eng" | "hin" | "mar" | "ben" | "tam" | "tel" | "kan" | "mal" | "guj" | "pan" | "ori" | "urd">;
+  /** Pages to read, e.g. 1-3,7 */
+  pages?: string;
+  /** Your id for the person or case, kept in the audit log */
+  reference_id?: string;
+}
+
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface DocaiKycRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Must be true: the person this document belongs to agreed to it being read. Missing or false is 422 consent_required. */
+  consent: boolean;
+  /** The document, when you know it (detected otherwise) */
+  document_type?: "pan_card" | "aadhaar" | "driving_licence" | "passport" | "voter_id";
+  /** OCR engine for pages without a text layer */
+  engine?: "auto" | "fast" | "accurate";
+  /** Base64, URL-safe base64 or a data: URL */
+  file_base64?: string;
+  /** A stored file of this org and environment (POST /v1/files) */
+  file_id?: string;
+  /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
+  file_url?: string;
+  /** Name for the stored input */
+  filename?: string;
+  /** OCR languages for pages without a text layer (default eng, hin) */
+  languages?: Array<"eng" | "hin" | "mar" | "ben" | "tam" | "tel" | "kan" | "mal" | "guj" | "pan" | "ori" | "urd">;
+  /** Pages to read, e.g. 1-3,7 */
+  pages?: string;
+  /** Opens a protected PDF; never stored or logged */
+  password?: string;
+  /** Why you are reading it (kept in the Verify audit log). Missing is 422 consent_required. */
+  purpose: string;
+  /** Your id for the person or case, kept in the audit log */
+  reference_id?: string;
+}
+
+export type DocaiKycResult = KYCResult;
 
 /** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
 export interface DocaiReceiptParams {
@@ -836,6 +1041,79 @@ export interface JobsListQuery {
   limit?: number;
   /** next_cursor of the previous page. */
   cursor?: string;
+}
+
+/** The number and VID are always masked to their last 4 (XXXX XXXX 1234), in the answer and anything stored */
+export interface KYCAadhaar {
+  address: Field;
+  date_of_birth: Field;
+  gender: Field;
+  name: Field;
+  number: Field;
+  vid: Field;
+  year_of_birth: Field;
+}
+
+export interface KYCDrivingLicence {
+  address: Field;
+  classes: Field[];
+  date_of_birth: Field;
+  issue_date: Field;
+  name: Field;
+  number: Field;
+  relation_name: Field;
+  valid_until: Field;
+}
+
+export interface KYCPANCard {
+  date_of_birth: Field;
+  father_name: Field;
+  name: Field;
+  number: Field;
+}
+
+export interface KYCPassport {
+  date_of_birth: Field;
+  expiry_date: Field;
+  file_number: Field;
+  given_names: Field;
+  issue_date: Field;
+  /** The machine-readable zone: value {line1, line2} and, when its check digits pass, what it says (passport_number, surname, given_names, nationality, issuing_country, sex, date_of_birth, expiry_date) */
+  mrz: Field;
+  /** Every ICAO 9303 check digit of the MRZ passes */
+  mrz_valid: boolean;
+  nationality: Field;
+  passport_number: Field;
+  place_of_birth: Field;
+  place_of_issue: Field;
+  sex: Field;
+  surname: Field;
+}
+
+/** Exactly one of pan_card, aadhaar, driving_licence, passport and voter_id is present: the one document_type names */
+export interface KYCResult {
+  aadhaar?: KYCAadhaar;
+  /** How sure the type is (1 when named in the request) */
+  document_confidence: number;
+  /** The document read (detected, or as named in document_type); its fields are under the property of the same name */
+  document_type: "pan_card" | "aadhaar" | "driving_licence" | "passport" | "voter_id";
+  driving_licence?: KYCDrivingLicence;
+  page_count: number;
+  pan_card?: KYCPANCard;
+  passport?: KYCPassport;
+  validation: ValidationIssue[];
+  voter_id?: KYCVoterID;
+  warnings?: string[];
+}
+
+export interface KYCVoterID {
+  address: Field;
+  date_of_birth: Field;
+  epic_number: Field;
+  gender: Field;
+  name: Field;
+  relation_name: Field;
+  relation_type: Field;
 }
 
 /** Lowco API's view of a lowco-auth key; never key material */
@@ -2463,7 +2741,7 @@ export interface UsageTotals {
 }
 
 export interface ValidationIssue {
-  code: "gstin_invalid" | "pan_mismatch" | "state_code_mismatch" | "date_invalid" | "due_before_invoice" | "line_arithmetic" | "subtotal_mismatch" | "tax_mismatch" | "total_mismatch" | "tax_type_mismatch" | "e_invoice_mismatch";
+  code: "gstin_invalid" | "pan_mismatch" | "state_code_mismatch" | "date_invalid" | "due_before_invoice" | "line_arithmetic" | "subtotal_mismatch" | "tax_mismatch" | "total_mismatch" | "tax_type_mismatch" | "e_invoice_mismatch" | "pan_invalid" | "aadhaar_checksum" | "dl_invalid" | "passport_number_invalid" | "epic_invalid" | "mrz_missing" | "mrz_checksum" | "mrz_mismatch" | "expired" | "date_order" | "balance_mismatch" | "opening_balance_mismatch" | "closing_balance_mismatch" | "date_out_of_period" | "debit_and_credit" | "ifsc_invalid" | "account_number_invalid" | "amount_mismatch" | "micr_invalid" | "cheque_number_mismatch" | "stale_cheque" | "post_dated" | "signature_missing";
   /** JSON Pointer of the value at fault */
   field: string;
   message: string;
@@ -4004,6 +4282,16 @@ export class BarcodeOperations {
 export class DocaiOperations {
   constructor(private readonly core: Core) {}
 
+  /** Extract a bank statement's account and reconciled transactions. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.bank_statement.execute. */
+  bankStatement(params: DocaiBankStatementParams, options?: CallOptions): Promise<Answer<DocaiBankStatementResult>> {
+    return this.core.operation<DocaiBankStatementResult>("/v1/docai/bank-statement", params as unknown as Record<string, unknown>, { input: "file", extra: [] }, options);
+  }
+
+  /** Extract a cheque: MICR, IFSC, payee, amounts cross-checked, signature. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.cheque.execute. */
+  cheque(params: DocaiChequeParams, options?: CallOptions): Promise<Answer<DocaiChequeResult>> {
+    return this.core.operation<DocaiChequeResult>("/v1/docai/cheque", params as unknown as Record<string, unknown>, { input: "file", extra: [] }, options);
+  }
+
   /** Classify a document and split multi-document files. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.classify.execute. */
   classify(params: DocaiClassifyParams, options?: CallOptions): Promise<Answer<DocaiClassifyResult>> {
     return this.core.operation<DocaiClassifyResult>("/v1/docai/classify", params as unknown as Record<string, unknown>, { input: "file", extra: [] }, options);
@@ -4017,6 +4305,11 @@ export class DocaiOperations {
   /** Extract a GST invoice. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.invoice.execute. */
   invoice(params: DocaiInvoiceParams, options?: CallOptions): Promise<Answer<DocaiInvoiceResult>> {
     return this.core.operation<DocaiInvoiceResult>("/v1/docai/invoice", params as unknown as Record<string, unknown>, { input: "file", extra: [] }, options);
+  }
+
+  /** Extract a PAN card, Aadhaar, driving licence, passport or voter ID (consent required). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.kyc.execute. */
+  kyc(params: DocaiKycParams, options?: CallOptions): Promise<Answer<DocaiKycResult>> {
+    return this.core.operation<DocaiKycResult>("/v1/docai/kyc", params as unknown as Record<string, unknown>, { input: "file", extra: [] }, options);
   }
 
   /** Extract a receipt. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.receipt.execute. */

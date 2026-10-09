@@ -246,7 +246,7 @@ type AuditListVerifyData struct {
 
 // AuditListVerifyQuery is a Lowco API object.
 type AuditListVerifyQuery struct {
-	// Only this operation One of: aadhaar-offline, bank-account, cin, driving-licence, email, fssai, gstin, iec, ifsc, mobile, pan, pan-aadhaar-link, passport, udyam, upi, vehicle-rc, voter-id.
+	// Only this operation (a verify lookup, or a document type read by docai/kyc) One of: aadhaar-offline, bank-account, cin, docai/kyc/aadhaar, docai/kyc/driving_licence, docai/kyc/pan_card, docai/kyc/passport, docai/kyc/voter_id, driving-licence, email, fssai, gstin, iec, ifsc, mobile, pan, pan-aadhaar-link, passport, udyam, upi, vehicle-rc, voter-id.
 	Operation *string `json:"operation,omitempty"`
 	// One of: valid, invalid, not_found, inactive, mismatch, unavailable.
 	Result *string `json:"result,omitempty"`
@@ -271,6 +271,54 @@ type BBox struct {
 	W float64 `json:"w"`
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
+}
+
+// BankStatementResult is a Lowco API object.
+type BankStatementResult struct {
+	Account BankStatementResultAccount `json:"account"`
+	// At least one balance could be checked and every one equals the previous balance plus the credit minus the debit (and the closing balance the last); mismatches are in validation, never corrected
+	BalanceReconciled bool                       `json:"balance_reconciled"`
+	ClosingBalance    Field                      `json:"closing_balance"`
+	OpeningBalance    Field                      `json:"opening_balance"`
+	PageCount         int                        `json:"page_count"`
+	PeriodFrom        Field                      `json:"period_from"`
+	PeriodTo          Field                      `json:"period_to"`
+	Summary           BankStatementResultSummary `json:"summary"`
+	// In the statement's order, every value with the box of the words it was read from
+	Transactions []BankTransaction `json:"transactions"`
+	Validation   []ValidationIssue `json:"validation"`
+	Warnings     []string          `json:"warnings,omitempty"`
+}
+
+// BankStatementResultAccount is a Lowco API object.
+type BankStatementResultAccount struct {
+	AccountNumber Field `json:"account_number"`
+	AccountType   Field `json:"account_type"`
+	BankName      Field `json:"bank_name"`
+	Branch        Field `json:"branch"`
+	Currency      Field `json:"currency"`
+	HolderName    Field `json:"holder_name"`
+	IFSC          Field `json:"ifsc"`
+}
+
+// BankStatementResultSummary is a Lowco API object.
+type BankStatementResultSummary struct {
+	TotalCredits     float64 `json:"total_credits"`
+	TotalDebits      float64 `json:"total_debits"`
+	TransactionCount int     `json:"transaction_count"`
+}
+
+// BankTransaction is a Lowco API object.
+type BankTransaction struct {
+	Balance Field `json:"balance"`
+	// One of salary, upi, card, cash, transfer, cheque, loan_emi, interest, bank_charges, tax, refund, investment, utilities, other (rules over the narration)
+	Category    Field `json:"category"`
+	Credit      Field `json:"credit"`
+	Date        Field `json:"date"`
+	Debit       Field `json:"debit"`
+	Description Field `json:"description"`
+	Reference   Field `json:"reference"`
+	ValueDate   Field `json:"value_date"`
 }
 
 // Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
@@ -383,6 +431,38 @@ type CapabilityHandling struct {
 	Providers []ProviderHandling `json:"providers"`
 }
 
+// ChequeResult is a Lowco API object.
+type ChequeResult struct {
+	AccountHolder Field `json:"account_holder"`
+	AccountNumber Field `json:"account_number"`
+	AmountFigures Field `json:"amount_figures"`
+	AmountWords   Field `json:"amount_words"`
+	// The amount in words equals the figures (null when either is missing)
+	AmountsConsistent *bool `json:"amounts_consistent"`
+	BankName          Field `json:"bank_name"`
+	Branch            Field `json:"branch"`
+	ChequeNumber      Field `json:"cheque_number"`
+	Date              Field `json:"date"`
+	IFSC              Field `json:"ifsc"`
+	// The MICR band (CTS-2010) read from the bottom of the cheque
+	Micr      ChequeResultMicr `json:"micr"`
+	PageCount int              `json:"page_count"`
+	Payee     Field            `json:"payee"`
+	// Ink where the drawer signs (true or false; null when no image of the page could be looked at)
+	SignaturePresent Field             `json:"signature_present"`
+	Validation       []ValidationIssue `json:"validation"`
+	Warnings         []string          `json:"warnings,omitempty"`
+}
+
+// The MICR band (CTS-2010) read from the bottom of the cheque
+type ChequeResultMicr struct {
+	AccountID    Field `json:"account_id"`
+	ChequeNumber Field `json:"cheque_number"`
+	// 9-digit MICR code: city, bank and branch
+	SortCode        Field `json:"sort_code"`
+	TransactionCode Field `json:"transaction_code"`
+}
+
 // ClassifyResult is a Lowco API object.
 type ClassifyResult struct {
 	// The label covering the most pages
@@ -487,6 +567,84 @@ type Deleted struct {
 	TemplateID *string `json:"template_id,omitempty"`
 	WebhookID  *string `json:"webhook_id,omitempty"`
 }
+
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type DocaiBankStatementParams struct {
+	// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+	File FileInput `json:"-"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// OCR engine for pages without a text layer One of: auto, fast, accurate.
+	Engine *string `json:"engine,omitempty"`
+	// OCR languages for pages without a text layer (default eng, hin)
+	Languages []string `json:"languages,omitempty"`
+	// Pages to read, e.g. 1-3,7
+	Pages *string `json:"pages,omitempty"`
+}
+
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type DocaiBankStatementRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// OCR engine for pages without a text layer One of: auto, fast, accurate.
+	Engine *string `json:"engine,omitempty"`
+	// Base64, URL-safe base64 or a data: URL
+	FileBase64 *string `json:"file_base64,omitempty"`
+	// A stored file of this org and environment (POST /v1/files)
+	FileID *string `json:"file_id,omitempty"`
+	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+	FileURL *string `json:"file_url,omitempty"`
+	// Name for the stored input
+	Filename *string `json:"filename,omitempty"`
+	// OCR languages for pages without a text layer (default eng, hin)
+	Languages []string `json:"languages,omitempty"`
+	// Pages to read, e.g. 1-3,7
+	Pages *string `json:"pages,omitempty"`
+	// Opens a protected PDF; never stored or logged
+	Password *string `json:"password,omitempty"`
+}
+
+// DocaiBankStatementResult is a Lowco API value.
+type DocaiBankStatementResult = BankStatementResult
+
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type DocaiChequeParams struct {
+	// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+	File FileInput `json:"-"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// OCR engine for pages without a text layer One of: auto, fast, accurate.
+	Engine *string `json:"engine,omitempty"`
+	// OCR languages for pages without a text layer (default eng, hin)
+	Languages []string `json:"languages,omitempty"`
+	// Pages to read, e.g. 1-3,7
+	Pages *string `json:"pages,omitempty"`
+}
+
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type DocaiChequeRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// OCR engine for pages without a text layer One of: auto, fast, accurate.
+	Engine *string `json:"engine,omitempty"`
+	// Base64, URL-safe base64 or a data: URL
+	FileBase64 *string `json:"file_base64,omitempty"`
+	// A stored file of this org and environment (POST /v1/files)
+	FileID *string `json:"file_id,omitempty"`
+	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+	FileURL *string `json:"file_url,omitempty"`
+	// Name for the stored input
+	Filename *string `json:"filename,omitempty"`
+	// OCR languages for pages without a text layer (default eng, hin)
+	Languages []string `json:"languages,omitempty"`
+	// Pages to read, e.g. 1-3,7
+	Pages *string `json:"pages,omitempty"`
+	// Opens a protected PDF; never stored or logged
+	Password *string `json:"password,omitempty"`
+}
+
+// DocaiChequeResult is a Lowco API value.
+type DocaiChequeResult = ChequeResult
 
 // Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
 type DocaiClassifyParams struct {
@@ -616,6 +774,61 @@ type DocaiInvoiceRequest struct {
 
 // DocaiInvoiceResult is a Lowco API value.
 type DocaiInvoiceResult = InvoiceResult
+
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type DocaiKycParams struct {
+	// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+	File FileInput `json:"-"`
+	// Must be true: the person this document belongs to agreed to it being read. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// Why you are reading it (kept in the Verify audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// The document, when you know it (detected otherwise) One of: pan_card, aadhaar, driving_licence, passport, voter_id.
+	DocumentType *string `json:"document_type,omitempty"`
+	// OCR engine for pages without a text layer One of: auto, fast, accurate.
+	Engine *string `json:"engine,omitempty"`
+	// OCR languages for pages without a text layer (default eng, hin)
+	Languages []string `json:"languages,omitempty"`
+	// Pages to read, e.g. 1-3,7
+	Pages *string `json:"pages,omitempty"`
+	// Your id for the person or case, kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type DocaiKycRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Must be true: the person this document belongs to agreed to it being read. Missing or false is 422 consent_required.
+	Consent bool `json:"consent"`
+	// The document, when you know it (detected otherwise) One of: pan_card, aadhaar, driving_licence, passport, voter_id.
+	DocumentType *string `json:"document_type,omitempty"`
+	// OCR engine for pages without a text layer One of: auto, fast, accurate.
+	Engine *string `json:"engine,omitempty"`
+	// Base64, URL-safe base64 or a data: URL
+	FileBase64 *string `json:"file_base64,omitempty"`
+	// A stored file of this org and environment (POST /v1/files)
+	FileID *string `json:"file_id,omitempty"`
+	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+	FileURL *string `json:"file_url,omitempty"`
+	// Name for the stored input
+	Filename *string `json:"filename,omitempty"`
+	// OCR languages for pages without a text layer (default eng, hin)
+	Languages []string `json:"languages,omitempty"`
+	// Pages to read, e.g. 1-3,7
+	Pages *string `json:"pages,omitempty"`
+	// Opens a protected PDF; never stored or logged
+	Password *string `json:"password,omitempty"`
+	// Why you are reading it (kept in the Verify audit log). Missing is 422 consent_required.
+	Purpose string `json:"purpose"`
+	// Your id for the person or case, kept in the audit log
+	ReferenceID *string `json:"reference_id,omitempty"`
+}
+
+// DocaiKycResult is a Lowco API value.
+type DocaiKycResult = KYCResult
 
 // Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
 type DocaiReceiptParams struct {
@@ -952,6 +1165,83 @@ type JobsListQuery struct {
 	Limit *int `json:"limit,omitempty"`
 	// next_cursor of the previous page.
 	Cursor *string `json:"cursor,omitempty"`
+}
+
+// The number and VID are always masked to their last 4 (XXXX XXXX 1234), in the answer and anything stored
+type KYCAadhaar struct {
+	Address     Field `json:"address"`
+	DateOfBirth Field `json:"date_of_birth"`
+	Gender      Field `json:"gender"`
+	Name        Field `json:"name"`
+	Number      Field `json:"number"`
+	Vid         Field `json:"vid"`
+	YearOfBirth Field `json:"year_of_birth"`
+}
+
+// KYCDrivingLicence is a Lowco API object.
+type KYCDrivingLicence struct {
+	Address      Field   `json:"address"`
+	Classes      []Field `json:"classes"`
+	DateOfBirth  Field   `json:"date_of_birth"`
+	IssueDate    Field   `json:"issue_date"`
+	Name         Field   `json:"name"`
+	Number       Field   `json:"number"`
+	RelationName Field   `json:"relation_name"`
+	ValidUntil   Field   `json:"valid_until"`
+}
+
+// KYCPANCard is a Lowco API object.
+type KYCPANCard struct {
+	DateOfBirth Field `json:"date_of_birth"`
+	FatherName  Field `json:"father_name"`
+	Name        Field `json:"name"`
+	Number      Field `json:"number"`
+}
+
+// KYCPassport is a Lowco API object.
+type KYCPassport struct {
+	DateOfBirth Field `json:"date_of_birth"`
+	ExpiryDate  Field `json:"expiry_date"`
+	FileNumber  Field `json:"file_number"`
+	GivenNames  Field `json:"given_names"`
+	IssueDate   Field `json:"issue_date"`
+	// The machine-readable zone: value {line1, line2} and, when its check digits pass, what it says (passport_number, surname, given_names, nationality, issuing_country, sex, date_of_birth, expiry_date)
+	Mrz Field `json:"mrz"`
+	// Every ICAO 9303 check digit of the MRZ passes
+	MrzValid       bool  `json:"mrz_valid"`
+	Nationality    Field `json:"nationality"`
+	PassportNumber Field `json:"passport_number"`
+	PlaceOfBirth   Field `json:"place_of_birth"`
+	PlaceOfIssue   Field `json:"place_of_issue"`
+	Sex            Field `json:"sex"`
+	Surname        Field `json:"surname"`
+}
+
+// Exactly one of pan_card, aadhaar, driving_licence, passport and voter_id is present: the one document_type names
+type KYCResult struct {
+	Aadhaar *KYCAadhaar `json:"aadhaar,omitempty"`
+	// How sure the type is (1 when named in the request)
+	DocumentConfidence float64 `json:"document_confidence"`
+	// The document read (detected, or as named in document_type); its fields are under the property of the same name One of: pan_card, aadhaar, driving_licence, passport, voter_id.
+	DocumentType   string             `json:"document_type"`
+	DrivingLicence *KYCDrivingLicence `json:"driving_licence,omitempty"`
+	PageCount      int                `json:"page_count"`
+	PANCard        *KYCPANCard        `json:"pan_card,omitempty"`
+	Passport       *KYCPassport       `json:"passport,omitempty"`
+	Validation     []ValidationIssue  `json:"validation"`
+	VoterID        *KYCVoterID        `json:"voter_id,omitempty"`
+	Warnings       []string           `json:"warnings,omitempty"`
+}
+
+// KYCVoterID is a Lowco API object.
+type KYCVoterID struct {
+	Address      Field `json:"address"`
+	DateOfBirth  Field `json:"date_of_birth"`
+	EpicNumber   Field `json:"epic_number"`
+	Gender       Field `json:"gender"`
+	Name         Field `json:"name"`
+	RelationName Field `json:"relation_name"`
+	RelationType Field `json:"relation_type"`
 }
 
 // Lowco API's view of a lowco-auth key; never key material
@@ -2671,7 +2961,7 @@ type UsageTotals struct {
 
 // ValidationIssue is a Lowco API object.
 type ValidationIssue struct {
-	// One of: gstin_invalid, pan_mismatch, state_code_mismatch, date_invalid, due_before_invoice, line_arithmetic, subtotal_mismatch, tax_mismatch, total_mismatch, tax_type_mismatch, e_invoice_mismatch.
+	// One of: gstin_invalid, pan_mismatch, state_code_mismatch, date_invalid, due_before_invoice, line_arithmetic, subtotal_mismatch, tax_mismatch, total_mismatch, tax_type_mismatch, e_invoice_mismatch, pan_invalid, aadhaar_checksum, dl_invalid, passport_number_invalid, epic_invalid, mrz_missing, mrz_checksum, mrz_mismatch, expired, date_order, balance_mismatch, opening_balance_mismatch, closing_balance_mismatch, date_out_of_period, debit_and_credit, ifsc_invalid, account_number_invalid, amount_mismatch, micr_invalid, cheque_number_mismatch, stale_cheque, post_dated, signature_missing.
 	Code string `json:"code"`
 	// JSON Pointer of the value at fault
 	Field   string `json:"field"`
@@ -4234,6 +4524,26 @@ func (s *BarcodeService) Generate(ctx context.Context, p BarcodeGenerateParams, 
 // DocAIService calls the /v1/docai operations.
 type DocAIService struct{ c *core }
 
+// BankStatement: Extract a bank statement's account and reconciled transactions. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.bank_statement.execute.
+func (s *DocAIService) BankStatement(ctx context.Context, p DocaiBankStatementParams, opts ...CallOption) (*Answer[DocaiBankStatementResult], error) {
+	var out Answer[DocaiBankStatementResult]
+	err := s.c.operation(ctx, "/v1/docai/bank-statement", "file", p.File, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// Cheque: Extract a cheque: MICR, IFSC, payee, amounts cross-checked, signature. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.cheque.execute.
+func (s *DocAIService) Cheque(ctx context.Context, p DocaiChequeParams, opts ...CallOption) (*Answer[DocaiChequeResult], error) {
+	var out Answer[DocaiChequeResult]
+	err := s.c.operation(ctx, "/v1/docai/cheque", "file", p.File, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
 // Classify: Classify a document and split multi-document files. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.classify.execute.
 func (s *DocAIService) Classify(ctx context.Context, p DocaiClassifyParams, opts ...CallOption) (*Answer[DocaiClassifyResult], error) {
 	var out Answer[DocaiClassifyResult]
@@ -4258,6 +4568,16 @@ func (s *DocAIService) Extract(ctx context.Context, p DocaiExtractParams, opts .
 func (s *DocAIService) Invoice(ctx context.Context, p DocaiInvoiceParams, opts ...CallOption) (*Answer[DocaiInvoiceResult], error) {
 	var out Answer[DocaiInvoiceResult]
 	err := s.c.operation(ctx, "/v1/docai/invoice", "file", p.File, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
+// Kyc: Extract a PAN card, Aadhaar, driving licence, passport or voter ID (consent required). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.kyc.execute.
+func (s *DocAIService) Kyc(ctx context.Context, p DocaiKycParams, opts ...CallOption) (*Answer[DocaiKycResult], error) {
+	var out Answer[DocaiKycResult]
+	err := s.c.operation(ctx, "/v1/docai/kyc", "file", p.File, nil, nil, p, &out.raw, opts)
 	if err != nil {
 		return nil, err
 	}

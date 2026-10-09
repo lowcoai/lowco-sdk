@@ -180,8 +180,8 @@ class AuditListVerifyData(TypedDict):
     next_cursor: Optional[str]
 
 class AuditListVerifyQuery(TypedDict):
-    operation: NotRequired[Literal["aadhaar-offline", "bank-account", "cin", "driving-licence", "email", "fssai", "gstin", "iec", "ifsc", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]]
-    """Only this operation"""
+    operation: NotRequired[Literal["aadhaar-offline", "bank-account", "cin", "docai/kyc/aadhaar", "docai/kyc/driving_licence", "docai/kyc/pan_card", "docai/kyc/passport", "docai/kyc/voter_id", "driving-licence", "email", "fssai", "gstin", "iec", "ifsc", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]]
+    """Only this operation (a verify lookup, or a document type read by docai/kyc)"""
     result: NotRequired[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]]
     identifier: NotRequired[str]
     """Rows for this identifier (with operation): fingerprinted the way the lookup was, never stored or logged"""
@@ -203,6 +203,46 @@ class BBox(TypedDict):
     w: float
     x: float
     y: float
+
+class BankStatementResult(TypedDict):
+    account: BankStatementResultAccount
+    balance_reconciled: bool
+    """At least one balance could be checked and every one equals the previous balance plus the credit minus the debit (and the closing balance the last); mismatches are in validation, never corrected"""
+    closing_balance: Field
+    opening_balance: Field
+    page_count: int
+    period_from: Field
+    period_to: Field
+    summary: BankStatementResultSummary
+    transactions: list[BankTransaction]
+    """In the statement's order, every value with the box of the words it was read from"""
+    validation: list[ValidationIssue]
+    warnings: NotRequired[list[str]]
+
+class BankStatementResultAccount(TypedDict):
+    account_number: Field
+    account_type: Field
+    bank_name: Field
+    branch: Field
+    currency: Field
+    holder_name: Field
+    ifsc: Field
+
+class BankStatementResultSummary(TypedDict):
+    total_credits: float
+    total_debits: float
+    transaction_count: int
+
+class BankTransaction(TypedDict):
+    balance: Field
+    category: Field
+    """One of salary, upi, card, cash, transfer, cheque, loan_emi, interest, bank_charges, tax, refund, investment, utilities, other (rules over the narration)"""
+    credit: Field
+    date: Field
+    debit: Field
+    description: Field
+    reference: Field
+    value_date: Field
 
 class BarcodeDecodeParams(TypedDict):
     """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
@@ -298,6 +338,35 @@ class CapabilityHandling(TypedDict):
     providers: list[ProviderHandling]
     """Enabled targets of the live route, by priority"""
 
+class ChequeResult(TypedDict):
+    account_holder: Field
+    account_number: Field
+    amount_figures: Field
+    amount_words: Field
+    amounts_consistent: Optional[bool]
+    """The amount in words equals the figures (null when either is missing)"""
+    bank_name: Field
+    branch: Field
+    cheque_number: Field
+    date: Field
+    ifsc: Field
+    micr: ChequeResultMicr
+    """The MICR band (CTS-2010) read from the bottom of the cheque"""
+    page_count: int
+    payee: Field
+    signature_present: Field
+    """Ink where the drawer signs (true or false; null when no image of the page could be looked at)"""
+    validation: list[ValidationIssue]
+    warnings: NotRequired[list[str]]
+
+class ChequeResultMicr(TypedDict):
+    """The MICR band (CTS-2010) read from the bottom of the cheque"""
+    account_id: Field
+    cheque_number: Field
+    sort_code: Field
+    """9-digit MICR code: city, bank and branch"""
+    transaction_code: Field
+
 class ClassifyResult(TypedDict):
     label: str
     """The label covering the most pages"""
@@ -379,6 +448,74 @@ class Deleted(TypedDict):
     file_id: NotRequired[str]
     template_id: NotRequired[str]
     webhook_id: NotRequired[str]
+
+class DocaiBankStatementParams(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    file: FileInput
+    """The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    engine: NotRequired[Literal["auto", "fast", "accurate"]]
+    """OCR engine for pages without a text layer"""
+    languages: NotRequired[list[Literal["eng", "hin", "mar", "ben", "tam", "tel", "kan", "mal", "guj", "pan", "ori", "urd"]]]
+    """OCR languages for pages without a text layer (default eng, hin)"""
+    pages: NotRequired[str]
+    """Pages to read, e.g. 1-3,7"""
+
+class DocaiBankStatementRequest(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    engine: NotRequired[Literal["auto", "fast", "accurate"]]
+    """OCR engine for pages without a text layer"""
+    file_base64: NotRequired[str]
+    """Base64, URL-safe base64 or a data: URL"""
+    file_id: NotRequired[str]
+    """A stored file of this org and environment (POST /v1/files)"""
+    file_url: NotRequired[str]
+    """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
+    filename: NotRequired[str]
+    """Name for the stored input"""
+    languages: NotRequired[list[Literal["eng", "hin", "mar", "ben", "tam", "tel", "kan", "mal", "guj", "pan", "ori", "urd"]]]
+    """OCR languages for pages without a text layer (default eng, hin)"""
+    pages: NotRequired[str]
+    """Pages to read, e.g. 1-3,7"""
+    password: NotRequired[str]
+    """Opens a protected PDF; never stored or logged"""
+
+class DocaiChequeParams(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    file: FileInput
+    """The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    engine: NotRequired[Literal["auto", "fast", "accurate"]]
+    """OCR engine for pages without a text layer"""
+    languages: NotRequired[list[Literal["eng", "hin", "mar", "ben", "tam", "tel", "kan", "mal", "guj", "pan", "ori", "urd"]]]
+    """OCR languages for pages without a text layer (default eng, hin)"""
+    pages: NotRequired[str]
+    """Pages to read, e.g. 1-3,7"""
+
+class DocaiChequeRequest(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    engine: NotRequired[Literal["auto", "fast", "accurate"]]
+    """OCR engine for pages without a text layer"""
+    file_base64: NotRequired[str]
+    """Base64, URL-safe base64 or a data: URL"""
+    file_id: NotRequired[str]
+    """A stored file of this org and environment (POST /v1/files)"""
+    file_url: NotRequired[str]
+    """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
+    filename: NotRequired[str]
+    """Name for the stored input"""
+    languages: NotRequired[list[Literal["eng", "hin", "mar", "ben", "tam", "tel", "kan", "mal", "guj", "pan", "ori", "urd"]]]
+    """OCR languages for pages without a text layer (default eng, hin)"""
+    pages: NotRequired[str]
+    """Pages to read, e.g. 1-3,7"""
+    password: NotRequired[str]
+    """Opens a protected PDF; never stored or logged"""
 
 class DocaiClassifyParams(TypedDict):
     """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
@@ -493,6 +630,56 @@ class DocaiInvoiceRequest(TypedDict):
     """Pages to read, e.g. 1-3,7"""
     password: NotRequired[str]
     """Opens a protected PDF; never stored or logged"""
+
+class DocaiKycParams(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    file: FileInput
+    """The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)"""
+    consent: bool
+    """Must be true: the person this document belongs to agreed to it being read. Missing or false is 422 consent_required."""
+    purpose: str
+    """Why you are reading it (kept in the Verify audit log). Missing is 422 consent_required."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    document_type: NotRequired[Literal["pan_card", "aadhaar", "driving_licence", "passport", "voter_id"]]
+    """The document, when you know it (detected otherwise)"""
+    engine: NotRequired[Literal["auto", "fast", "accurate"]]
+    """OCR engine for pages without a text layer"""
+    languages: NotRequired[list[Literal["eng", "hin", "mar", "ben", "tam", "tel", "kan", "mal", "guj", "pan", "ori", "urd"]]]
+    """OCR languages for pages without a text layer (default eng, hin)"""
+    pages: NotRequired[str]
+    """Pages to read, e.g. 1-3,7"""
+    reference_id: NotRequired[str]
+    """Your id for the person or case, kept in the audit log"""
+
+class DocaiKycRequest(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    consent: bool
+    """Must be true: the person this document belongs to agreed to it being read. Missing or false is 422 consent_required."""
+    document_type: NotRequired[Literal["pan_card", "aadhaar", "driving_licence", "passport", "voter_id"]]
+    """The document, when you know it (detected otherwise)"""
+    engine: NotRequired[Literal["auto", "fast", "accurate"]]
+    """OCR engine for pages without a text layer"""
+    file_base64: NotRequired[str]
+    """Base64, URL-safe base64 or a data: URL"""
+    file_id: NotRequired[str]
+    """A stored file of this org and environment (POST /v1/files)"""
+    file_url: NotRequired[str]
+    """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
+    filename: NotRequired[str]
+    """Name for the stored input"""
+    languages: NotRequired[list[Literal["eng", "hin", "mar", "ben", "tam", "tel", "kan", "mal", "guj", "pan", "ori", "urd"]]]
+    """OCR languages for pages without a text layer (default eng, hin)"""
+    pages: NotRequired[str]
+    """Pages to read, e.g. 1-3,7"""
+    password: NotRequired[str]
+    """Opens a protected PDF; never stored or logged"""
+    purpose: str
+    """Why you are reading it (kept in the Verify audit log). Missing is 422 consent_required."""
+    reference_id: NotRequired[str]
+    """Your id for the person or case, kept in the audit log"""
 
 class DocaiReceiptParams(TypedDict):
     """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
@@ -780,6 +967,73 @@ class JobsListQuery(TypedDict):
     """Page size"""
     cursor: NotRequired[str]
     """next_cursor of the previous page."""
+
+class KYCAadhaar(TypedDict):
+    """The number and VID are always masked to their last 4 (XXXX XXXX 1234), in the answer and anything stored"""
+    address: Field
+    date_of_birth: Field
+    gender: Field
+    name: Field
+    number: Field
+    vid: Field
+    year_of_birth: Field
+
+class KYCDrivingLicence(TypedDict):
+    address: Field
+    classes: list[Field]
+    date_of_birth: Field
+    issue_date: Field
+    name: Field
+    number: Field
+    relation_name: Field
+    valid_until: Field
+
+class KYCPANCard(TypedDict):
+    date_of_birth: Field
+    father_name: Field
+    name: Field
+    number: Field
+
+class KYCPassport(TypedDict):
+    date_of_birth: Field
+    expiry_date: Field
+    file_number: Field
+    given_names: Field
+    issue_date: Field
+    mrz: Field
+    """The machine-readable zone: value {line1, line2} and, when its check digits pass, what it says (passport_number, surname, given_names, nationality, issuing_country, sex, date_of_birth, expiry_date)"""
+    mrz_valid: bool
+    """Every ICAO 9303 check digit of the MRZ passes"""
+    nationality: Field
+    passport_number: Field
+    place_of_birth: Field
+    place_of_issue: Field
+    sex: Field
+    surname: Field
+
+class KYCResult(TypedDict):
+    """Exactly one of pan_card, aadhaar, driving_licence, passport and voter_id is present: the one document_type names"""
+    aadhaar: NotRequired[KYCAadhaar]
+    document_confidence: float
+    """How sure the type is (1 when named in the request)"""
+    document_type: Literal["pan_card", "aadhaar", "driving_licence", "passport", "voter_id"]
+    """The document read (detected, or as named in document_type); its fields are under the property of the same name"""
+    driving_licence: NotRequired[KYCDrivingLicence]
+    page_count: int
+    pan_card: NotRequired[KYCPANCard]
+    passport: NotRequired[KYCPassport]
+    validation: list[ValidationIssue]
+    voter_id: NotRequired[KYCVoterID]
+    warnings: NotRequired[list[str]]
+
+class KYCVoterID(TypedDict):
+    address: Field
+    date_of_birth: Field
+    epic_number: Field
+    gender: Field
+    name: Field
+    relation_name: Field
+    relation_type: Field
 
 class KeyBinding(TypedDict):
     """Lowco API's view of a lowco-auth key; never key material"""
@@ -2232,7 +2486,7 @@ class UsageTotals(TypedDict):
     quantity: int
 
 class ValidationIssue(TypedDict):
-    code: Literal["gstin_invalid", "pan_mismatch", "state_code_mismatch", "date_invalid", "due_before_invoice", "line_arithmetic", "subtotal_mismatch", "tax_mismatch", "total_mismatch", "tax_type_mismatch", "e_invoice_mismatch"]
+    code: Literal["gstin_invalid", "pan_mismatch", "state_code_mismatch", "date_invalid", "due_before_invoice", "line_arithmetic", "subtotal_mismatch", "tax_mismatch", "total_mismatch", "tax_type_mismatch", "e_invoice_mismatch", "pan_invalid", "aadhaar_checksum", "dl_invalid", "passport_number_invalid", "epic_invalid", "mrz_missing", "mrz_checksum", "mrz_mismatch", "expired", "date_order", "balance_mismatch", "opening_balance_mismatch", "closing_balance_mismatch", "date_out_of_period", "debit_and_credit", "ifsc_invalid", "account_number_invalid", "amount_mismatch", "micr_invalid", "cheque_number_mismatch", "stale_cheque", "post_dated", "signature_missing"]
     field: str
     """JSON Pointer of the value at fault"""
     message: str
@@ -3636,9 +3890,12 @@ class WebhooksListQuery(TypedDict):
 
 
 BarcodeDecodeResult = DecodeResult
+DocaiBankStatementResult = BankStatementResult
+DocaiChequeResult = ChequeResult
 DocaiClassifyResult = ClassifyResult
 DocaiExtractResult = ExtractResult
 DocaiInvoiceResult = InvoiceResult
+DocaiKycResult = KYCResult
 DocaiReceiptResult = ReceiptResult
 DocaiTablesResult = TablesResult
 OcrHandwritingResult = OCRResult
@@ -3698,6 +3955,42 @@ class DocaiOperations:
     def __init__(self, core: Core) -> None:
         self._core = core
 
+    def bank_statement(
+        self,
+        *,
+        file: FileInput,
+        callback_url: Optional[str] = None,
+        engine: Optional[Literal["auto", "fast", "accurate"]] = None,
+        languages: Optional[list[Literal["eng", "hin", "mar", "ben", "tam", "tel", "kan", "mal", "guj", "pan", "ori", "urd"]]] = None,
+        pages: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[DocaiBankStatementResult]:
+        """Extract a bank statement's account and reconciled transactions. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.bank_statement.execute."""
+        params = {"file": file, "callback_url": callback_url, "engine": engine, "languages": languages, "pages": pages}
+        return self._core.operation("/v1/docai/bank-statement", params, input_kind="file", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def cheque(
+        self,
+        *,
+        file: FileInput,
+        callback_url: Optional[str] = None,
+        engine: Optional[Literal["auto", "fast", "accurate"]] = None,
+        languages: Optional[list[Literal["eng", "hin", "mar", "ben", "tam", "tel", "kan", "mal", "guj", "pan", "ori", "urd"]]] = None,
+        pages: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[DocaiChequeResult]:
+        """Extract a cheque: MICR, IFSC, payee, amounts cross-checked, signature. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.cheque.execute."""
+        params = {"file": file, "callback_url": callback_url, "engine": engine, "languages": languages, "pages": pages}
+        return self._core.operation("/v1/docai/cheque", params, input_kind="file", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
     def classify(
         self,
         *,
@@ -3754,6 +4047,28 @@ class DocaiOperations:
         """Extract a GST invoice. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.invoice.execute."""
         params = {"file": file, "callback_url": callback_url, "engine": engine, "languages": languages, "pages": pages}
         return self._core.operation("/v1/docai/invoice", params, input_kind="file", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
+    def kyc(
+        self,
+        *,
+        file: FileInput,
+        consent: bool,
+        purpose: str,
+        callback_url: Optional[str] = None,
+        document_type: Optional[Literal["pan_card", "aadhaar", "driving_licence", "passport", "voter_id"]] = None,
+        engine: Optional[Literal["auto", "fast", "accurate"]] = None,
+        languages: Optional[list[Literal["eng", "hin", "mar", "ben", "tam", "tel", "kan", "mal", "guj", "pan", "ori", "urd"]]] = None,
+        pages: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[DocaiKycResult]:
+        """Extract a PAN card, Aadhaar, driving licence, passport or voter ID (consent required). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.kyc.execute."""
+        params = {"file": file, "consent": consent, "purpose": purpose, "callback_url": callback_url, "document_type": document_type, "engine": engine, "languages": languages, "pages": pages, "reference_id": reference_id}
+        return self._core.operation("/v1/docai/kyc", params, input_kind="file", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
 
     def receipt(
         self,
@@ -4599,11 +4914,11 @@ class AuditResource:
         """Every item of list, page after page (follows next_cursor)."""
         return self._core.paginate(f"/v1/audit-logs", {"action": action, "actor_id": actor_id, "object_type": object_type, "object_id": object_id, "created_after": created_after, "created_before": created_before, "limit": limit, "format": format}, request_id=request_id)
 
-    def list_verify(self, *, created_after: Optional[str] = None, created_before: Optional[str] = None, cursor: Optional[str] = None, format: Optional[Literal["json", "csv"]] = None, identifier: Optional[str] = None, job_id: Optional[str] = None, limit: Optional[int] = None, operation: Optional[Literal["aadhaar-offline", "bank-account", "cin", "driving-licence", "email", "fssai", "gstin", "iec", "ifsc", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]] = None, reference_id: Optional[str] = None, result: Optional[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> AuditListVerifyData:
+    def list_verify(self, *, created_after: Optional[str] = None, created_before: Optional[str] = None, cursor: Optional[str] = None, format: Optional[Literal["json", "csv"]] = None, identifier: Optional[str] = None, job_id: Optional[str] = None, limit: Optional[int] = None, operation: Optional[Literal["aadhaar-offline", "bank-account", "cin", "docai/kyc/aadhaar", "docai/kyc/driving_licence", "docai/kyc/pan_card", "docai/kyc/passport", "docai/kyc/voter_id", "driving-licence", "email", "fssai", "gstin", "iec", "ifsc", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]] = None, reference_id: Optional[str] = None, result: Optional[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> AuditListVerifyData:
         """The Verify audit log of the calling environment, newest first: one row per lookup, the identifier only as its fingerprint and last 4."""
         return self._core.call("GET", f"/v1/verify/audit", query={"operation": operation, "result": result, "identifier": identifier, "reference_id": reference_id, "job_id": job_id, "created_after": created_after, "created_before": created_before, "limit": limit, "cursor": cursor, "format": format}, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
-    def list_verify_all(self, *, operation: Optional[Literal["aadhaar-offline", "bank-account", "cin", "driving-licence", "email", "fssai", "gstin", "iec", "ifsc", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]] = None, result: Optional[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]] = None, identifier: Optional[str] = None, reference_id: Optional[str] = None, job_id: Optional[str] = None, created_after: Optional[str] = None, created_before: Optional[str] = None, limit: Optional[int] = None, format: Optional[Literal["json", "csv"]] = None, request_id: Optional[str] = None) -> Iterator[VerifyAuditRow]:
+    def list_verify_all(self, *, operation: Optional[Literal["aadhaar-offline", "bank-account", "cin", "docai/kyc/aadhaar", "docai/kyc/driving_licence", "docai/kyc/pan_card", "docai/kyc/passport", "docai/kyc/voter_id", "driving-licence", "email", "fssai", "gstin", "iec", "ifsc", "mobile", "pan", "pan-aadhaar-link", "passport", "udyam", "upi", "vehicle-rc", "voter-id"]] = None, result: Optional[Literal["valid", "invalid", "not_found", "inactive", "mismatch", "unavailable"]] = None, identifier: Optional[str] = None, reference_id: Optional[str] = None, job_id: Optional[str] = None, created_after: Optional[str] = None, created_before: Optional[str] = None, limit: Optional[int] = None, format: Optional[Literal["json", "csv"]] = None, request_id: Optional[str] = None) -> Iterator[VerifyAuditRow]:
         """Every item of list_verify, page after page (follows next_cursor)."""
         return self._core.paginate(f"/v1/verify/audit", {"operation": operation, "result": result, "identifier": identifier, "reference_id": reference_id, "job_id": job_id, "created_after": created_after, "created_before": created_before, "limit": limit, "format": format}, request_id=request_id)
 
