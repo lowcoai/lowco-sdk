@@ -33300,6 +33300,170 @@
         ]
       }
     },
+    "/v1/sign/s/{token}/documents/{n}/pages/{p}": {
+      "get": {
+        "operationId": "sign_session_page",
+        "parameters": [
+          {
+            "description": "The signer link's token (https://sign.lowco.ai/s/{token})",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The session_id from opening the link",
+            "in": "header",
+            "name": "X-Sign-Session",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The document's index, from 0",
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The page number, from 1",
+            "in": "path",
+            "name": "p",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Resolution, 50 to 300 (default 110: a phone's width for an A4 page)",
+            "in": "query",
+            "name": "dpi",
+            "schema": {
+              "default": 110,
+              "maximum": 300,
+              "minimum": 50,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/png": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The page"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "past": {
+                    "summary": "A page past the end",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_param",
+                        "message": "The document has 2 pages.",
+                        "param": "p",
+                        "reason": "invalid_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "busy": {
+                    "summary": "Rendering unavailable",
+                    "value": {
+                      "error": {
+                        "code": 503,
+                        "doc_url": "https://docs.lowco.ai/api/errors#service_unavailable",
+                        "message": "The page could not be rendered; retry shortly.",
+                        "reason": "service_unavailable",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: provider_unavailable, service_unavailable.",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "One page of a document as a PNG",
+        "tags": [
+          "sign"
+        ]
+      }
+    },
     "/v1/sign/s/{token}/logo": {
       "get": {
         "operationId": "sign_session_logo",

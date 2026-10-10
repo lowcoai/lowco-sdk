@@ -128,7 +128,7 @@ var resourceNames = map[string][2]string{
 // the signer link's routes are the signer page's, not a developer's.
 var skipped = map[string]bool{"files_download": true, "sign_session_open": true, "sign_session_state": true, "sign_session_otp": true,
 	"sign_session_otp_verify": true, "sign_session_viewed": true, "sign_session_sign": true, "sign_session_decline": true,
-	"sign_session_document": true, "sign_session_logo": true}
+	"sign_session_document": true, "sign_session_logo": true, "sign_session_page": true}
 
 func load(path string) (*Model, error) {
 	b, err := os.ReadFile(path)
