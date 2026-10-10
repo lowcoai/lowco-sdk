@@ -62,7 +62,7 @@ abstract final class ErrorReason {
   static const keyNotFound = 'key_not_found';
   /// HTTP 401: The key was revoked.
   static const keyRevoked = 'key_revoked';
-  /// HTTP 404: No message with this id exists in this environment.
+  /// HTTP 404: No message, sender, suppression or OTP with this id exists in this environment.
   static const messageNotFound = 'message_not_found';
   /// HTTP 405: The route exists, but not for this HTTP method.
   static const methodNotAllowed = 'method_not_allowed';
@@ -102,7 +102,7 @@ abstract final class ErrorReason {
   static const suppressed = 'suppressed';
   /// HTTP 422: The message template is not approved.
   static const templateNotApproved = 'template_not_approved';
-  /// HTTP 404: No render template (or version) with this id exists in this environment.
+  /// HTTP 404: No render template (or version), signing template or message template with this id exists in this environment.
   static const templateNotFound = 'template_not_found';
   /// HTTP 504: An operation exceeded its deadline and could not be promoted to a job.
   static const timeout = 'timeout';
@@ -151,7 +151,7 @@ const errorReasons = <String, ({int status, String when, String action})>{
   'key_expired': (status: 401, when: 'The key passed its expiry, or the old key\'s overlap window after a rotation ended.', action: 'Use the new key from the rotation, or create a key.'),
   'key_not_found': (status: 404, when: 'The key has no Lowco API binding, or (key sync) no such key exists in this organisation.', action: 'Create the key in the console\'s API keys page, or check the key id and the organisation.'),
   'key_revoked': (status: 401, when: 'The key was revoked.', action: 'Create a new key in the console.'),
-  'message_not_found': (status: 404, when: 'No message with this id exists in this environment.', action: 'Check the id and the environment of the key.'),
+  'message_not_found': (status: 404, when: 'No message, sender, suppression or OTP with this id exists in this environment.', action: 'Check the id and the environment of the key.'),
   'method_not_allowed': (status: 405, when: 'The route exists, but not for this HTTP method.', action: 'Use the method the API reference shows.'),
   'missing_key': (status: 401, when: 'No API key or user token reached the API.', action: 'Send Authorization: Bearer <key> (or X-Api-Key).'),
   'missing_param': (status: 400, when: 'A required parameter or input is missing; param names it.', action: 'Add the parameter named in param.'),
@@ -171,7 +171,7 @@ const errorReasons = <String, ({int status, String when, String action})>{
   'service_unavailable': (status: 503, when: 'The service is shedding load or a dependency is down.', action: 'Retry after Retry-After, with backoff.'),
   'suppressed': (status: 422, when: 'The recipient is on the suppression list.', action: 'Do not send to this recipient.'),
   'template_not_approved': (status: 422, when: 'The message template is not approved.', action: 'Wait for approval or use an approved template.'),
-  'template_not_found': (status: 404, when: 'No render template (or version) with this id exists in this environment.', action: 'List templates with GET /v1/render/templates.'),
+  'template_not_found': (status: 404, when: 'No render template (or version), signing template or message template with this id exists in this environment.', action: 'List templates with GET /v1/render/templates, /v1/sign/templates or /v1/messages/templates.'),
   'timeout': (status: 504, when: 'An operation exceeded its deadline and could not be promoted to a job.', action: 'Retry with ?mode=async to run it as a job.'),
   'token_expired': (status: 401, when: 'The console user\'s token, or a signed download link, has expired.', action: 'Sign in again, or ask the API for a fresh link (GET /v1/files/{id}/content).'),
   'too_many_files': (status: 422, when: 'More files than the operation takes.', action: 'Send fewer files per call.'),
@@ -1267,6 +1267,44 @@ class Colors {
       };
 }
 
+/// A DNS record an email domain publishes
+class DNSRecord {
+  const DNSRecord({
+    this.name,
+    this.purpose,
+    this.status,
+    this.type,
+    this.value,
+  });
+
+  factory DNSRecord.fromJson(Map<String, dynamic> json) => DNSRecord(
+        name: json['name'] as String?,
+        purpose: json['purpose'] as String?,
+        status: json['status'] as String?,
+        type: json['type'] as String?,
+        value: json['value'] as String?,
+      );
+
+  final String? name;
+
+  final String? purpose;
+
+  final String? status;
+
+  final String? type;
+
+  final String? value;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (name != null) 'name': name!,
+        if (purpose != null) 'purpose': purpose!,
+        if (status != null) 'status': status!,
+        if (type != null) 'type': type!,
+        if (value != null) 'value': value!,
+      };
+}
+
 /// The data-handling page (UI-08). Operators maintain the providers' profiles; the list follows the live routes.
 class DataHandling {
   const DataHandling({
@@ -1480,6 +1518,8 @@ class Deleted {
   const Deleted({
     this.deleted,
     this.fileId,
+    this.senderId,
+    this.suppressionId,
     this.templateId,
     this.webhookId,
   });
@@ -1487,6 +1527,8 @@ class Deleted {
   factory Deleted.fromJson(Map<String, dynamic> json) => Deleted(
         deleted: json['deleted'] as bool?,
         fileId: json['file_id'] as String?,
+        senderId: json['sender_id'] as String?,
+        suppressionId: json['suppression_id'] as String?,
         templateId: json['template_id'] as String?,
         webhookId: json['webhook_id'] as String?,
       );
@@ -1494,6 +1536,10 @@ class Deleted {
   final bool? deleted;
 
   final String? fileId;
+
+  final String? senderId;
+
+  final String? suppressionId;
 
   final String? templateId;
 
@@ -1503,6 +1549,8 @@ class Deleted {
   Map<String, dynamic> toJson() => {
         if (deleted != null) 'deleted': deleted!,
         if (fileId != null) 'file_id': fileId!,
+        if (senderId != null) 'sender_id': senderId!,
+        if (suppressionId != null) 'suppression_id': suppressionId!,
         if (templateId != null) 'template_id': templateId!,
         if (webhookId != null) 'webhook_id': webhookId!,
       };
@@ -3225,24 +3273,31 @@ class JobInput {
   const JobInput({
     this.fileId,
     this.fileIds,
+    this.messages,
     this.pages,
     this.rows,
     this.send,
+    this.skipped,
     this.templateId,
   });
 
   factory JobInput.fromJson(Map<String, dynamic> json) => JobInput(
         fileId: json['file_id'] as String?,
         fileIds: (json['file_ids'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        messages: (json['messages'] as num?)?.toInt(),
         pages: (json['pages'] as num?)?.toInt(),
         rows: (json['rows'] as num?)?.toInt(),
         send: json['send'] as bool?,
+        skipped: (json['skipped'] as num?)?.toInt(),
         templateId: json['template_id'] as String?,
       );
 
   final String? fileId;
 
   final List<String>? fileIds;
+
+  /// A message batch's rows
+  final int? messages;
 
   final int? pages;
 
@@ -3252,6 +3307,9 @@ class JobInput {
   /// A sign bulk job sends each request
   final bool? send;
 
+  /// A message batch's marketing rows to suppressed recipients, skipped
+  final int? skipped;
+
   /// A sign bulk job's template
   final String? templateId;
 
@@ -3259,9 +3317,11 @@ class JobInput {
   Map<String, dynamic> toJson() => {
         if (fileId != null) 'file_id': fileId!,
         if (fileIds != null) 'file_ids': fileIds!,
+        if (messages != null) 'messages': messages!,
         if (pages != null) 'pages': pages!,
         if (rows != null) 'rows': rows!,
         if (send != null) 'send': send!,
+        if (skipped != null) 'skipped': skipped!,
         if (templateId != null) 'template_id': templateId!,
       };
 }
@@ -4286,6 +4346,1465 @@ class KeysListQuery {
       };
 }
 
+/// A message. The recipient is masked; the carrier is never disclosed
+class Message {
+  const Message({
+    this.attachments,
+    this.batchId,
+    this.cancelledAt,
+    this.category,
+    this.channel,
+    this.createdAt,
+    this.credited,
+    this.deliveredAt,
+    this.failedAt,
+    this.failure,
+    this.language,
+    this.messageId,
+    this.metadata,
+    this.otpId,
+    this.queuedAt,
+    this.readAt,
+    this.referenceId,
+    this.scheduledAt,
+    this.sender,
+    this.sentAt,
+    this.status,
+    this.template,
+    this.templateId,
+    this.timeline,
+    this.to,
+    this.updatedAt,
+  });
+
+  factory Message.fromJson(Map<String, dynamic> json) => Message(
+        attachments: (json['attachments'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        batchId: json['batch_id'] as String?,
+        cancelledAt: json['cancelled_at'] as String?,
+        category: json['category'] as String?,
+        channel: json['channel'] as String?,
+        createdAt: json['created_at'] as String?,
+        credited: json['credited'] as bool?,
+        deliveredAt: json['delivered_at'] as String?,
+        failedAt: json['failed_at'] as String?,
+        failure: json['failure'] == null ? null : MessageFailure.fromJson(json['failure'] as Map<String, dynamic>),
+        language: json['language'] as String?,
+        messageId: json['message_id'] as String?,
+        metadata: (json['metadata'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        otpId: json['otp_id'] as String?,
+        queuedAt: json['queued_at'] as String?,
+        readAt: json['read_at'] as String?,
+        referenceId: json['reference_id'] as String?,
+        scheduledAt: json['scheduled_at'] as String?,
+        sender: json['sender'] as String?,
+        sentAt: json['sent_at'] as String?,
+        status: json['status'] as String?,
+        template: json['template'] as String?,
+        templateId: json['template_id'] as String?,
+        timeline: (json['timeline'] as List?)?.map((e) => (e == null ? null : MessageEvent.fromJson(e as Map<String, dynamic>))!).toList().cast<MessageEvent>(),
+        to: json['to'] as String?,
+        updatedAt: json['updated_at'] as String?,
+      );
+
+  /// Stored file ids
+  final List<String>? attachments;
+
+  /// The batch's job, when sent in one
+  final String? batchId;
+
+  final String? cancelledAt;
+
+  final String? category;
+
+  final String? channel;
+
+  final String? createdAt;
+
+  /// The message's usage was credited back (a failure Lowco or the carrier caused, or a cancellation)
+  final bool? credited;
+
+  final String? deliveredAt;
+
+  final String? failedAt;
+
+  final MessageFailure? failure;
+
+  final String? language;
+
+  /// msg_…
+  final String? messageId;
+
+  /// Your keys and values, returned in answers and webhooks
+  final Map<String, String>? metadata;
+
+  /// The OTP it carries
+  final String? otpId;
+
+  final String? queuedAt;
+
+  final String? readAt;
+
+  final String? referenceId;
+
+  final String? scheduledAt;
+
+  final String? sender;
+
+  /// The carrier accepted it
+  final String? sentAt;
+
+  /// scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only)
+  final String? status;
+
+  /// The template's name
+  final String? template;
+
+  final String? templateId;
+
+  /// GET /v1/messages/{id} only
+  final List<MessageEvent>? timeline;
+
+  /// Masked
+  final String? to;
+
+  final String? updatedAt;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (attachments != null) 'attachments': attachments!,
+        if (batchId != null) 'batch_id': batchId!,
+        if (cancelledAt != null) 'cancelled_at': cancelledAt!,
+        if (category != null) 'category': category!,
+        if (channel != null) 'channel': channel!,
+        if (createdAt != null) 'created_at': createdAt!,
+        if (credited != null) 'credited': credited!,
+        if (deliveredAt != null) 'delivered_at': deliveredAt!,
+        if (failedAt != null) 'failed_at': failedAt!,
+        if (failure != null) 'failure': failure!.toJson(),
+        if (language != null) 'language': language!,
+        if (messageId != null) 'message_id': messageId!,
+        if (metadata != null) 'metadata': metadata!,
+        if (otpId != null) 'otp_id': otpId!,
+        if (queuedAt != null) 'queued_at': queuedAt!,
+        if (readAt != null) 'read_at': readAt!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (scheduledAt != null) 'scheduled_at': scheduledAt!,
+        if (sender != null) 'sender': sender!,
+        if (sentAt != null) 'sent_at': sentAt!,
+        if (status != null) 'status': status!,
+        if (template != null) 'template': template!,
+        if (templateId != null) 'template_id': templateId!,
+        if (timeline != null) 'timeline': timeline!.map((e) => e.toJson()).toList(),
+        if (to != null) 'to': to!,
+        if (updatedAt != null) 'updated_at': updatedAt!,
+      };
+}
+
+/// Up to 1000 messages, accepted as one job
+class MessageBatch {
+  const MessageBatch({
+    this.callbackUrl,
+    this.messages,
+  });
+
+  factory MessageBatch.fromJson(Map<String, dynamic> json) => MessageBatch(
+        callbackUrl: json['callback_url'] as String?,
+        messages: (json['messages'] as List?)?.map((e) => (e == null ? null : MessageSend.fromJson(e as Map<String, dynamic>))!).toList().cast<MessageSend>(),
+      );
+
+  /// https URL for the batch job's webhook
+  final String? callbackUrl;
+
+  /// 1 to 1000; every row is checked first (all or nothing), except marketing rows to suppressed recipients, which are skipped
+  final List<MessageSend>? messages;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (messages != null) 'messages': messages!.map((e) => e.toJson()).toList(),
+      };
+}
+
+/// The batch's job (it succeeds once every message has left the queue) and each row
+class MessageBatchAccepted {
+  const MessageBatchAccepted({
+    this.accepted,
+    this.jobId,
+    this.messages,
+    this.skipped,
+    this.status,
+    this.total,
+  });
+
+  factory MessageBatchAccepted.fromJson(Map<String, dynamic> json) => MessageBatchAccepted(
+        accepted: (json['accepted'] as num?)?.toInt(),
+        jobId: json['job_id'] as String?,
+        messages: (json['messages'] as List?)?.map((e) => (e == null ? null : MessageBatchAcceptedMessage.fromJson(e as Map<String, dynamic>))!).toList().cast<MessageBatchAcceptedMessage>(),
+        skipped: (json['skipped'] as List?)?.map((e) => (e == null ? null : MessageBatchAcceptedSkippedItem.fromJson(e as Map<String, dynamic>))!).toList().cast<MessageBatchAcceptedSkippedItem>(),
+        status: json['status'] as String?,
+        total: (json['total'] as num?)?.toInt(),
+      );
+
+  final int? accepted;
+
+  final String? jobId;
+
+  final List<MessageBatchAcceptedMessage>? messages;
+
+  final List<MessageBatchAcceptedSkippedItem>? skipped;
+
+  final String? status;
+
+  final int? total;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (accepted != null) 'accepted': accepted!,
+        if (jobId != null) 'job_id': jobId!,
+        if (messages != null) 'messages': messages!.map((e) => e.toJson()).toList(),
+        if (skipped != null) 'skipped': skipped!.map((e) => e.toJson()).toList(),
+        if (status != null) 'status': status!,
+        if (total != null) 'total': total!,
+      };
+}
+
+class MessageBatchAcceptedMessage {
+  const MessageBatchAcceptedMessage({
+    this.index,
+    this.messageId,
+    this.status,
+  });
+
+  factory MessageBatchAcceptedMessage.fromJson(Map<String, dynamic> json) => MessageBatchAcceptedMessage(
+        index: (json['index'] as num?)?.toInt(),
+        messageId: json['message_id'] as String?,
+        status: json['status'] as String?,
+      );
+
+  final int? index;
+
+  final String? messageId;
+
+  /// scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only)
+  final String? status;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (index != null) 'index': index!,
+        if (messageId != null) 'message_id': messageId!,
+        if (status != null) 'status': status!,
+      };
+}
+
+class MessageBatchAcceptedSkippedItem {
+  const MessageBatchAcceptedSkippedItem({
+    this.index,
+    this.reason,
+  });
+
+  factory MessageBatchAcceptedSkippedItem.fromJson(Map<String, dynamic> json) => MessageBatchAcceptedSkippedItem(
+        index: (json['index'] as num?)?.toInt(),
+        reason: json['reason'] as String?,
+      );
+
+  final int? index;
+
+  final String? reason;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (index != null) 'index': index!,
+        if (reason != null) 'reason': reason!,
+      };
+}
+
+/// A step of the message's timeline
+class MessageEvent {
+  const MessageEvent({
+    this.at,
+    this.providerCode,
+    this.reason,
+    this.status,
+  });
+
+  factory MessageEvent.fromJson(Map<String, dynamic> json) => MessageEvent(
+        at: json['at'] as String?,
+        providerCode: json['provider_code'] as String?,
+        reason: json['reason'] as String?,
+        status: json['status'] as String?,
+      );
+
+  final String? at;
+
+  final String? providerCode;
+
+  final String? reason;
+
+  /// scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only)
+  final String? status;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (at != null) 'at': at!,
+        if (providerCode != null) 'provider_code': providerCode!,
+        if (reason != null) 'reason': reason!,
+        if (status != null) 'status': status!,
+      };
+}
+
+/// Why a message failed
+class MessageFailure {
+  const MessageFailure({
+    this.message,
+    this.providerCode,
+    this.reason,
+  });
+
+  factory MessageFailure.fromJson(Map<String, dynamic> json) => MessageFailure(
+        message: json['message'] as String?,
+        providerCode: json['provider_code'] as String?,
+        reason: json['reason'] as String?,
+      );
+
+  final String? message;
+
+  /// The carrier's own code
+  final String? providerCode;
+
+  /// Credited back when Lowco or the carrier caused it: carrier_error, provider_unavailable, internal_error, expired
+  final String? reason;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (message != null) 'message': message!,
+        if (providerCode != null) 'provider_code': providerCode!,
+        if (reason != null) 'reason': reason!,
+      };
+}
+
+/// A message to send: a template with its variables, or the channel's raw content
+class MessageSend {
+  const MessageSend({
+    this.attachments,
+    this.body,
+    this.callbackUrl,
+    this.category,
+    this.channel,
+    this.data,
+    this.html,
+    this.language,
+    this.metadata,
+    this.referenceId,
+    this.scheduleAt,
+    this.sender,
+    this.subject,
+    this.template,
+    this.text,
+    this.title,
+    this.to,
+    this.variables,
+  });
+
+  factory MessageSend.fromJson(Map<String, dynamic> json) => MessageSend(
+        attachments: (json['attachments'] as List?)?.map((e) => (e == null ? null : FileRef.fromJson(e as Map<String, dynamic>))!).toList().cast<FileRef>(),
+        body: json['body'] as String?,
+        callbackUrl: json['callback_url'] as String?,
+        category: json['category'] as String?,
+        channel: json['channel'] as String?,
+        data: (json['data'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        html: json['html'] as String?,
+        language: json['language'] as String?,
+        metadata: (json['metadata'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        referenceId: json['reference_id'] as String?,
+        scheduleAt: json['schedule_at'] as String?,
+        sender: json['sender'] as String?,
+        subject: json['subject'] as String?,
+        template: json['template'] as String?,
+        text: json['text'] as String?,
+        title: json['title'] as String?,
+        to: json['to'] as String?,
+        variables: (json['variables'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+      );
+
+  /// email: at most 10 files (file_id, file_url or file_base64), 25 MB together
+  final List<FileRef>? attachments;
+
+  /// push
+  final String? body;
+
+  /// https URL for this message's events, instead of the environment's webhook endpoints
+  final String? callbackUrl;
+
+  /// Default transactional. marketing to a suppressed recipient is refused (422 suppressed); WhatsApp marketing needs an approved template
+  final String? category;
+
+  final String? channel;
+
+  /// A push's data payload
+  final Map<String, String>? data;
+
+  /// email (at most 500 KB)
+  final String? html;
+
+  /// Picks the template in this language (default en)
+  final String? language;
+
+  /// Your keys and values, returned in answers and webhooks
+  final Map<String, String>? metadata;
+
+  /// Your id, to find the message by
+  final String? referenceId;
+
+  /// Send later (at most 30 days ahead); cancel until then
+  final String? scheduleAt;
+
+  /// The sender (snd_…): required for sms, whatsapp and push; an email without one goes from Lowco's address
+  final String? sender;
+
+  /// email
+  final String? subject;
+
+  /// A template's id (mtp_…) or name on the channel; an SMS to an Indian number must use one (TRAI DLT)
+  final String? template;
+
+  /// sms and whatsapp (a session reply within 24 hours of the customer's message); an email's plain part
+  final String? text;
+
+  /// push
+  final String? title;
+
+  /// +E.164 or a 10-digit Indian mobile (sms, whatsapp), an email address, or the device's push token
+  final String? to;
+
+  /// The template's {{variables}}
+  final Map<String, String>? variables;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (attachments != null) 'attachments': attachments!.map((e) => e.toJson()).toList(),
+        if (body != null) 'body': body!,
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (category != null) 'category': category!,
+        if (channel != null) 'channel': channel!,
+        if (data != null) 'data': data!,
+        if (html != null) 'html': html!,
+        if (language != null) 'language': language!,
+        if (metadata != null) 'metadata': metadata!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (scheduleAt != null) 'schedule_at': scheduleAt!,
+        if (sender != null) 'sender': sender!,
+        if (subject != null) 'subject': subject!,
+        if (template != null) 'template': template!,
+        if (text != null) 'text': text!,
+        if (title != null) 'title': title!,
+        if (to != null) 'to': to!,
+        if (variables != null) 'variables': variables!,
+      };
+}
+
+/// A sender (never its credentials)
+class MessageSender {
+  const MessageSender({
+    this.address,
+    this.bundleId,
+    this.businessAccountId,
+    this.channel,
+    this.createdAt,
+    this.dltEntityId,
+    this.domain,
+    this.failureReason,
+    this.fromName,
+    this.hasCredentials,
+    this.header,
+    this.keyId,
+    this.name,
+    this.phoneNumber,
+    this.phoneNumberId,
+    this.platform,
+    this.projectId,
+    this.replyTo,
+    this.sandbox,
+    this.senderId,
+    this.status,
+    this.teamId,
+    this.updatedAt,
+    this.verification,
+    this.verifiedAt,
+  });
+
+  factory MessageSender.fromJson(Map<String, dynamic> json) => MessageSender(
+        address: json['address'] as String?,
+        bundleId: json['bundle_id'] as String?,
+        businessAccountId: json['business_account_id'] as String?,
+        channel: json['channel'] as String?,
+        createdAt: json['created_at'] as String?,
+        dltEntityId: json['dlt_entity_id'] as String?,
+        domain: json['domain'] as String?,
+        failureReason: json['failure_reason'] as String?,
+        fromName: json['from_name'] as String?,
+        hasCredentials: json['has_credentials'] as bool?,
+        header: json['header'] as String?,
+        keyId: json['key_id'] as String?,
+        name: json['name'] as String?,
+        phoneNumber: json['phone_number'] as String?,
+        phoneNumberId: json['phone_number_id'] as String?,
+        platform: json['platform'] as String?,
+        projectId: json['project_id'] as String?,
+        replyTo: json['reply_to'] as String?,
+        sandbox: json['sandbox'] as bool?,
+        senderId: json['sender_id'] as String?,
+        status: json['status'] as String?,
+        teamId: json['team_id'] as String?,
+        updatedAt: json['updated_at'] as String?,
+        verification: json['verification'] == null ? null : SenderVerification.fromJson(json['verification'] as Map<String, dynamic>),
+        verifiedAt: json['verified_at'] as String?,
+      );
+
+  /// email: the From address
+  final String? address;
+
+  /// push (apns)
+  final String? bundleId;
+
+  /// whatsapp: the WABA id (templates are submitted to it)
+  final String? businessAccountId;
+
+  final String? channel;
+
+  final String? createdAt;
+
+  /// sms: the DLT principal entity id
+  final String? dltEntityId;
+
+  /// email: the domain (from address when omitted); SPF, DKIM and DMARC are checked on it
+  final String? domain;
+
+  final String? failureReason;
+
+  /// email
+  final String? fromName;
+
+  final bool? hasCredentials;
+
+  /// sms: the 6-letter DLT sender id
+  final String? header;
+
+  /// push (apns): the .p8 key's id
+  final String? keyId;
+
+  final String? name;
+
+  /// whatsapp: the business number, +E.164
+  final String? phoneNumber;
+
+  /// whatsapp: the number's id in the WhatsApp Business Account
+  final String? phoneNumberId;
+
+  /// push
+  final String? platform;
+
+  /// push (fcm): the Firebase project
+  final String? projectId;
+
+  /// email
+  final String? replyTo;
+
+  /// push (apns): Apple's development environment
+  final bool? sandbox;
+
+  /// snd_…
+  final String? senderId;
+
+  /// A message needs a verified sender (422 sender_not_verified)
+  final String? status;
+
+  /// push (apns)
+  final String? teamId;
+
+  final String? updatedAt;
+
+  final SenderVerification? verification;
+
+  final String? verifiedAt;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (address != null) 'address': address!,
+        if (bundleId != null) 'bundle_id': bundleId!,
+        if (businessAccountId != null) 'business_account_id': businessAccountId!,
+        if (channel != null) 'channel': channel!,
+        if (createdAt != null) 'created_at': createdAt!,
+        if (dltEntityId != null) 'dlt_entity_id': dltEntityId!,
+        if (domain != null) 'domain': domain!,
+        if (failureReason != null) 'failure_reason': failureReason!,
+        if (fromName != null) 'from_name': fromName!,
+        if (hasCredentials != null) 'has_credentials': hasCredentials!,
+        if (header != null) 'header': header!,
+        if (keyId != null) 'key_id': keyId!,
+        if (name != null) 'name': name!,
+        if (phoneNumber != null) 'phone_number': phoneNumber!,
+        if (phoneNumberId != null) 'phone_number_id': phoneNumberId!,
+        if (platform != null) 'platform': platform!,
+        if (projectId != null) 'project_id': projectId!,
+        if (replyTo != null) 'reply_to': replyTo!,
+        if (sandbox != null) 'sandbox': sandbox!,
+        if (senderId != null) 'sender_id': senderId!,
+        if (status != null) 'status': status!,
+        if (teamId != null) 'team_id': teamId!,
+        if (updatedAt != null) 'updated_at': updatedAt!,
+        if (verification != null) 'verification': verification!.toJson(),
+        if (verifiedAt != null) 'verified_at': verifiedAt!,
+      };
+}
+
+/// A sender
+class MessageSenderCreate {
+  const MessageSenderCreate({
+    this.address,
+    this.bundleId,
+    this.businessAccountId,
+    this.channel,
+    this.credentials,
+    this.dltEntityId,
+    this.domain,
+    this.fromName,
+    this.header,
+    this.keyId,
+    this.name,
+    this.phoneNumber,
+    this.phoneNumberId,
+    this.platform,
+    this.projectId,
+    this.replyTo,
+    this.sandbox,
+    this.teamId,
+  });
+
+  factory MessageSenderCreate.fromJson(Map<String, dynamic> json) => MessageSenderCreate(
+        address: json['address'] as String?,
+        bundleId: json['bundle_id'] as String?,
+        businessAccountId: json['business_account_id'] as String?,
+        channel: json['channel'] as String?,
+        credentials: (json['credentials'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        dltEntityId: json['dlt_entity_id'] as String?,
+        domain: json['domain'] as String?,
+        fromName: json['from_name'] as String?,
+        header: json['header'] as String?,
+        keyId: json['key_id'] as String?,
+        name: json['name'] as String?,
+        phoneNumber: json['phone_number'] as String?,
+        phoneNumberId: json['phone_number_id'] as String?,
+        platform: json['platform'] as String?,
+        projectId: json['project_id'] as String?,
+        replyTo: json['reply_to'] as String?,
+        sandbox: json['sandbox'] as bool?,
+        teamId: json['team_id'] as String?,
+      );
+
+  /// email: the From address
+  final String? address;
+
+  /// push (apns)
+  final String? bundleId;
+
+  /// whatsapp: the WABA id (templates are submitted to it)
+  final String? businessAccountId;
+
+  final String? channel;
+
+  /// push: service_account_json (fcm) or private_key (apns, the .p8 PEM). Sealed; never answered
+  final Map<String, String>? credentials;
+
+  /// sms: the DLT principal entity id
+  final String? dltEntityId;
+
+  /// email: the domain (from address when omitted); SPF, DKIM and DMARC are checked on it
+  final String? domain;
+
+  /// email
+  final String? fromName;
+
+  /// sms: the 6-letter DLT sender id
+  final String? header;
+
+  /// push (apns): the .p8 key's id
+  final String? keyId;
+
+  final String? name;
+
+  /// whatsapp: the business number, +E.164
+  final String? phoneNumber;
+
+  /// whatsapp: the number's id in the WhatsApp Business Account
+  final String? phoneNumberId;
+
+  /// push
+  final String? platform;
+
+  /// push (fcm): the Firebase project
+  final String? projectId;
+
+  /// email
+  final String? replyTo;
+
+  /// push (apns): Apple's development environment
+  final bool? sandbox;
+
+  /// push (apns)
+  final String? teamId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (address != null) 'address': address!,
+        if (bundleId != null) 'bundle_id': bundleId!,
+        if (businessAccountId != null) 'business_account_id': businessAccountId!,
+        if (channel != null) 'channel': channel!,
+        if (credentials != null) 'credentials': credentials!,
+        if (dltEntityId != null) 'dlt_entity_id': dltEntityId!,
+        if (domain != null) 'domain': domain!,
+        if (fromName != null) 'from_name': fromName!,
+        if (header != null) 'header': header!,
+        if (keyId != null) 'key_id': keyId!,
+        if (name != null) 'name': name!,
+        if (phoneNumber != null) 'phone_number': phoneNumber!,
+        if (phoneNumberId != null) 'phone_number_id': phoneNumberId!,
+        if (platform != null) 'platform': platform!,
+        if (projectId != null) 'project_id': projectId!,
+        if (replyTo != null) 'reply_to': replyTo!,
+        if (sandbox != null) 'sandbox': sandbox!,
+        if (teamId != null) 'team_id': teamId!,
+      };
+}
+
+/// A message template
+class MessageTemplate {
+  const MessageTemplate({
+    this.approvalStatus,
+    this.body,
+    this.buttons,
+    this.category,
+    this.channel,
+    this.createdAt,
+    this.dltEntityId,
+    this.dltTemplateId,
+    this.footer,
+    this.header,
+    this.html,
+    this.language,
+    this.name,
+    this.rejectionReason,
+    this.sender,
+    this.subject,
+    this.submittedAt,
+    this.syncedAt,
+    this.templateId,
+    this.text,
+    this.title,
+    this.updatedAt,
+    this.variables,
+  });
+
+  factory MessageTemplate.fromJson(Map<String, dynamic> json) => MessageTemplate(
+        approvalStatus: json['approval_status'] as String?,
+        body: json['body'] as String?,
+        buttons: (json['buttons'] as List?)?.map((e) => (e == null ? null : MessageTemplateButton.fromJson(e as Map<String, dynamic>))!).toList().cast<MessageTemplateButton>(),
+        category: json['category'] as String?,
+        channel: json['channel'] as String?,
+        createdAt: json['created_at'] as String?,
+        dltEntityId: json['dlt_entity_id'] as String?,
+        dltTemplateId: json['dlt_template_id'] as String?,
+        footer: json['footer'] as String?,
+        header: json['header'] == null ? null : MessageTemplateHeader.fromJson(json['header'] as Map<String, dynamic>),
+        html: json['html'] as String?,
+        language: json['language'] as String?,
+        name: json['name'] as String?,
+        rejectionReason: json['rejection_reason'] as String?,
+        sender: json['sender'] as String?,
+        subject: json['subject'] as String?,
+        submittedAt: json['submitted_at'] as String?,
+        syncedAt: json['synced_at'] as String?,
+        templateId: json['template_id'] as String?,
+        text: json['text'] as String?,
+        title: json['title'] as String?,
+        updatedAt: json['updated_at'] as String?,
+        variables: (json['variables'] as List?)?.map((e) => (e == null ? null : MessageTemplateVariable.fromJson(e as Map<String, dynamic>))!).toList().cast<MessageTemplateVariable>(),
+      );
+
+  /// WhatsApp templates are pending until Meta approves them; sms, email and push need no approval
+  final String? approvalStatus;
+
+  /// sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders
+  final String? body;
+
+  /// At most 10
+  final List<MessageTemplateButton>? buttons;
+
+  /// whatsapp: Meta's category
+  final String? category;
+
+  final String? channel;
+
+  final String? createdAt;
+
+  /// sms: the DLT principal entity id
+  final String? dltEntityId;
+
+  /// sms: the DLT template id (12 to 25 digits)
+  final String? dltTemplateId;
+
+  /// whatsapp
+  final String? footer;
+
+  /// whatsapp
+  final MessageTemplateHeader? header;
+
+  /// email
+  final String? html;
+
+  /// Default en
+  final String? language;
+
+  /// Unique per channel and language
+  final String? name;
+
+  /// Meta's reason, when rejected
+  final String? rejectionReason;
+
+  /// whatsapp: the sender whose business account approves it
+  final String? sender;
+
+  /// email
+  final String? subject;
+
+  final String? submittedAt;
+
+  /// When the approval was last read from Meta
+  final String? syncedAt;
+
+  /// mtp_…
+  final String? templateId;
+
+  /// email: the plain part
+  final String? text;
+
+  /// push
+  final String? title;
+
+  final String? updatedAt;
+
+  /// Declared variables (inferred from the placeholders when omitted)
+  final List<MessageTemplateVariable>? variables;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (approvalStatus != null) 'approval_status': approvalStatus!,
+        if (body != null) 'body': body!,
+        if (buttons != null) 'buttons': buttons!.map((e) => e.toJson()).toList(),
+        if (category != null) 'category': category!,
+        if (channel != null) 'channel': channel!,
+        if (createdAt != null) 'created_at': createdAt!,
+        if (dltEntityId != null) 'dlt_entity_id': dltEntityId!,
+        if (dltTemplateId != null) 'dlt_template_id': dltTemplateId!,
+        if (footer != null) 'footer': footer!,
+        if (header != null) 'header': header!.toJson(),
+        if (html != null) 'html': html!,
+        if (language != null) 'language': language!,
+        if (name != null) 'name': name!,
+        if (rejectionReason != null) 'rejection_reason': rejectionReason!,
+        if (sender != null) 'sender': sender!,
+        if (subject != null) 'subject': subject!,
+        if (submittedAt != null) 'submitted_at': submittedAt!,
+        if (syncedAt != null) 'synced_at': syncedAt!,
+        if (templateId != null) 'template_id': templateId!,
+        if (text != null) 'text': text!,
+        if (title != null) 'title': title!,
+        if (updatedAt != null) 'updated_at': updatedAt!,
+        if (variables != null) 'variables': variables!.map((e) => e.toJson()).toList(),
+      };
+}
+
+/// whatsapp
+class MessageTemplateButton {
+  const MessageTemplateButton({
+    this.phone,
+    this.text,
+    this.type,
+    this.url,
+  });
+
+  factory MessageTemplateButton.fromJson(Map<String, dynamic> json) => MessageTemplateButton(
+        phone: json['phone'] as String?,
+        text: json['text'] as String?,
+        type: json['type'] as String?,
+        url: json['url'] as String?,
+      );
+
+  final String? phone;
+
+  final String? text;
+
+  final String? type;
+
+  final String? url;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (phone != null) 'phone': phone!,
+        if (text != null) 'text': text!,
+        if (type != null) 'type': type!,
+        if (url != null) 'url': url!,
+      };
+}
+
+/// A template
+class MessageTemplateCreate {
+  const MessageTemplateCreate({
+    this.body,
+    this.buttons,
+    this.category,
+    this.channel,
+    this.dltEntityId,
+    this.dltTemplateId,
+    this.footer,
+    this.header,
+    this.html,
+    this.language,
+    this.name,
+    this.sender,
+    this.subject,
+    this.text,
+    this.title,
+    this.variables,
+  });
+
+  factory MessageTemplateCreate.fromJson(Map<String, dynamic> json) => MessageTemplateCreate(
+        body: json['body'] as String?,
+        buttons: (json['buttons'] as List?)?.map((e) => (e == null ? null : MessageTemplateCreateButton.fromJson(e as Map<String, dynamic>))!).toList().cast<MessageTemplateCreateButton>(),
+        category: json['category'] as String?,
+        channel: json['channel'] as String?,
+        dltEntityId: json['dlt_entity_id'] as String?,
+        dltTemplateId: json['dlt_template_id'] as String?,
+        footer: json['footer'] as String?,
+        header: json['header'] == null ? null : MessageTemplateCreateHeader.fromJson(json['header'] as Map<String, dynamic>),
+        html: json['html'] as String?,
+        language: json['language'] as String?,
+        name: json['name'] as String?,
+        sender: json['sender'] as String?,
+        subject: json['subject'] as String?,
+        text: json['text'] as String?,
+        title: json['title'] as String?,
+        variables: (json['variables'] as List?)?.map((e) => (e == null ? null : MessageTemplateCreateVariable.fromJson(e as Map<String, dynamic>))!).toList().cast<MessageTemplateCreateVariable>(),
+      );
+
+  /// sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders
+  final String? body;
+
+  /// At most 10
+  final List<MessageTemplateCreateButton>? buttons;
+
+  /// whatsapp: Meta's category
+  final String? category;
+
+  final String? channel;
+
+  /// sms: the DLT principal entity id
+  final String? dltEntityId;
+
+  /// sms: the DLT template id (12 to 25 digits)
+  final String? dltTemplateId;
+
+  /// whatsapp
+  final String? footer;
+
+  /// whatsapp
+  final MessageTemplateCreateHeader? header;
+
+  /// email
+  final String? html;
+
+  /// Default en
+  final String? language;
+
+  /// Unique per channel and language
+  final String? name;
+
+  /// whatsapp: the sender whose business account approves it
+  final String? sender;
+
+  /// email
+  final String? subject;
+
+  /// email: the plain part
+  final String? text;
+
+  /// push
+  final String? title;
+
+  /// Declared variables (inferred from the placeholders when omitted)
+  final List<MessageTemplateCreateVariable>? variables;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (body != null) 'body': body!,
+        if (buttons != null) 'buttons': buttons!.map((e) => e.toJson()).toList(),
+        if (category != null) 'category': category!,
+        if (channel != null) 'channel': channel!,
+        if (dltEntityId != null) 'dlt_entity_id': dltEntityId!,
+        if (dltTemplateId != null) 'dlt_template_id': dltTemplateId!,
+        if (footer != null) 'footer': footer!,
+        if (header != null) 'header': header!.toJson(),
+        if (html != null) 'html': html!,
+        if (language != null) 'language': language!,
+        if (name != null) 'name': name!,
+        if (sender != null) 'sender': sender!,
+        if (subject != null) 'subject': subject!,
+        if (text != null) 'text': text!,
+        if (title != null) 'title': title!,
+        if (variables != null) 'variables': variables!.map((e) => e.toJson()).toList(),
+      };
+}
+
+/// whatsapp
+class MessageTemplateCreateButton {
+  const MessageTemplateCreateButton({
+    this.phone,
+    this.text,
+    this.type,
+    this.url,
+  });
+
+  factory MessageTemplateCreateButton.fromJson(Map<String, dynamic> json) => MessageTemplateCreateButton(
+        phone: json['phone'] as String?,
+        text: json['text'] as String?,
+        type: json['type'] as String?,
+        url: json['url'] as String?,
+      );
+
+  final String? phone;
+
+  final String? text;
+
+  final String? type;
+
+  final String? url;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (phone != null) 'phone': phone!,
+        if (text != null) 'text': text!,
+        if (type != null) 'type': type!,
+        if (url != null) 'url': url!,
+      };
+}
+
+/// whatsapp
+class MessageTemplateCreateHeader {
+  const MessageTemplateCreateHeader({
+    this.text,
+    this.type,
+  });
+
+  factory MessageTemplateCreateHeader.fromJson(Map<String, dynamic> json) => MessageTemplateCreateHeader(
+        text: json['text'] as String?,
+        type: json['type'] as String?,
+      );
+
+  final String? text;
+
+  final String? type;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (text != null) 'text': text!,
+        if (type != null) 'type': type!,
+      };
+}
+
+class MessageTemplateCreateVariable {
+  const MessageTemplateCreateVariable({
+    this.example,
+    this.name,
+  });
+
+  factory MessageTemplateCreateVariable.fromJson(Map<String, dynamic> json) => MessageTemplateCreateVariable(
+        example: json['example'] as String?,
+        name: json['name'] as String?,
+      );
+
+  /// Required for whatsapp (Meta reviews it)
+  final String? example;
+
+  final String? name;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (example != null) 'example': example!,
+        if (name != null) 'name': name!,
+      };
+}
+
+/// whatsapp
+class MessageTemplateHeader {
+  const MessageTemplateHeader({
+    this.text,
+    this.type,
+  });
+
+  factory MessageTemplateHeader.fromJson(Map<String, dynamic> json) => MessageTemplateHeader(
+        text: json['text'] as String?,
+        type: json['type'] as String?,
+      );
+
+  final String? text;
+
+  final String? type;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (text != null) 'text': text!,
+        if (type != null) 'type': type!,
+      };
+}
+
+/// The fields to change (channel, name and language identify a template and stay); an edited WhatsApp template is submitted to Meta again
+class MessageTemplatePatch {
+  const MessageTemplatePatch({
+    this.body,
+    this.buttons,
+    this.category,
+    this.dltEntityId,
+    this.dltTemplateId,
+    this.footer,
+    this.header,
+    this.html,
+    this.sender,
+    this.subject,
+    this.text,
+    this.title,
+    this.variables,
+  });
+
+  factory MessageTemplatePatch.fromJson(Map<String, dynamic> json) => MessageTemplatePatch(
+        body: json['body'] as String?,
+        buttons: (json['buttons'] as List?)?.map((e) => (e == null ? null : MessageTemplatePatchButton.fromJson(e as Map<String, dynamic>))!).toList().cast<MessageTemplatePatchButton>(),
+        category: json['category'] as String?,
+        dltEntityId: json['dlt_entity_id'] as String?,
+        dltTemplateId: json['dlt_template_id'] as String?,
+        footer: json['footer'] as String?,
+        header: json['header'] == null ? null : MessageTemplatePatchHeader.fromJson(json['header'] as Map<String, dynamic>),
+        html: json['html'] as String?,
+        sender: json['sender'] as String?,
+        subject: json['subject'] as String?,
+        text: json['text'] as String?,
+        title: json['title'] as String?,
+        variables: (json['variables'] as List?)?.map((e) => (e == null ? null : MessageTemplatePatchVariable.fromJson(e as Map<String, dynamic>))!).toList().cast<MessageTemplatePatchVariable>(),
+      );
+
+  /// sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders
+  final String? body;
+
+  /// At most 10
+  final List<MessageTemplatePatchButton>? buttons;
+
+  /// whatsapp: Meta's category
+  final String? category;
+
+  /// sms: the DLT principal entity id
+  final String? dltEntityId;
+
+  /// sms: the DLT template id (12 to 25 digits)
+  final String? dltTemplateId;
+
+  /// whatsapp
+  final String? footer;
+
+  /// whatsapp
+  final MessageTemplatePatchHeader? header;
+
+  /// email
+  final String? html;
+
+  /// whatsapp: the sender whose business account approves it
+  final String? sender;
+
+  /// email
+  final String? subject;
+
+  /// email: the plain part
+  final String? text;
+
+  /// push
+  final String? title;
+
+  /// Declared variables (inferred from the placeholders when omitted)
+  final List<MessageTemplatePatchVariable>? variables;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (body != null) 'body': body!,
+        if (buttons != null) 'buttons': buttons!.map((e) => e.toJson()).toList(),
+        if (category != null) 'category': category!,
+        if (dltEntityId != null) 'dlt_entity_id': dltEntityId!,
+        if (dltTemplateId != null) 'dlt_template_id': dltTemplateId!,
+        if (footer != null) 'footer': footer!,
+        if (header != null) 'header': header!.toJson(),
+        if (html != null) 'html': html!,
+        if (sender != null) 'sender': sender!,
+        if (subject != null) 'subject': subject!,
+        if (text != null) 'text': text!,
+        if (title != null) 'title': title!,
+        if (variables != null) 'variables': variables!.map((e) => e.toJson()).toList(),
+      };
+}
+
+/// whatsapp
+class MessageTemplatePatchButton {
+  const MessageTemplatePatchButton({
+    this.phone,
+    this.text,
+    this.type,
+    this.url,
+  });
+
+  factory MessageTemplatePatchButton.fromJson(Map<String, dynamic> json) => MessageTemplatePatchButton(
+        phone: json['phone'] as String?,
+        text: json['text'] as String?,
+        type: json['type'] as String?,
+        url: json['url'] as String?,
+      );
+
+  final String? phone;
+
+  final String? text;
+
+  final String? type;
+
+  final String? url;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (phone != null) 'phone': phone!,
+        if (text != null) 'text': text!,
+        if (type != null) 'type': type!,
+        if (url != null) 'url': url!,
+      };
+}
+
+/// whatsapp
+class MessageTemplatePatchHeader {
+  const MessageTemplatePatchHeader({
+    this.text,
+    this.type,
+  });
+
+  factory MessageTemplatePatchHeader.fromJson(Map<String, dynamic> json) => MessageTemplatePatchHeader(
+        text: json['text'] as String?,
+        type: json['type'] as String?,
+      );
+
+  final String? text;
+
+  final String? type;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (text != null) 'text': text!,
+        if (type != null) 'type': type!,
+      };
+}
+
+class MessageTemplatePatchVariable {
+  const MessageTemplatePatchVariable({
+    this.example,
+    this.name,
+  });
+
+  factory MessageTemplatePatchVariable.fromJson(Map<String, dynamic> json) => MessageTemplatePatchVariable(
+        example: json['example'] as String?,
+        name: json['name'] as String?,
+      );
+
+  /// Required for whatsapp (Meta reviews it)
+  final String? example;
+
+  final String? name;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (example != null) 'example': example!,
+        if (name != null) 'name': name!,
+      };
+}
+
+class MessageTemplateVariable {
+  const MessageTemplateVariable({
+    this.example,
+    this.name,
+  });
+
+  factory MessageTemplateVariable.fromJson(Map<String, dynamic> json) => MessageTemplateVariable(
+        example: json['example'] as String?,
+        name: json['name'] as String?,
+      );
+
+  /// Required for whatsapp (Meta reviews it)
+  final String? example;
+
+  final String? name;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (example != null) 'example': example!,
+        if (name != null) 'name': name!,
+      };
+}
+
+/// A page; pass next_cursor as cursor for the next one (null at the end).
+class MessageTemplatesListData {
+  const MessageTemplatesListData({
+    this.items,
+    this.nextCursor,
+  });
+
+  factory MessageTemplatesListData.fromJson(Map<String, dynamic> json) => MessageTemplatesListData(
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : MessageTemplate.fromJson(e as Map<String, dynamic>))!).toList().cast<MessageTemplate>(),
+        nextCursor: json['next_cursor'] as String?,
+      );
+
+  final List<MessageTemplate>? items;
+
+  final String? nextCursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+        if (nextCursor != null) 'next_cursor': nextCursor!,
+      };
+}
+
+class MessageTemplatesListQuery {
+  const MessageTemplatesListQuery({
+    this.channel,
+    this.approvalStatus,
+    this.name,
+    this.limit,
+    this.cursor,
+  });
+
+  factory MessageTemplatesListQuery.fromJson(Map<String, dynamic> json) => MessageTemplatesListQuery(
+        channel: json['channel'] as String?,
+        approvalStatus: json['approval_status'] as String?,
+        name: json['name'] as String?,
+        limit: (json['limit'] as num?)?.toInt(),
+        cursor: json['cursor'] as String?,
+      );
+
+  final String? channel;
+
+  final String? approvalStatus;
+
+  final String? name;
+
+  /// Page size
+  final int? limit;
+
+  /// next_cursor of the previous page.
+  final String? cursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (channel != null) 'channel': channel!,
+        if (approvalStatus != null) 'approval_status': approvalStatus!,
+        if (name != null) 'name': name!,
+        if (limit != null) 'limit': limit!,
+        if (cursor != null) 'cursor': cursor!,
+      };
+}
+
+/// A page; pass next_cursor as cursor for the next one (null at the end).
+class MessagesListData {
+  const MessagesListData({
+    this.items,
+    this.nextCursor,
+  });
+
+  factory MessagesListData.fromJson(Map<String, dynamic> json) => MessagesListData(
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : Message.fromJson(e as Map<String, dynamic>))!).toList().cast<Message>(),
+        nextCursor: json['next_cursor'] as String?,
+      );
+
+  final List<Message>? items;
+
+  final String? nextCursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+        if (nextCursor != null) 'next_cursor': nextCursor!,
+      };
+}
+
+class MessagesListQuery {
+  const MessagesListQuery({
+    this.channel,
+    this.status,
+    this.referenceId,
+    this.to,
+    this.batchId,
+    this.createdAfter,
+    this.createdBefore,
+    this.limit,
+    this.cursor,
+  });
+
+  factory MessagesListQuery.fromJson(Map<String, dynamic> json) => MessagesListQuery(
+        channel: json['channel'] as String?,
+        status: json['status'] as String?,
+        referenceId: json['reference_id'] as String?,
+        to: json['to'] as String?,
+        batchId: json['batch_id'] as String?,
+        createdAfter: json['created_after'] as String?,
+        createdBefore: json['created_before'] as String?,
+        limit: (json['limit'] as num?)?.toInt(),
+        cursor: json['cursor'] as String?,
+      );
+
+  final String? channel;
+
+  final String? status;
+
+  final String? referenceId;
+
+  /// A recipient (needs channel)
+  final String? to;
+
+  /// A batch's job id
+  final String? batchId;
+
+  final String? createdAfter;
+
+  final String? createdBefore;
+
+  /// Page size
+  final int? limit;
+
+  /// next_cursor of the previous page.
+  final String? cursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (channel != null) 'channel': channel!,
+        if (status != null) 'status': status!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (to != null) 'to': to!,
+        if (batchId != null) 'batch_id': batchId!,
+        if (createdAfter != null) 'created_after': createdAfter!,
+        if (createdBefore != null) 'created_before': createdBefore!,
+        if (limit != null) 'limit': limit!,
+        if (cursor != null) 'cursor': cursor!,
+      };
+}
+
 class OCRPage {
   const OCRPage({
     this.blocks,
@@ -4441,6 +5960,237 @@ class OCRResult {
         if (pages != null) 'pages': pages!.map((e) => e.toJson()).toList(),
         if (text != null) 'text': text!,
         if (warnings != null) 'warnings': warnings!,
+      };
+}
+
+/// An OTP (never its code)
+class OTP {
+  const OTP({
+    this.attemptsRemaining,
+    this.channel,
+    this.createdAt,
+    this.expiresAt,
+    this.messageId,
+    this.otpId,
+    this.referenceId,
+    this.resendAfter,
+    this.resendsRemaining,
+    this.status,
+    this.testCode,
+    this.to,
+    this.verifiedAt,
+  });
+
+  factory OTP.fromJson(Map<String, dynamic> json) => OTP(
+        attemptsRemaining: (json['attempts_remaining'] as num?)?.toInt(),
+        channel: json['channel'] as String?,
+        createdAt: json['created_at'] as String?,
+        expiresAt: json['expires_at'] as String?,
+        messageId: json['message_id'] as String?,
+        otpId: json['otp_id'] as String?,
+        referenceId: json['reference_id'] as String?,
+        resendAfter: json['resend_after'] as String?,
+        resendsRemaining: (json['resends_remaining'] as num?)?.toInt(),
+        status: json['status'] as String?,
+        testCode: json['test_code'] as String?,
+        to: json['to'] as String?,
+        verifiedAt: json['verified_at'] as String?,
+      );
+
+  final int? attemptsRemaining;
+
+  final String? channel;
+
+  final String? createdAt;
+
+  final String? expiresAt;
+
+  /// The message carrying the latest code
+  final String? messageId;
+
+  /// otp_…
+  final String? otpId;
+
+  final String? referenceId;
+
+  /// Resends are 30 seconds apart
+  final String? resendAfter;
+
+  final int? resendsRemaining;
+
+  final String? status;
+
+  /// Test environment only: the code (123456, its first length digits)
+  final String? testCode;
+
+  /// Masked
+  final String? to;
+
+  final String? verifiedAt;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (attemptsRemaining != null) 'attempts_remaining': attemptsRemaining!,
+        if (channel != null) 'channel': channel!,
+        if (createdAt != null) 'created_at': createdAt!,
+        if (expiresAt != null) 'expires_at': expiresAt!,
+        if (messageId != null) 'message_id': messageId!,
+        if (otpId != null) 'otp_id': otpId!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (resendAfter != null) 'resend_after': resendAfter!,
+        if (resendsRemaining != null) 'resends_remaining': resendsRemaining!,
+        if (status != null) 'status': status!,
+        if (testCode != null) 'test_code': testCode!,
+        if (to != null) 'to': to!,
+        if (verifiedAt != null) 'verified_at': verifiedAt!,
+      };
+}
+
+class OTPResend {
+  const OTPResend({
+    this.otpId,
+  });
+
+  factory OTPResend.fromJson(Map<String, dynamic> json) => OTPResend(
+        otpId: json['otp_id'] as String?,
+      );
+
+  final String? otpId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (otpId != null) 'otp_id': otpId!,
+      };
+}
+
+/// Send a one-time code
+class OTPSend {
+  const OTPSend({
+    this.channel,
+    this.length,
+    this.maxAttempts,
+    this.metadata,
+    this.referenceId,
+    this.sender,
+    this.template,
+    this.to,
+    this.ttlSeconds,
+  });
+
+  factory OTPSend.fromJson(Map<String, dynamic> json) => OTPSend(
+        channel: json['channel'] as String?,
+        length: (json['length'] as num?)?.toInt(),
+        maxAttempts: (json['max_attempts'] as num?)?.toInt(),
+        metadata: (json['metadata'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        referenceId: json['reference_id'] as String?,
+        sender: json['sender'] as String?,
+        template: json['template'] as String?,
+        to: json['to'] as String?,
+        ttlSeconds: (json['ttl_seconds'] as num?)?.toInt(),
+      );
+
+  final String? channel;
+
+  final int? length;
+
+  final int? maxAttempts;
+
+  /// Your keys and values, returned in answers and webhooks
+  final Map<String, String>? metadata;
+
+  final String? referenceId;
+
+  /// Required for sms and whatsapp
+  final String? sender;
+
+  /// A template with {{code}} (and optionally {{ttl_minutes}}): required for an SMS to an Indian number and for WhatsApp (an authentication template)
+  final String? template;
+
+  final String? to;
+
+  final int? ttlSeconds;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (channel != null) 'channel': channel!,
+        if (length != null) 'length': length!,
+        if (maxAttempts != null) 'max_attempts': maxAttempts!,
+        if (metadata != null) 'metadata': metadata!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (sender != null) 'sender': sender!,
+        if (template != null) 'template': template!,
+        if (to != null) 'to': to!,
+        if (ttlSeconds != null) 'ttl_seconds': ttlSeconds!,
+      };
+}
+
+/// Verified, or why not; the last wrong attempt fails the OTP closed
+class OTPVerified {
+  const OTPVerified({
+    this.attemptsRemaining,
+    this.otpId,
+    this.reason,
+    this.referenceId,
+    this.status,
+    this.verified,
+    this.verifiedAt,
+  });
+
+  factory OTPVerified.fromJson(Map<String, dynamic> json) => OTPVerified(
+        attemptsRemaining: (json['attempts_remaining'] as num?)?.toInt(),
+        otpId: json['otp_id'] as String?,
+        reason: json['reason'] as String?,
+        referenceId: json['reference_id'] as String?,
+        status: json['status'] as String?,
+        verified: json['verified'] as bool?,
+        verifiedAt: json['verified_at'] as String?,
+      );
+
+  final int? attemptsRemaining;
+
+  final String? otpId;
+
+  final String? reason;
+
+  final String? referenceId;
+
+  final String? status;
+
+  final bool? verified;
+
+  final String? verifiedAt;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (attemptsRemaining != null) 'attempts_remaining': attemptsRemaining!,
+        if (otpId != null) 'otp_id': otpId!,
+        if (reason != null) 'reason': reason!,
+        if (referenceId != null) 'reference_id': referenceId!,
+        if (status != null) 'status': status!,
+        if (verified != null) 'verified': verified!,
+        if (verifiedAt != null) 'verified_at': verifiedAt!,
+      };
+}
+
+class OTPVerify {
+  const OTPVerify({
+    this.code,
+    this.otpId,
+  });
+
+  factory OTPVerify.fromJson(Map<String, dynamic> json) => OTPVerify(
+        code: json['code'] as String?,
+        otpId: json['otp_id'] as String?,
+      );
+
+  final String? code;
+
+  final String? otpId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (code != null) 'code': code!,
+        if (otpId != null) 'otp_id': otpId!,
       };
 }
 
@@ -7764,6 +9514,40 @@ class ReceiptResultMerchant {
       };
 }
 
+/// What a carrier's callback carried
+class ReceiptsAccepted {
+  const ReceiptsAccepted({
+    this.applied,
+    this.pending,
+    this.received,
+    this.stale,
+  });
+
+  factory ReceiptsAccepted.fromJson(Map<String, dynamic> json) => ReceiptsAccepted(
+        applied: (json['applied'] as num?)?.toInt(),
+        pending: (json['pending'] as num?)?.toInt(),
+        received: (json['received'] as num?)?.toInt(),
+        stale: (json['stale'] as num?)?.toInt(),
+      );
+
+  final int? applied;
+
+  /// For a message whose send result has not arrived yet (applied when it does)
+  final int? pending;
+
+  final int? received;
+
+  final int? stale;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (applied != null) 'applied': applied!,
+        if (pending != null) 'pending': pending!,
+        if (received != null) 'received': received!,
+        if (stale != null) 'stale': stale!,
+      };
+}
+
 /// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
 class RenderDocxParams {
   const RenderDocxParams({
@@ -8854,6 +10638,98 @@ class RetentionDefault {
   Map<String, dynamic> toJson() => {
         if (inputHours != null) 'input_hours': inputHours!,
         if (outputHours != null) 'output_hours': outputHours!,
+      };
+}
+
+/// What verifying the sender found
+class SenderVerification {
+  const SenderVerification({
+    this.checkedAt,
+    this.checks,
+    this.message,
+    this.records,
+  });
+
+  factory SenderVerification.fromJson(Map<String, dynamic> json) => SenderVerification(
+        checkedAt: json['checked_at'] as String?,
+        checks: (json['checks'] as Map?)?.map((k, e) => MapEntry(k as String, (e as bool?)!)).cast<String, bool>(),
+        message: json['message'] as String?,
+        records: (json['records'] as List?)?.map((e) => (e == null ? null : DNSRecord.fromJson(e as Map<String, dynamic>))!).toList().cast<DNSRecord>(),
+      );
+
+  final String? checkedAt;
+
+  /// spf, dkim, dmarc, phone_number, credentials, dlt_header
+  final Map<String, bool>? checks;
+
+  final String? message;
+
+  /// email: the records to publish
+  final List<DNSRecord>? records;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (checkedAt != null) 'checked_at': checkedAt!,
+        if (checks != null) 'checks': checks!,
+        if (message != null) 'message': message!,
+        if (records != null) 'records': records!.map((e) => e.toJson()).toList(),
+      };
+}
+
+/// A page; pass next_cursor as cursor for the next one (null at the end).
+class SendersListData {
+  const SendersListData({
+    this.items,
+    this.nextCursor,
+  });
+
+  factory SendersListData.fromJson(Map<String, dynamic> json) => SendersListData(
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : MessageSender.fromJson(e as Map<String, dynamic>))!).toList().cast<MessageSender>(),
+        nextCursor: json['next_cursor'] as String?,
+      );
+
+  final List<MessageSender>? items;
+
+  final String? nextCursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+        if (nextCursor != null) 'next_cursor': nextCursor!,
+      };
+}
+
+class SendersListQuery {
+  const SendersListQuery({
+    this.channel,
+    this.status,
+    this.limit,
+    this.cursor,
+  });
+
+  factory SendersListQuery.fromJson(Map<String, dynamic> json) => SendersListQuery(
+        channel: json['channel'] as String?,
+        status: json['status'] as String?,
+        limit: (json['limit'] as num?)?.toInt(),
+        cursor: json['cursor'] as String?,
+      );
+
+  final String? channel;
+
+  final String? status;
+
+  /// Page size
+  final int? limit;
+
+  /// next_cursor of the previous page.
+  final String? cursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (channel != null) 'channel': channel!,
+        if (status != null) 'status': status!,
+        if (limit != null) 'limit': limit!,
+        if (cursor != null) 'cursor': cursor!,
       };
 }
 
@@ -11451,6 +13327,150 @@ class StoredFile {
         if (pages != null) 'pages': pages!,
         if (sha256 != null) 'sha256': sha256!,
         if (source != null) 'source': source!,
+      };
+}
+
+/// A suppressed recipient
+class Suppression {
+  const Suppression({
+    this.channel,
+    this.createdAt,
+    this.messageId,
+    this.reason,
+    this.source,
+    this.suppressionId,
+    this.to,
+  });
+
+  factory Suppression.fromJson(Map<String, dynamic> json) => Suppression(
+        channel: json['channel'] as String?,
+        createdAt: json['created_at'] as String?,
+        messageId: json['message_id'] as String?,
+        reason: json['reason'] as String?,
+        source: json['source'] as String?,
+        suppressionId: json['suppression_id'] as String?,
+        to: json['to'] as String?,
+      );
+
+  final String? channel;
+
+  final String? createdAt;
+
+  /// The message that caused it
+  final String? messageId;
+
+  final String? reason;
+
+  /// api: you; carrier: a bounce, complaint, opt-out or unsubscribe link
+  final String? source;
+
+  /// sup_…
+  final String? suppressionId;
+
+  /// Masked
+  final String? to;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (channel != null) 'channel': channel!,
+        if (createdAt != null) 'created_at': createdAt!,
+        if (messageId != null) 'message_id': messageId!,
+        if (reason != null) 'reason': reason!,
+        if (source != null) 'source': source!,
+        if (suppressionId != null) 'suppression_id': suppressionId!,
+        if (to != null) 'to': to!,
+      };
+}
+
+/// A recipient marketing must not reach on a channel
+class SuppressionCreate {
+  const SuppressionCreate({
+    this.channel,
+    this.reason,
+    this.to,
+  });
+
+  factory SuppressionCreate.fromJson(Map<String, dynamic> json) => SuppressionCreate(
+        channel: json['channel'] as String?,
+        reason: json['reason'] as String?,
+        to: json['to'] as String?,
+      );
+
+  final String? channel;
+
+  /// Default manual
+  final String? reason;
+
+  final String? to;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (channel != null) 'channel': channel!,
+        if (reason != null) 'reason': reason!,
+        if (to != null) 'to': to!,
+      };
+}
+
+/// A page; pass next_cursor as cursor for the next one (null at the end).
+class SuppressionsListData {
+  const SuppressionsListData({
+    this.items,
+    this.nextCursor,
+  });
+
+  factory SuppressionsListData.fromJson(Map<String, dynamic> json) => SuppressionsListData(
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : Suppression.fromJson(e as Map<String, dynamic>))!).toList().cast<Suppression>(),
+        nextCursor: json['next_cursor'] as String?,
+      );
+
+  final List<Suppression>? items;
+
+  final String? nextCursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+        if (nextCursor != null) 'next_cursor': nextCursor!,
+      };
+}
+
+class SuppressionsListQuery {
+  const SuppressionsListQuery({
+    this.channel,
+    this.to,
+    this.reason,
+    this.limit,
+    this.cursor,
+  });
+
+  factory SuppressionsListQuery.fromJson(Map<String, dynamic> json) => SuppressionsListQuery(
+        channel: json['channel'] as String?,
+        to: json['to'] as String?,
+        reason: json['reason'] as String?,
+        limit: (json['limit'] as num?)?.toInt(),
+        cursor: json['cursor'] as String?,
+      );
+
+  final String? channel;
+
+  /// A recipient
+  final String? to;
+
+  final String? reason;
+
+  /// Page size
+  final int? limit;
+
+  /// next_cursor of the previous page.
+  final String? cursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (channel != null) 'channel': channel!,
+        if (to != null) 'to': to!,
+        if (reason != null) 'reason': reason!,
+        if (limit != null) 'limit': limit!,
+        if (cursor != null) 'cursor': cursor!,
       };
 }
 
@@ -18575,12 +20595,103 @@ class KeysResource {
 }
 
 /// .
+class MessageTemplatesResource {
+  MessageTemplatesResource(this._core);
+  final Core _core;
+
+  /// Store a template (a WhatsApp template is submitted to Meta for approval).
+  Future<MessageTemplate> create(MessageTemplateCreate body, [RequestOptions? options]) => _core.call('POST', '/v1/messages/templates', query: null, body: body.toJson(), decode: (j) => MessageTemplate.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Delete a template (messages already accepted keep it).
+  Future<Deleted> delete(String id, [RequestOptions? options]) => _core.call('DELETE', '/v1/messages/templates/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => Deleted.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Read a template.
+  Future<MessageTemplate> get(String id, [RequestOptions? options]) => _core.call('GET', '/v1/messages/templates/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => MessageTemplate.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// List templates, newest first.
+  Future<MessageTemplatesListData> list(MessageTemplatesListQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/messages/templates', query: query?.toJson(), body: null, decode: (j) => MessageTemplatesListData.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Every item of list, page after page (follows next_cursor).
+  Stream<MessageTemplate> listAll(MessageTemplatesListQuery? query, [RequestOptions? options]) => _core.paginate('/v1/messages/templates', query?.toJson(), (j) => MessageTemplate.fromJson(j as Map<String, dynamic>), options);
+
+  /// Change a template's content (a WhatsApp template goes back to pending).
+  Future<MessageTemplate> update(String id, MessageTemplatePatch body, [RequestOptions? options]) => _core.call('PATCH', '/v1/messages/templates/${Uri.encodeComponent(id)}', query: null, body: body.toJson(), decode: (j) => MessageTemplate.fromJson(j as Map<String, dynamic>), options: options);
+
+}
+
+/// .
+class MessagesResource {
+  MessagesResource(this._core);
+  final Core _core;
+
+  /// Cancel a scheduled message (its usage is credited back).
+  Future<Message> cancel(String id, [RequestOptions? options]) => _core.call('POST', '/v1/messages/${Uri.encodeComponent(id)}/cancel', query: null, body: null, decode: (j) => Message.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Read a message with its timeline.
+  Future<Message> get(String id, [RequestOptions? options]) => _core.call('GET', '/v1/messages/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => Message.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// List messages, newest first.
+  Future<MessagesListData> list(MessagesListQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/messages', query: query?.toJson(), body: null, decode: (j) => MessagesListData.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Every item of list, page after page (follows next_cursor).
+  Stream<Message> listAll(MessagesListQuery? query, [RequestOptions? options]) => _core.paginate('/v1/messages', query?.toJson(), (j) => Message.fromJson(j as Map<String, dynamic>), options);
+
+  /// Send a message on any channel (202): queued, then sent, delivered and read from carrier receipts; 1 api_messages_<channel>.
+  Future<Message> send(MessageSend body, [RequestOptions? options]) => _core.call('POST', '/v1/messages', query: null, body: body.toJson(), decode: (j) => Message.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Send up to 1000 messages as one job (202).
+  Future<MessageBatchAccepted> sendBatch(MessageBatch body, [RequestOptions? options]) => _core.call('POST', '/v1/messages/batch', query: null, body: body.toJson(), decode: (j) => MessageBatchAccepted.fromJson(j as Map<String, dynamic>), options: options);
+
+}
+
+/// .
+class OtpResource {
+  OtpResource(this._core);
+  final Core _core;
+
+  /// Send a pending OTP again with a new code (3 times, 30 seconds apart).
+  Future<OTP> resend(OTPResend body, [RequestOptions? options]) => _core.call('POST', '/v1/otp/resend', query: null, body: body.toJson(), decode: (j) => OTP.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Send a one-time code (202); the code is never answered (test: 123456).
+  Future<OTP> send(OTPSend body, [RequestOptions? options]) => _core.call('POST', '/v1/otp/send', query: null, body: body.toJson(), decode: (j) => OTP.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Check a code: fails closed after max_attempts; 1 api_otp_verifications per check.
+  Future<OTPVerified> verify(OTPVerify body, [RequestOptions? options]) => _core.call('POST', '/v1/otp/verify', query: null, body: body.toJson(), decode: (j) => OTPVerified.fromJson(j as Map<String, dynamic>), options: options);
+
+}
+
+/// .
 class RequestsResource {
   RequestsResource(this._core);
   final Core _core;
 
   /// What the request log recorded for one request, and its provider path.
   Future<RequestRecord> get(String requestId, [RequestOptions? options]) => _core.call('GET', '/v1/requests/${Uri.encodeComponent(requestId)}', query: null, body: null, decode: (j) => RequestRecord.fromJson(j as Map<String, dynamic>), options: options);
+
+}
+
+/// .
+class SendersResource {
+  SendersResource(this._core);
+  final Core _core;
+
+  /// Add a sender (pending until verified).
+  Future<MessageSender> create(MessageSenderCreate body, [RequestOptions? options]) => _core.call('POST', '/v1/messages/senders', query: null, body: body.toJson(), decode: (j) => MessageSender.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Delete a sender and its credentials.
+  Future<Deleted> delete(String id, [RequestOptions? options]) => _core.call('DELETE', '/v1/messages/senders/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => Deleted.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Read a sender with what verifying it found.
+  Future<MessageSender> get(String id, [RequestOptions? options]) => _core.call('GET', '/v1/messages/senders/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => MessageSender.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// List senders, newest first.
+  Future<SendersListData> list(SendersListQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/messages/senders', query: query?.toJson(), body: null, decode: (j) => SendersListData.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Every item of list, page after page (follows next_cursor).
+  Stream<MessageSender> listAll(SendersListQuery? query, [RequestOptions? options]) => _core.paginate('/v1/messages/senders', query?.toJson(), (j) => MessageSender.fromJson(j as Map<String, dynamic>), options);
+
+  /// Verify a sender (202): DNS records for an email domain, the number at the BSP, push credentials, the DLT header; at once in test.
+  Future<MessageSender> verify(String id, [RequestOptions? options]) => _core.call('POST', '/v1/messages/senders/${Uri.encodeComponent(id)}/verify', query: null, body: null, decode: (j) => MessageSender.fromJson(j as Map<String, dynamic>), options: options);
 
 }
 
@@ -18677,6 +20788,25 @@ class SignTemplatesResource {
 
   /// Change a template's name, title, options or metadata.
   Future<SignTemplate> update(String id, SignTemplatePatch body, [RequestOptions? options]) => _core.call('PATCH', '/v1/sign/templates/${Uri.encodeComponent(id)}', query: null, body: body.toJson(), decode: (j) => SignTemplate.fromJson(j as Map<String, dynamic>), options: options);
+
+}
+
+/// .
+class SuppressionsResource {
+  SuppressionsResource(this._core);
+  final Core _core;
+
+  /// Suppress a recipient for marketing on a channel.
+  Future<Suppression> create(SuppressionCreate body, [RequestOptions? options]) => _core.call('POST', '/v1/messages/suppressions', query: null, body: body.toJson(), decode: (j) => Suppression.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Let marketing reach the recipient again.
+  Future<Deleted> delete(String id, [RequestOptions? options]) => _core.call('DELETE', '/v1/messages/suppressions/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => Deleted.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// List suppressions, newest first.
+  Future<SuppressionsListData> list(SuppressionsListQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/messages/suppressions', query: query?.toJson(), body: null, decode: (j) => SuppressionsListData.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Every item of list, page after page (follows next_cursor).
+  Stream<Suppression> listAll(SuppressionsListQuery? query, [RequestOptions? options]) => _core.paginate('/v1/messages/suppressions', query?.toJson(), (j) => Suppression.fromJson(j as Map<String, dynamic>), options);
 
 }
 
@@ -18793,10 +20923,15 @@ class GeneratedClient {
         files = FilesResource(core),
         jobs = JobsResource(core),
         keys = KeysResource(core),
+        messageTemplates = MessageTemplatesResource(core),
+        messages = MessagesResource(core),
+        otp = OtpResource(core),
         requests = RequestsResource(core),
+        senders = SendersResource(core),
         settings = SettingsResource(core),
         sign = SignResource(core),
         signTemplates = SignTemplatesResource(core),
+        suppressions = SuppressionsResource(core),
         templates = TemplatesResource(core),
         usage = UsageResource(core),
         webhooks = WebhooksResource(core);
@@ -18835,7 +20970,19 @@ class GeneratedClient {
   final KeysResource keys;
 
   /// .
+  final MessageTemplatesResource messageTemplates;
+
+  /// .
+  final MessagesResource messages;
+
+  /// .
+  final OtpResource otp;
+
+  /// .
   final RequestsResource requests;
+
+  /// .
+  final SendersResource senders;
 
   /// Environment settings.
   final SettingsResource settings;
@@ -18845,6 +20992,9 @@ class GeneratedClient {
 
   /// .
   final SignTemplatesResource signTemplates;
+
+  /// .
+  final SuppressionsResource suppressions;
 
   /// Stored render templates.
   final TemplatesResource templates;

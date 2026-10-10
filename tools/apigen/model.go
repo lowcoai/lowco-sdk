@@ -122,13 +122,26 @@ var resourceNames = map[string][2]string{
 	"sign_templates_get": {"signTemplates", "get"}, "sign_templates_update": {"signTemplates", "update"},
 	"sign_templates_delete": {"signTemplates", "delete"}, "sign_templates_request": {"signTemplates", "createRequest"},
 	"sign_templates_bulk": {"signTemplates", "bulkSend"},
+	// The Communication API (COM-01).
+	"messages_send": {"messages", "send"}, "messages_batch": {"messages", "sendBatch"}, "messages_list": {"messages", "list"},
+	"messages_get": {"messages", "get"}, "messages_cancel": {"messages", "cancel"},
+	"message_templates_create": {"messageTemplates", "create"}, "message_templates_list": {"messageTemplates", "list"},
+	"message_templates_get": {"messageTemplates", "get"}, "message_templates_update": {"messageTemplates", "update"},
+	"message_templates_delete": {"messageTemplates", "delete"},
+	"message_senders_create":   {"senders", "create"}, "message_senders_list": {"senders", "list"}, "message_senders_get": {"senders", "get"},
+	"message_senders_delete": {"senders", "delete"}, "message_senders_verify": {"senders", "verify"},
+	"message_suppressions_create": {"suppressions", "create"}, "message_suppressions_list": {"suppressions", "list"},
+	"message_suppressions_delete": {"suppressions", "delete"},
+	"otp_send":                    {"otp", "send"}, "otp_verify": {"otp", "verify"}, "otp_resend": {"otp", "resend"},
 }
 
 // skipped operationIds: the signed download is a plain URL (Client.download);
 // the signer link's routes are the signer page's, not a developer's.
 var skipped = map[string]bool{"files_download": true, "sign_session_open": true, "sign_session_state": true, "sign_session_otp": true,
 	"sign_session_otp_verify": true, "sign_session_viewed": true, "sign_session_sign": true, "sign_session_decline": true,
-	"sign_session_document": true, "sign_session_logo": true, "sign_session_page": true}
+	"sign_session_document": true, "sign_session_logo": true, "sign_session_page": true,
+	// Carriers and recipients call these, not developers (COM-02).
+	"messages_receipts": true, "messages_receipts_challenge": true, "messages_unsubscribe_page": true, "messages_unsubscribe": true}
 
 func load(path string) (*Model, error) {
 	b, err := os.ReadFile(path)

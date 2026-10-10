@@ -70,7 +70,7 @@ const (
 	ReasonKeyNotFound ErrorReason = "key_not_found"
 	// ReasonKeyRevoked (HTTP 401): The key was revoked.
 	ReasonKeyRevoked ErrorReason = "key_revoked"
-	// ReasonMessageNotFound (HTTP 404): No message with this id exists in this environment.
+	// ReasonMessageNotFound (HTTP 404): No message, sender, suppression or OTP with this id exists in this environment.
 	ReasonMessageNotFound ErrorReason = "message_not_found"
 	// ReasonMethodNotAllowed (HTTP 405): The route exists, but not for this HTTP method.
 	ReasonMethodNotAllowed ErrorReason = "method_not_allowed"
@@ -110,7 +110,7 @@ const (
 	ReasonSuppressed ErrorReason = "suppressed"
 	// ReasonTemplateNotApproved (HTTP 422): The message template is not approved.
 	ReasonTemplateNotApproved ErrorReason = "template_not_approved"
-	// ReasonTemplateNotFound (HTTP 404): No render template (or version) with this id exists in this environment.
+	// ReasonTemplateNotFound (HTTP 404): No render template (or version), signing template or message template with this id exists in this environment.
 	ReasonTemplateNotFound ErrorReason = "template_not_found"
 	// ReasonTimeout (HTTP 504): An operation exceeded its deadline and could not be promoted to a job.
 	ReasonTimeout ErrorReason = "timeout"
@@ -166,7 +166,7 @@ var ErrorReasons = map[ErrorReason]ReasonInfo{
 	ReasonKeyExpired:            {401, "The key passed its expiry, or the old key's overlap window after a rotation ended.", "Use the new key from the rotation, or create a key."},
 	ReasonKeyNotFound:           {404, "The key has no Lowco API binding, or (key sync) no such key exists in this organisation.", "Create the key in the console's API keys page, or check the key id and the organisation."},
 	ReasonKeyRevoked:            {401, "The key was revoked.", "Create a new key in the console."},
-	ReasonMessageNotFound:       {404, "No message with this id exists in this environment.", "Check the id and the environment of the key."},
+	ReasonMessageNotFound:       {404, "No message, sender, suppression or OTP with this id exists in this environment.", "Check the id and the environment of the key."},
 	ReasonMethodNotAllowed:      {405, "The route exists, but not for this HTTP method.", "Use the method the API reference shows."},
 	ReasonMissingKey:            {401, "No API key or user token reached the API.", "Send Authorization: Bearer <key> (or X-Api-Key)."},
 	ReasonMissingParam:          {400, "A required parameter or input is missing; param names it.", "Add the parameter named in param."},
@@ -186,7 +186,7 @@ var ErrorReasons = map[ErrorReason]ReasonInfo{
 	ReasonServiceUnavailable:    {503, "The service is shedding load or a dependency is down.", "Retry after Retry-After, with backoff."},
 	ReasonSuppressed:            {422, "The recipient is on the suppression list.", "Do not send to this recipient."},
 	ReasonTemplateNotApproved:   {422, "The message template is not approved.", "Wait for approval or use an approved template."},
-	ReasonTemplateNotFound:      {404, "No render template (or version) with this id exists in this environment.", "List templates with GET /v1/render/templates."},
+	ReasonTemplateNotFound:      {404, "No render template (or version), signing template or message template with this id exists in this environment.", "List templates with GET /v1/render/templates, /v1/sign/templates or /v1/messages/templates."},
 	ReasonTimeout:               {504, "An operation exceeded its deadline and could not be promoted to a job.", "Retry with ?mode=async to run it as a job."},
 	ReasonTokenExpired:          {401, "The console user's token, or a signed download link, has expired.", "Sign in again, or ask the API for a fresh link (GET /v1/files/{id}/content)."},
 	ReasonTooManyFiles:          {422, "More files than the operation takes.", "Send fewer files per call."},
@@ -501,6 +501,18 @@ type Colors struct {
 	Foreground *string `json:"foreground,omitempty"`
 }
 
+// A DNS record an email domain publishes
+type DNSRecord struct {
+	Name string `json:"name"`
+	// One of: spf, dkim, dmarc, return_path.
+	Purpose string `json:"purpose"`
+	// One of: pending, verified, failed.
+	Status string `json:"status"`
+	// One of: TXT, CNAME, MX.
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
 // The data-handling page (UI-08). Operators maintain the providers' profiles; the list follows the live routes.
 type DataHandling struct {
 	// Per capability, the providers in rotation
@@ -562,10 +574,12 @@ type DecodedCodeBbox struct {
 
 // Deleted is a Lowco API object.
 type Deleted struct {
-	Deleted    bool    `json:"deleted"`
-	FileID     *string `json:"file_id,omitempty"`
-	TemplateID *string `json:"template_id,omitempty"`
-	WebhookID  *string `json:"webhook_id,omitempty"`
+	Deleted       bool    `json:"deleted"`
+	FileID        *string `json:"file_id,omitempty"`
+	SenderID      *string `json:"sender_id,omitempty"`
+	SuppressionID *string `json:"suppression_id,omitempty"`
+	TemplateID    *string `json:"template_id,omitempty"`
+	WebhookID     *string `json:"webhook_id,omitempty"`
 }
 
 // Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
@@ -1113,11 +1127,15 @@ type JobEvent struct {
 type JobInput struct {
 	FileID  *string  `json:"file_id,omitempty"`
 	FileIds []string `json:"file_ids,omitempty"`
-	Pages   *int     `json:"pages,omitempty"`
+	// A message batch's rows
+	Messages *int `json:"messages,omitempty"`
+	Pages    *int `json:"pages,omitempty"`
 	// A sign bulk job's rows
 	Rows *int `json:"rows,omitempty"`
 	// A sign bulk job sends each request
 	Send *bool `json:"send,omitempty"`
+	// A message batch's marketing rows to suppressed recipients, skipped
+	Skipped *int `json:"skipped,omitempty"`
 	// A sign bulk job's template
 	TemplateID *string `json:"template_id,omitempty"`
 }
@@ -1405,6 +1423,453 @@ type KeysListQuery struct {
 	Cursor *string `json:"cursor,omitempty"`
 }
 
+// A message. The recipient is masked; the carrier is never disclosed
+type Message struct {
+	// Stored file ids
+	Attachments []string `json:"attachments,omitempty"`
+	// The batch's job, when sent in one
+	BatchID     *string `json:"batch_id,omitempty"`
+	CancelledAt *string `json:"cancelled_at,omitempty"`
+	// One of: transactional, otp, marketing.
+	Category string `json:"category"`
+	// One of: sms, whatsapp, email, push.
+	Channel   string `json:"channel"`
+	CreatedAt string `json:"created_at"`
+	// The message's usage was credited back (a failure Lowco or the carrier caused, or a cancellation)
+	Credited    *bool           `json:"credited,omitempty"`
+	DeliveredAt *string         `json:"delivered_at,omitempty"`
+	FailedAt    *string         `json:"failed_at,omitempty"`
+	Failure     *MessageFailure `json:"failure,omitempty"`
+	Language    *string         `json:"language,omitempty"`
+	// msg_…
+	MessageID string `json:"message_id"`
+	// Your keys and values, returned in answers and webhooks
+	Metadata map[string]string `json:"metadata,omitempty"`
+	// The OTP it carries
+	OtpID       *string `json:"otp_id,omitempty"`
+	QueuedAt    *string `json:"queued_at,omitempty"`
+	ReadAt      *string `json:"read_at,omitempty"`
+	ReferenceID *string `json:"reference_id,omitempty"`
+	ScheduledAt *string `json:"scheduled_at"`
+	Sender      *string `json:"sender,omitempty"`
+	// The carrier accepted it
+	SentAt *string `json:"sent_at,omitempty"`
+	// scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only) One of: scheduled, queued, sent, delivered, read, failed, undeliverable, cancelled.
+	Status string `json:"status"`
+	// The template's name
+	Template   *string `json:"template,omitempty"`
+	TemplateID *string `json:"template_id,omitempty"`
+	// GET /v1/messages/{id} only
+	Timeline []MessageEvent `json:"timeline,omitempty"`
+	// Masked
+	To        string `json:"to"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+// Up to 1000 messages, accepted as one job
+type MessageBatch struct {
+	// https URL for the batch job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// 1 to 1000; every row is checked first (all or nothing), except marketing rows to suppressed recipients, which are skipped
+	Messages []MessageSend `json:"messages"`
+}
+
+// The batch's job (it succeeds once every message has left the queue) and each row
+type MessageBatchAccepted struct {
+	Accepted int                               `json:"accepted"`
+	JobID    string                            `json:"job_id"`
+	Messages []MessageBatchAcceptedMessage     `json:"messages"`
+	Skipped  []MessageBatchAcceptedSkippedItem `json:"skipped"`
+	// One of: processing, succeeded.
+	Status string `json:"status"`
+	Total  int    `json:"total"`
+}
+
+// MessageBatchAcceptedMessage is a Lowco API object.
+type MessageBatchAcceptedMessage struct {
+	Index     int    `json:"index"`
+	MessageID string `json:"message_id"`
+	// scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only) One of: scheduled, queued, sent, delivered, read, failed, undeliverable, cancelled.
+	Status string `json:"status"`
+}
+
+// MessageBatchAcceptedSkippedItem is a Lowco API object.
+type MessageBatchAcceptedSkippedItem struct {
+	Index int `json:"index"`
+	// One of: suppressed.
+	Reason string `json:"reason"`
+}
+
+// A step of the message's timeline
+type MessageEvent struct {
+	At           string  `json:"at"`
+	ProviderCode *string `json:"provider_code,omitempty"`
+	Reason       *string `json:"reason,omitempty"`
+	// scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only) One of: scheduled, queued, sent, delivered, read, failed, undeliverable, cancelled.
+	Status string `json:"status"`
+}
+
+// Why a message failed
+type MessageFailure struct {
+	Message *string `json:"message,omitempty"`
+	// The carrier's own code
+	ProviderCode *string `json:"provider_code,omitempty"`
+	// Credited back when Lowco or the carrier caused it: carrier_error, provider_unavailable, internal_error, expired One of: invalid_recipient, blocked, rejected, expired, carrier_error, provider_unavailable, internal_error, not_on_channel, token_unregistered.
+	Reason string `json:"reason"`
+}
+
+// A message to send: a template with its variables, or the channel's raw content
+type MessageSend struct {
+	// email: at most 10 files (file_id, file_url or file_base64), 25 MB together
+	Attachments []FileRef `json:"attachments,omitempty"`
+	// push
+	Body *string `json:"body,omitempty"`
+	// https URL for this message's events, instead of the environment's webhook endpoints
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Default transactional. marketing to a suppressed recipient is refused (422 suppressed); WhatsApp marketing needs an approved template One of: transactional, otp, marketing.
+	Category *string `json:"category,omitempty"`
+	// One of: sms, whatsapp, email, push.
+	Channel string `json:"channel"`
+	// A push's data payload
+	Data map[string]string `json:"data,omitempty"`
+	// email (at most 500 KB)
+	HTML *string `json:"html,omitempty"`
+	// Picks the template in this language (default en)
+	Language *string `json:"language,omitempty"`
+	// Your keys and values, returned in answers and webhooks
+	Metadata map[string]string `json:"metadata,omitempty"`
+	// Your id, to find the message by
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// Send later (at most 30 days ahead); cancel until then
+	ScheduleAt *string `json:"schedule_at,omitempty"`
+	// The sender (snd_…): required for sms, whatsapp and push; an email without one goes from Lowco's address
+	Sender *string `json:"sender,omitempty"`
+	// email
+	Subject *string `json:"subject,omitempty"`
+	// A template's id (mtp_…) or name on the channel; an SMS to an Indian number must use one (TRAI DLT)
+	Template *string `json:"template,omitempty"`
+	// sms and whatsapp (a session reply within 24 hours of the customer's message); an email's plain part
+	Text *string `json:"text,omitempty"`
+	// push
+	Title *string `json:"title,omitempty"`
+	// +E.164 or a 10-digit Indian mobile (sms, whatsapp), an email address, or the device's push token
+	To string `json:"to"`
+	// The template's {{variables}}
+	Variables map[string]string `json:"variables,omitempty"`
+}
+
+// A sender (never its credentials)
+type MessageSender struct {
+	// email: the From address
+	Address *string `json:"address,omitempty"`
+	// push (apns)
+	BundleID *string `json:"bundle_id,omitempty"`
+	// whatsapp: the WABA id (templates are submitted to it)
+	BusinessAccountID *string `json:"business_account_id,omitempty"`
+	// One of: sms, whatsapp, email, push.
+	Channel   string `json:"channel"`
+	CreatedAt string `json:"created_at"`
+	// sms: the DLT principal entity id
+	DltEntityID *string `json:"dlt_entity_id,omitempty"`
+	// email: the domain (from address when omitted); SPF, DKIM and DMARC are checked on it
+	Domain        *string `json:"domain,omitempty"`
+	FailureReason *string `json:"failure_reason,omitempty"`
+	// email
+	FromName       *string `json:"from_name,omitempty"`
+	HasCredentials *bool   `json:"has_credentials,omitempty"`
+	// sms: the 6-letter DLT sender id
+	Header *string `json:"header,omitempty"`
+	// push (apns): the .p8 key's id
+	KeyID *string `json:"key_id,omitempty"`
+	Name  string  `json:"name"`
+	// whatsapp: the business number, +E.164
+	PhoneNumber *string `json:"phone_number,omitempty"`
+	// whatsapp: the number's id in the WhatsApp Business Account
+	PhoneNumberID *string `json:"phone_number_id,omitempty"`
+	// push One of: fcm, apns.
+	Platform *string `json:"platform,omitempty"`
+	// push (fcm): the Firebase project
+	ProjectID *string `json:"project_id,omitempty"`
+	// email
+	ReplyTo *string `json:"reply_to,omitempty"`
+	// push (apns): Apple's development environment
+	Sandbox *bool `json:"sandbox,omitempty"`
+	// snd_…
+	SenderID string `json:"sender_id"`
+	// A message needs a verified sender (422 sender_not_verified) One of: pending, verified, failed.
+	Status string `json:"status"`
+	// push (apns)
+	TeamID       *string            `json:"team_id,omitempty"`
+	UpdatedAt    string             `json:"updated_at"`
+	Verification SenderVerification `json:"verification"`
+	VerifiedAt   *string            `json:"verified_at,omitempty"`
+}
+
+// A sender
+type MessageSenderCreate struct {
+	// email: the From address
+	Address *string `json:"address,omitempty"`
+	// push (apns)
+	BundleID *string `json:"bundle_id,omitempty"`
+	// whatsapp: the WABA id (templates are submitted to it)
+	BusinessAccountID *string `json:"business_account_id,omitempty"`
+	// One of: sms, whatsapp, email, push.
+	Channel string `json:"channel"`
+	// push: service_account_json (fcm) or private_key (apns, the .p8 PEM). Sealed; never answered
+	Credentials map[string]string `json:"credentials,omitempty"`
+	// sms: the DLT principal entity id
+	DltEntityID *string `json:"dlt_entity_id,omitempty"`
+	// email: the domain (from address when omitted); SPF, DKIM and DMARC are checked on it
+	Domain *string `json:"domain,omitempty"`
+	// email
+	FromName *string `json:"from_name,omitempty"`
+	// sms: the 6-letter DLT sender id
+	Header *string `json:"header,omitempty"`
+	// push (apns): the .p8 key's id
+	KeyID *string `json:"key_id,omitempty"`
+	Name  string  `json:"name"`
+	// whatsapp: the business number, +E.164
+	PhoneNumber *string `json:"phone_number,omitempty"`
+	// whatsapp: the number's id in the WhatsApp Business Account
+	PhoneNumberID *string `json:"phone_number_id,omitempty"`
+	// push One of: fcm, apns.
+	Platform *string `json:"platform,omitempty"`
+	// push (fcm): the Firebase project
+	ProjectID *string `json:"project_id,omitempty"`
+	// email
+	ReplyTo *string `json:"reply_to,omitempty"`
+	// push (apns): Apple's development environment
+	Sandbox *bool `json:"sandbox,omitempty"`
+	// push (apns)
+	TeamID *string `json:"team_id,omitempty"`
+}
+
+// A message template
+type MessageTemplate struct {
+	// WhatsApp templates are pending until Meta approves them; sms, email and push need no approval One of: not_required, pending, approved, rejected.
+	ApprovalStatus string `json:"approval_status"`
+	// sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders
+	Body *string `json:"body,omitempty"`
+	// At most 10
+	Buttons []MessageTemplateButton `json:"buttons,omitempty"`
+	// whatsapp: Meta's category One of: marketing, utility, authentication.
+	Category *string `json:"category,omitempty"`
+	// One of: sms, whatsapp, email, push.
+	Channel   string `json:"channel"`
+	CreatedAt string `json:"created_at"`
+	// sms: the DLT principal entity id
+	DltEntityID *string `json:"dlt_entity_id,omitempty"`
+	// sms: the DLT template id (12 to 25 digits)
+	DltTemplateID *string `json:"dlt_template_id,omitempty"`
+	// whatsapp
+	Footer *string `json:"footer,omitempty"`
+	// whatsapp
+	Header *MessageTemplateHeader `json:"header,omitempty"`
+	// email
+	HTML *string `json:"html,omitempty"`
+	// Default en
+	Language string `json:"language"`
+	// Unique per channel and language
+	Name string `json:"name"`
+	// Meta's reason, when rejected
+	RejectionReason *string `json:"rejection_reason,omitempty"`
+	// whatsapp: the sender whose business account approves it
+	Sender *string `json:"sender,omitempty"`
+	// email
+	Subject     *string `json:"subject,omitempty"`
+	SubmittedAt *string `json:"submitted_at,omitempty"`
+	// When the approval was last read from Meta
+	SyncedAt *string `json:"synced_at,omitempty"`
+	// mtp_…
+	TemplateID string `json:"template_id"`
+	// email: the plain part
+	Text *string `json:"text,omitempty"`
+	// push
+	Title     *string `json:"title,omitempty"`
+	UpdatedAt string  `json:"updated_at"`
+	// Declared variables (inferred from the placeholders when omitted)
+	Variables []MessageTemplateVariable `json:"variables,omitempty"`
+}
+
+// whatsapp
+type MessageTemplateButton struct {
+	Phone *string `json:"phone,omitempty"`
+	Text  string  `json:"text"`
+	// One of: quick_reply, url, phone_number.
+	Type string  `json:"type"`
+	URL  *string `json:"url,omitempty"`
+}
+
+// A template
+type MessageTemplateCreate struct {
+	// sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders
+	Body *string `json:"body,omitempty"`
+	// At most 10
+	Buttons []MessageTemplateCreateButton `json:"buttons,omitempty"`
+	// whatsapp: Meta's category One of: marketing, utility, authentication.
+	Category *string `json:"category,omitempty"`
+	// One of: sms, whatsapp, email, push.
+	Channel string `json:"channel"`
+	// sms: the DLT principal entity id
+	DltEntityID *string `json:"dlt_entity_id,omitempty"`
+	// sms: the DLT template id (12 to 25 digits)
+	DltTemplateID *string `json:"dlt_template_id,omitempty"`
+	// whatsapp
+	Footer *string `json:"footer,omitempty"`
+	// whatsapp
+	Header *MessageTemplateCreateHeader `json:"header,omitempty"`
+	// email
+	HTML *string `json:"html,omitempty"`
+	// Default en
+	Language *string `json:"language,omitempty"`
+	// Unique per channel and language
+	Name string `json:"name"`
+	// whatsapp: the sender whose business account approves it
+	Sender *string `json:"sender,omitempty"`
+	// email
+	Subject *string `json:"subject,omitempty"`
+	// email: the plain part
+	Text *string `json:"text,omitempty"`
+	// push
+	Title *string `json:"title,omitempty"`
+	// Declared variables (inferred from the placeholders when omitted)
+	Variables []MessageTemplateCreateVariable `json:"variables,omitempty"`
+}
+
+// whatsapp
+type MessageTemplateCreateButton struct {
+	Phone *string `json:"phone,omitempty"`
+	Text  string  `json:"text"`
+	// One of: quick_reply, url, phone_number.
+	Type string  `json:"type"`
+	URL  *string `json:"url,omitempty"`
+}
+
+// whatsapp
+type MessageTemplateCreateHeader struct {
+	Text *string `json:"text,omitempty"`
+	// One of: text, image, document, video.
+	Type string `json:"type"`
+}
+
+// MessageTemplateCreateVariable is a Lowco API object.
+type MessageTemplateCreateVariable struct {
+	// Required for whatsapp (Meta reviews it)
+	Example *string `json:"example,omitempty"`
+	Name    string  `json:"name"`
+}
+
+// whatsapp
+type MessageTemplateHeader struct {
+	Text *string `json:"text,omitempty"`
+	// One of: text, image, document, video.
+	Type string `json:"type"`
+}
+
+// The fields to change (channel, name and language identify a template and stay); an edited WhatsApp template is submitted to Meta again
+type MessageTemplatePatch struct {
+	// sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders
+	Body *string `json:"body,omitempty"`
+	// At most 10
+	Buttons []MessageTemplatePatchButton `json:"buttons,omitempty"`
+	// whatsapp: Meta's category One of: marketing, utility, authentication.
+	Category *string `json:"category,omitempty"`
+	// sms: the DLT principal entity id
+	DltEntityID *string `json:"dlt_entity_id,omitempty"`
+	// sms: the DLT template id (12 to 25 digits)
+	DltTemplateID *string `json:"dlt_template_id,omitempty"`
+	// whatsapp
+	Footer *string `json:"footer,omitempty"`
+	// whatsapp
+	Header *MessageTemplatePatchHeader `json:"header,omitempty"`
+	// email
+	HTML *string `json:"html,omitempty"`
+	// whatsapp: the sender whose business account approves it
+	Sender *string `json:"sender,omitempty"`
+	// email
+	Subject *string `json:"subject,omitempty"`
+	// email: the plain part
+	Text *string `json:"text,omitempty"`
+	// push
+	Title *string `json:"title,omitempty"`
+	// Declared variables (inferred from the placeholders when omitted)
+	Variables []MessageTemplatePatchVariable `json:"variables,omitempty"`
+}
+
+// whatsapp
+type MessageTemplatePatchButton struct {
+	Phone *string `json:"phone,omitempty"`
+	Text  string  `json:"text"`
+	// One of: quick_reply, url, phone_number.
+	Type string  `json:"type"`
+	URL  *string `json:"url,omitempty"`
+}
+
+// whatsapp
+type MessageTemplatePatchHeader struct {
+	Text *string `json:"text,omitempty"`
+	// One of: text, image, document, video.
+	Type string `json:"type"`
+}
+
+// MessageTemplatePatchVariable is a Lowco API object.
+type MessageTemplatePatchVariable struct {
+	// Required for whatsapp (Meta reviews it)
+	Example *string `json:"example,omitempty"`
+	Name    string  `json:"name"`
+}
+
+// MessageTemplateVariable is a Lowco API object.
+type MessageTemplateVariable struct {
+	// Required for whatsapp (Meta reviews it)
+	Example *string `json:"example,omitempty"`
+	Name    string  `json:"name"`
+}
+
+// A page; pass next_cursor as cursor for the next one (null at the end).
+type MessageTemplatesListData struct {
+	Items      []MessageTemplate `json:"items"`
+	NextCursor *string           `json:"next_cursor"`
+}
+
+// MessageTemplatesListQuery is a Lowco API object.
+type MessageTemplatesListQuery struct {
+	// One of: sms, whatsapp, email, push.
+	Channel *string `json:"channel,omitempty"`
+	// One of: not_required, pending, approved, rejected.
+	ApprovalStatus *string `json:"approval_status,omitempty"`
+	Name           *string `json:"name,omitempty"`
+	// Page size
+	Limit *int `json:"limit,omitempty"`
+	// next_cursor of the previous page.
+	Cursor *string `json:"cursor,omitempty"`
+}
+
+// A page; pass next_cursor as cursor for the next one (null at the end).
+type MessagesListData struct {
+	Items      []Message `json:"items"`
+	NextCursor *string   `json:"next_cursor"`
+}
+
+// MessagesListQuery is a Lowco API object.
+type MessagesListQuery struct {
+	// One of: sms, whatsapp, email, push.
+	Channel *string `json:"channel,omitempty"`
+	// One of: scheduled, queued, sent, delivered, read, failed, undeliverable, cancelled.
+	Status      *string `json:"status,omitempty"`
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// A recipient (needs channel)
+	To *string `json:"to,omitempty"`
+	// A batch's job id
+	BatchID       *string `json:"batch_id,omitempty"`
+	CreatedAfter  *string `json:"created_after,omitempty"`
+	CreatedBefore *string `json:"created_before,omitempty"`
+	// Page size
+	Limit *int `json:"limit,omitempty"`
+	// next_cursor of the previous page.
+	Cursor *string `json:"cursor,omitempty"`
+}
+
 // OCRPage is a Lowco API object.
 type OCRPage struct {
 	Blocks     []OCRRegion `json:"blocks,omitempty"`
@@ -1443,6 +1908,71 @@ type OCRResult struct {
 	Pages             []OCRPage `json:"pages"`
 	Text              string    `json:"text"`
 	Warnings          []string  `json:"warnings,omitempty"`
+}
+
+// An OTP (never its code)
+type OTP struct {
+	AttemptsRemaining int `json:"attempts_remaining"`
+	// One of: sms, whatsapp, email, push.
+	Channel   string `json:"channel"`
+	CreatedAt string `json:"created_at"`
+	ExpiresAt string `json:"expires_at"`
+	// The message carrying the latest code
+	MessageID string `json:"message_id"`
+	// otp_…
+	OtpID       string  `json:"otp_id"`
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// Resends are 30 seconds apart
+	ResendAfter      *string `json:"resend_after,omitempty"`
+	ResendsRemaining int     `json:"resends_remaining"`
+	// One of: pending, verified, failed, expired.
+	Status string `json:"status"`
+	// Test environment only: the code (123456, its first length digits)
+	TestCode *string `json:"test_code,omitempty"`
+	// Masked
+	To         string  `json:"to"`
+	VerifiedAt *string `json:"verified_at,omitempty"`
+}
+
+// OTPResend is a Lowco API object.
+type OTPResend struct {
+	OtpID string `json:"otp_id"`
+}
+
+// Send a one-time code
+type OTPSend struct {
+	// One of: sms, whatsapp, email.
+	Channel     string `json:"channel"`
+	Length      *int   `json:"length,omitempty"`
+	MaxAttempts *int   `json:"max_attempts,omitempty"`
+	// Your keys and values, returned in answers and webhooks
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	ReferenceID *string           `json:"reference_id,omitempty"`
+	// Required for sms and whatsapp
+	Sender *string `json:"sender,omitempty"`
+	// A template with {{code}} (and optionally {{ttl_minutes}}): required for an SMS to an Indian number and for WhatsApp (an authentication template)
+	Template   *string `json:"template,omitempty"`
+	To         string  `json:"to"`
+	TtlSeconds *int    `json:"ttl_seconds,omitempty"`
+}
+
+// Verified, or why not; the last wrong attempt fails the OTP closed
+type OTPVerified struct {
+	AttemptsRemaining int    `json:"attempts_remaining"`
+	OtpID             string `json:"otp_id"`
+	// One of: incorrect, expired, attempts_exhausted, already_verified.
+	Reason      *string `json:"reason,omitempty"`
+	ReferenceID *string `json:"reference_id,omitempty"`
+	// One of: pending, verified, failed, expired.
+	Status     string  `json:"status"`
+	Verified   bool    `json:"verified"`
+	VerifiedAt *string `json:"verified_at,omitempty"`
+}
+
+// OTPVerify is a Lowco API object.
+type OTPVerify struct {
+	Code  string `json:"code"`
+	OtpID string `json:"otp_id"`
 }
 
 // Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
@@ -2481,6 +3011,15 @@ type ReceiptResultMerchant struct {
 	Name    Field `json:"name"`
 }
 
+// What a carrier's callback carried
+type ReceiptsAccepted struct {
+	Applied int `json:"applied"`
+	// For a message whose send result has not arrived yet (applied when it does)
+	Pending  int `json:"pending"`
+	Received int `json:"received"`
+	Stale    int `json:"stale"`
+}
+
 // Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
 type RenderDocxParams struct {
 	// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
@@ -2817,6 +3356,34 @@ type RetentionDefault struct {
 	InputHours int `json:"input_hours"`
 	// 0 is zero retention
 	OutputHours int `json:"output_hours"`
+}
+
+// What verifying the sender found
+type SenderVerification struct {
+	CheckedAt *string `json:"checked_at,omitempty"`
+	// spf, dkim, dmarc, phone_number, credentials, dlt_header
+	Checks  map[string]bool `json:"checks,omitempty"`
+	Message *string         `json:"message,omitempty"`
+	// email: the records to publish
+	Records []DNSRecord `json:"records,omitempty"`
+}
+
+// A page; pass next_cursor as cursor for the next one (null at the end).
+type SendersListData struct {
+	Items      []MessageSender `json:"items"`
+	NextCursor *string         `json:"next_cursor"`
+}
+
+// SendersListQuery is a Lowco API object.
+type SendersListQuery struct {
+	// One of: sms, whatsapp, email, push.
+	Channel *string `json:"channel,omitempty"`
+	// One of: pending, verified, failed.
+	Status *string `json:"status,omitempty"`
+	// Page size
+	Limit *int `json:"limit,omitempty"`
+	// next_cursor of the previous page.
+	Cursor *string `json:"cursor,omitempty"`
 }
 
 // Settings is a Lowco API object.
@@ -3551,6 +4118,52 @@ type StoredFile struct {
 	SHA256 string `json:"sha256"`
 	// How the file arrived One of: upload, url, base64, output.
 	Source string `json:"source"`
+}
+
+// A suppressed recipient
+type Suppression struct {
+	// One of: sms, whatsapp, email, push.
+	Channel   string `json:"channel"`
+	CreatedAt string `json:"created_at"`
+	// The message that caused it
+	MessageID *string `json:"message_id,omitempty"`
+	// One of: unsubscribed, bounced, complained, manual.
+	Reason string `json:"reason"`
+	// api: you; carrier: a bounce, complaint, opt-out or unsubscribe link One of: api, carrier.
+	Source string `json:"source"`
+	// sup_…
+	SuppressionID string `json:"suppression_id"`
+	// Masked
+	To string `json:"to"`
+}
+
+// A recipient marketing must not reach on a channel
+type SuppressionCreate struct {
+	// One of: sms, whatsapp, email, push.
+	Channel string `json:"channel"`
+	// Default manual One of: unsubscribed, bounced, complained, manual.
+	Reason *string `json:"reason,omitempty"`
+	To     string  `json:"to"`
+}
+
+// A page; pass next_cursor as cursor for the next one (null at the end).
+type SuppressionsListData struct {
+	Items      []Suppression `json:"items"`
+	NextCursor *string       `json:"next_cursor"`
+}
+
+// SuppressionsListQuery is a Lowco API object.
+type SuppressionsListQuery struct {
+	// One of: sms, whatsapp, email, push.
+	Channel *string `json:"channel,omitempty"`
+	// A recipient
+	To *string `json:"to,omitempty"`
+	// One of: unsubscribed, bounced, complained, manual.
+	Reason *string `json:"reason,omitempty"`
+	// Page size
+	Limit *int `json:"limit,omitempty"`
+	// next_cursor of the previous page.
+	Cursor *string `json:"cursor,omitempty"`
 }
 
 // TablesResult is a Lowco API object.
@@ -6377,6 +6990,142 @@ func (r *KeysResource) Validate(ctx context.Context, body KeyValidate, opts ...R
 	return &out, nil
 }
 
+// MessageTemplatesResource: .
+type MessageTemplatesResource struct{ c *core }
+
+// Create: Store a template (a WhatsApp template is submitted to Meta for approval).
+func (r *MessageTemplatesResource) Create(ctx context.Context, body MessageTemplateCreate, opts ...RequestOption) (*MessageTemplate, error) {
+	var out MessageTemplate
+	if err := r.c.call(ctx, http.MethodPost, "/v1/messages/templates", toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Delete: Delete a template (messages already accepted keep it).
+func (r *MessageTemplatesResource) Delete(ctx context.Context, id string, opts ...RequestOption) (*Deleted, error) {
+	var out Deleted
+	if err := r.c.call(ctx, http.MethodDelete, sprintf("/v1/messages/templates/%s", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Get: Read a template.
+func (r *MessageTemplatesResource) Get(ctx context.Context, id string, opts ...RequestOption) (*MessageTemplate, error) {
+	var out MessageTemplate
+	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/messages/templates/%s", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// List: List templates, newest first.
+func (r *MessageTemplatesResource) List(ctx context.Context, query *MessageTemplatesListQuery, opts ...RequestOption) (*MessageTemplatesListData, error) {
+	var out MessageTemplatesListData
+	if err := r.c.call(ctx, http.MethodGet, "/v1/messages/templates", toQuery(query), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListAll pages through List, following next_cursor.
+func (r *MessageTemplatesResource) ListAll(ctx context.Context, query *MessageTemplatesListQuery, opts ...RequestOption) *Pager[MessageTemplate] {
+	return newPager[MessageTemplate](r.c, "/v1/messages/templates", toQuery(query), opts)
+}
+
+// Update: Change a template's content (a WhatsApp template goes back to pending).
+func (r *MessageTemplatesResource) Update(ctx context.Context, id string, body MessageTemplatePatch, opts ...RequestOption) (*MessageTemplate, error) {
+	var out MessageTemplate
+	if err := r.c.call(ctx, http.MethodPatch, sprintf("/v1/messages/templates/%s", url.PathEscape(id)), toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// MessagesResource: .
+type MessagesResource struct{ c *core }
+
+// Cancel: Cancel a scheduled message (its usage is credited back).
+func (r *MessagesResource) Cancel(ctx context.Context, id string, opts ...RequestOption) (*Message, error) {
+	var out Message
+	if err := r.c.call(ctx, http.MethodPost, sprintf("/v1/messages/%s/cancel", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Get: Read a message with its timeline.
+func (r *MessagesResource) Get(ctx context.Context, id string, opts ...RequestOption) (*Message, error) {
+	var out Message
+	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/messages/%s", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// List: List messages, newest first.
+func (r *MessagesResource) List(ctx context.Context, query *MessagesListQuery, opts ...RequestOption) (*MessagesListData, error) {
+	var out MessagesListData
+	if err := r.c.call(ctx, http.MethodGet, "/v1/messages", toQuery(query), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListAll pages through List, following next_cursor.
+func (r *MessagesResource) ListAll(ctx context.Context, query *MessagesListQuery, opts ...RequestOption) *Pager[Message] {
+	return newPager[Message](r.c, "/v1/messages", toQuery(query), opts)
+}
+
+// Send: Send a message on any channel (202): queued, then sent, delivered and read from carrier receipts; 1 api_messages_<channel>.
+func (r *MessagesResource) Send(ctx context.Context, body MessageSend, opts ...RequestOption) (*Message, error) {
+	var out Message
+	if err := r.c.call(ctx, http.MethodPost, "/v1/messages", toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SendBatch: Send up to 1000 messages as one job (202).
+func (r *MessagesResource) SendBatch(ctx context.Context, body MessageBatch, opts ...RequestOption) (*MessageBatchAccepted, error) {
+	var out MessageBatchAccepted
+	if err := r.c.call(ctx, http.MethodPost, "/v1/messages/batch", toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// OtpResource: .
+type OtpResource struct{ c *core }
+
+// Resend: Send a pending OTP again with a new code (3 times, 30 seconds apart).
+func (r *OtpResource) Resend(ctx context.Context, body OTPResend, opts ...RequestOption) (*OTP, error) {
+	var out OTP
+	if err := r.c.call(ctx, http.MethodPost, "/v1/otp/resend", toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Send: Send a one-time code (202); the code is never answered (test: 123456).
+func (r *OtpResource) Send(ctx context.Context, body OTPSend, opts ...RequestOption) (*OTP, error) {
+	var out OTP
+	if err := r.c.call(ctx, http.MethodPost, "/v1/otp/send", toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Verify: Check a code: fails closed after max_attempts; 1 api_otp_verifications per check.
+func (r *OtpResource) Verify(ctx context.Context, body OTPVerify, opts ...RequestOption) (*OTPVerified, error) {
+	var out OTPVerified
+	if err := r.c.call(ctx, http.MethodPost, "/v1/otp/verify", toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // RequestsResource: .
 type RequestsResource struct{ c *core }
 
@@ -6384,6 +7133,59 @@ type RequestsResource struct{ c *core }
 func (r *RequestsResource) Get(ctx context.Context, requestId string, opts ...RequestOption) (*RequestRecord, error) {
 	var out RequestRecord
 	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/requests/%s", url.PathEscape(requestId)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SendersResource: .
+type SendersResource struct{ c *core }
+
+// Create: Add a sender (pending until verified).
+func (r *SendersResource) Create(ctx context.Context, body MessageSenderCreate, opts ...RequestOption) (*MessageSender, error) {
+	var out MessageSender
+	if err := r.c.call(ctx, http.MethodPost, "/v1/messages/senders", toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Delete: Delete a sender and its credentials.
+func (r *SendersResource) Delete(ctx context.Context, id string, opts ...RequestOption) (*Deleted, error) {
+	var out Deleted
+	if err := r.c.call(ctx, http.MethodDelete, sprintf("/v1/messages/senders/%s", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Get: Read a sender with what verifying it found.
+func (r *SendersResource) Get(ctx context.Context, id string, opts ...RequestOption) (*MessageSender, error) {
+	var out MessageSender
+	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/messages/senders/%s", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// List: List senders, newest first.
+func (r *SendersResource) List(ctx context.Context, query *SendersListQuery, opts ...RequestOption) (*SendersListData, error) {
+	var out SendersListData
+	if err := r.c.call(ctx, http.MethodGet, "/v1/messages/senders", toQuery(query), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListAll pages through List, following next_cursor.
+func (r *SendersResource) ListAll(ctx context.Context, query *SendersListQuery, opts ...RequestOption) *Pager[MessageSender] {
+	return newPager[MessageSender](r.c, "/v1/messages/senders", toQuery(query), opts)
+}
+
+// Verify: Verify a sender (202): DNS records for an email domain, the number at the BSP, push credentials, the DLT header; at once in test.
+func (r *SendersResource) Verify(ctx context.Context, id string, opts ...RequestOption) (*MessageSender, error) {
+	var out MessageSender
+	if err := r.c.call(ctx, http.MethodPost, sprintf("/v1/messages/senders/%s/verify", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -6605,6 +7407,41 @@ func (r *SignTemplatesResource) Update(ctx context.Context, id string, body Sign
 		return nil, err
 	}
 	return &out, nil
+}
+
+// SuppressionsResource: .
+type SuppressionsResource struct{ c *core }
+
+// Create: Suppress a recipient for marketing on a channel.
+func (r *SuppressionsResource) Create(ctx context.Context, body SuppressionCreate, opts ...RequestOption) (*Suppression, error) {
+	var out Suppression
+	if err := r.c.call(ctx, http.MethodPost, "/v1/messages/suppressions", toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Delete: Let marketing reach the recipient again.
+func (r *SuppressionsResource) Delete(ctx context.Context, id string, opts ...RequestOption) (*Deleted, error) {
+	var out Deleted
+	if err := r.c.call(ctx, http.MethodDelete, sprintf("/v1/messages/suppressions/%s", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// List: List suppressions, newest first.
+func (r *SuppressionsResource) List(ctx context.Context, query *SuppressionsListQuery, opts ...RequestOption) (*SuppressionsListData, error) {
+	var out SuppressionsListData
+	if err := r.c.call(ctx, http.MethodGet, "/v1/messages/suppressions", toQuery(query), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListAll pages through List, following next_cursor.
+func (r *SuppressionsResource) ListAll(ctx context.Context, query *SuppressionsListQuery, opts ...RequestOption) *Pager[Suppression] {
+	return newPager[Suppression](r.c, "/v1/messages/suppressions", toQuery(query), opts)
 }
 
 // TemplatesResource: Stored render templates.
@@ -6854,14 +7691,24 @@ type services struct {
 	Jobs *JobsResource
 	// Keys: .
 	Keys *KeysResource
+	// MessageTemplates: .
+	MessageTemplates *MessageTemplatesResource
+	// Messages: .
+	Messages *MessagesResource
+	// Otp: .
+	Otp *OtpResource
 	// Requests: .
 	Requests *RequestsResource
+	// Senders: .
+	Senders *SendersResource
 	// Settings: Environment settings.
 	Settings *SettingsResource
 	// Sign: .
 	Sign *SignResource
 	// SignTemplates: .
 	SignTemplates *SignTemplatesResource
+	// Suppressions: .
+	Suppressions *SuppressionsResource
 	// Templates: Stored render templates.
 	Templates *TemplatesResource
 	// Usage: Usage and balance.
@@ -6872,23 +7719,28 @@ type services struct {
 
 func newServices(c *core) services {
 	return services{
-		Barcode:       &BarcodeService{c},
-		DocAI:         &DocAIService{c},
-		OCR:           &OCRService{c},
-		PDF:           &PDFService{c},
-		QR:            &QRService{c},
-		Render:        &RenderService{c},
-		Verify:        &VerifyService{c},
-		Audit:         &AuditResource{c},
-		Files:         &FilesResource{c},
-		Jobs:          &JobsResource{c},
-		Keys:          &KeysResource{c},
-		Requests:      &RequestsResource{c},
-		Settings:      &SettingsResource{c},
-		Sign:          &SignResource{c},
-		SignTemplates: &SignTemplatesResource{c},
-		Templates:     &TemplatesResource{c},
-		Usage:         &UsageResource{c},
-		Webhooks:      &WebhooksResource{c},
+		Barcode:          &BarcodeService{c},
+		DocAI:            &DocAIService{c},
+		OCR:              &OCRService{c},
+		PDF:              &PDFService{c},
+		QR:               &QRService{c},
+		Render:           &RenderService{c},
+		Verify:           &VerifyService{c},
+		Audit:            &AuditResource{c},
+		Files:            &FilesResource{c},
+		Jobs:             &JobsResource{c},
+		Keys:             &KeysResource{c},
+		MessageTemplates: &MessageTemplatesResource{c},
+		Messages:         &MessagesResource{c},
+		Otp:              &OtpResource{c},
+		Requests:         &RequestsResource{c},
+		Senders:          &SendersResource{c},
+		Settings:         &SettingsResource{c},
+		Sign:             &SignResource{c},
+		SignTemplates:    &SignTemplatesResource{c},
+		Suppressions:     &SuppressionsResource{c},
+		Templates:        &TemplatesResource{c},
+		Usage:            &UsageResource{c},
+		Webhooks:         &WebhooksResource{c},
 	}
 }

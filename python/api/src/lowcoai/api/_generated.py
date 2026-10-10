@@ -106,7 +106,7 @@ ERROR_REASONS: Dict[str, Dict[str, Any]] = {
     "key_expired": {"status": 401, "when": "The key passed its expiry, or the old key's overlap window after a rotation ended.", "action": "Use the new key from the rotation, or create a key."},
     "key_not_found": {"status": 404, "when": "The key has no Lowco API binding, or (key sync) no such key exists in this organisation.", "action": "Create the key in the console's API keys page, or check the key id and the organisation."},
     "key_revoked": {"status": 401, "when": "The key was revoked.", "action": "Create a new key in the console."},
-    "message_not_found": {"status": 404, "when": "No message with this id exists in this environment.", "action": "Check the id and the environment of the key."},
+    "message_not_found": {"status": 404, "when": "No message, sender, suppression or OTP with this id exists in this environment.", "action": "Check the id and the environment of the key."},
     "method_not_allowed": {"status": 405, "when": "The route exists, but not for this HTTP method.", "action": "Use the method the API reference shows."},
     "missing_key": {"status": 401, "when": "No API key or user token reached the API.", "action": "Send Authorization: Bearer <key> (or X-Api-Key)."},
     "missing_param": {"status": 400, "when": "A required parameter or input is missing; param names it.", "action": "Add the parameter named in param."},
@@ -126,7 +126,7 @@ ERROR_REASONS: Dict[str, Dict[str, Any]] = {
     "service_unavailable": {"status": 503, "when": "The service is shedding load or a dependency is down.", "action": "Retry after Retry-After, with backoff."},
     "suppressed": {"status": 422, "when": "The recipient is on the suppression list.", "action": "Do not send to this recipient."},
     "template_not_approved": {"status": 422, "when": "The message template is not approved.", "action": "Wait for approval or use an approved template."},
-    "template_not_found": {"status": 404, "when": "No render template (or version) with this id exists in this environment.", "action": "List templates with GET /v1/render/templates."},
+    "template_not_found": {"status": 404, "when": "No render template (or version), signing template or message template with this id exists in this environment.", "action": "List templates with GET /v1/render/templates, /v1/sign/templates or /v1/messages/templates."},
     "timeout": {"status": 504, "when": "An operation exceeded its deadline and could not be promoted to a job.", "action": "Retry with ?mode=async to run it as a job."},
     "token_expired": {"status": 401, "when": "The console user's token, or a signed download link, has expired.", "action": "Sign in again, or ask the API for a fresh link (GET /v1/files/{id}/content)."},
     "too_many_files": {"status": 422, "when": "More files than the operation takes.", "action": "Send fewer files per call."},
@@ -392,6 +392,14 @@ class Colors(TypedDict):
     foreground: NotRequired[str]
     """#RRGGBB"""
 
+class DNSRecord(TypedDict):
+    """A DNS record an email domain publishes"""
+    name: str
+    purpose: Literal["spf", "dkim", "dmarc", "return_path"]
+    status: Literal["pending", "verified", "failed"]
+    type: Literal["TXT", "CNAME", "MX"]
+    value: str
+
 class DataHandling(TypedDict):
     """The data-handling page (UI-08). Operators maintain the providers' profiles; the list follows the live routes."""
     capabilities: list[CapabilityHandling]
@@ -446,6 +454,8 @@ class DecodedCodeBbox(TypedDict):
 class Deleted(TypedDict):
     deleted: bool
     file_id: NotRequired[str]
+    sender_id: NotRequired[str]
+    suppression_id: NotRequired[str]
     template_id: NotRequired[str]
     webhook_id: NotRequired[str]
 
@@ -926,11 +936,15 @@ class JobInput(TypedDict):
     """A public summary of the inputs: file ids and pages, never bytes or URLs"""
     file_id: NotRequired[str]
     file_ids: NotRequired[list[str]]
+    messages: NotRequired[int]
+    """A message batch's rows"""
     pages: NotRequired[int]
     rows: NotRequired[int]
     """A sign bulk job's rows"""
     send: NotRequired[bool]
     """A sign bulk job sends each request"""
+    skipped: NotRequired[int]
+    """A message batch's marketing rows to suppressed recipients, skipped"""
     template_id: NotRequired[str]
     """A sign bulk job's template"""
 
@@ -1178,6 +1192,401 @@ class KeysListQuery(TypedDict):
     cursor: NotRequired[str]
     """next_cursor of the previous page."""
 
+class Message(TypedDict):
+    """A message. The recipient is masked; the carrier is never disclosed"""
+    attachments: NotRequired[list[str]]
+    """Stored file ids"""
+    batch_id: NotRequired[str]
+    """The batch's job, when sent in one"""
+    cancelled_at: NotRequired[str]
+    category: Literal["transactional", "otp", "marketing"]
+    channel: Literal["sms", "whatsapp", "email", "push"]
+    created_at: str
+    credited: NotRequired[bool]
+    """The message's usage was credited back (a failure Lowco or the carrier caused, or a cancellation)"""
+    delivered_at: NotRequired[str]
+    failed_at: NotRequired[str]
+    failure: NotRequired[MessageFailure]
+    language: NotRequired[str]
+    message_id: str
+    """msg_…"""
+    metadata: NotRequired[dict[str, str]]
+    """Your keys and values, returned in answers and webhooks"""
+    otp_id: NotRequired[str]
+    """The OTP it carries"""
+    queued_at: NotRequired[str]
+    read_at: NotRequired[str]
+    reference_id: NotRequired[str]
+    scheduled_at: Optional[str]
+    sender: NotRequired[str]
+    sent_at: NotRequired[str]
+    """The carrier accepted it"""
+    status: Literal["scheduled", "queued", "sent", "delivered", "read", "failed", "undeliverable", "cancelled"]
+    """scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only)"""
+    template: NotRequired[str]
+    """The template's name"""
+    template_id: NotRequired[str]
+    timeline: NotRequired[list[MessageEvent]]
+    """GET /v1/messages/{id} only"""
+    to: str
+    """Masked"""
+    updated_at: str
+
+class MessageBatch(TypedDict):
+    """Up to 1000 messages, accepted as one job"""
+    callback_url: NotRequired[str]
+    """https URL for the batch job's webhook"""
+    messages: list[MessageSend]
+    """1 to 1000; every row is checked first (all or nothing), except marketing rows to suppressed recipients, which are skipped"""
+
+class MessageBatchAccepted(TypedDict):
+    """The batch's job (it succeeds once every message has left the queue) and each row"""
+    accepted: int
+    job_id: str
+    messages: list[MessageBatchAcceptedMessage]
+    skipped: list[MessageBatchAcceptedSkippedItem]
+    status: Literal["processing", "succeeded"]
+    total: int
+
+class MessageBatchAcceptedMessage(TypedDict):
+    index: int
+    message_id: str
+    status: Literal["scheduled", "queued", "sent", "delivered", "read", "failed", "undeliverable", "cancelled"]
+    """scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only)"""
+
+class MessageBatchAcceptedSkippedItem(TypedDict):
+    index: int
+    reason: Literal["suppressed"]
+
+class MessageEvent(TypedDict):
+    """A step of the message's timeline"""
+    at: str
+    provider_code: NotRequired[str]
+    reason: NotRequired[str]
+    status: Literal["scheduled", "queued", "sent", "delivered", "read", "failed", "undeliverable", "cancelled"]
+    """scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only)"""
+
+class MessageFailure(TypedDict):
+    """Why a message failed"""
+    message: NotRequired[str]
+    provider_code: NotRequired[str]
+    """The carrier's own code"""
+    reason: Literal["invalid_recipient", "blocked", "rejected", "expired", "carrier_error", "provider_unavailable", "internal_error", "not_on_channel", "token_unregistered"]
+    """Credited back when Lowco or the carrier caused it: carrier_error, provider_unavailable, internal_error, expired"""
+
+class MessageSend(TypedDict):
+    """A message to send: a template with its variables, or the channel's raw content"""
+    attachments: NotRequired[list[FileRef]]
+    """email: at most 10 files (file_id, file_url or file_base64), 25 MB together"""
+    body: NotRequired[str]
+    """push"""
+    callback_url: NotRequired[str]
+    """https URL for this message's events, instead of the environment's webhook endpoints"""
+    category: NotRequired[Literal["transactional", "otp", "marketing"]]
+    """Default transactional. marketing to a suppressed recipient is refused (422 suppressed); WhatsApp marketing needs an approved template"""
+    channel: Literal["sms", "whatsapp", "email", "push"]
+    data: NotRequired[dict[str, str]]
+    """A push's data payload"""
+    html: NotRequired[str]
+    """email (at most 500 KB)"""
+    language: NotRequired[str]
+    """Picks the template in this language (default en)"""
+    metadata: NotRequired[dict[str, str]]
+    """Your keys and values, returned in answers and webhooks"""
+    reference_id: NotRequired[str]
+    """Your id, to find the message by"""
+    schedule_at: NotRequired[str]
+    """Send later (at most 30 days ahead); cancel until then"""
+    sender: NotRequired[str]
+    """The sender (snd_…): required for sms, whatsapp and push; an email without one goes from Lowco's address"""
+    subject: NotRequired[str]
+    """email"""
+    template: NotRequired[str]
+    """A template's id (mtp_…) or name on the channel; an SMS to an Indian number must use one (TRAI DLT)"""
+    text: NotRequired[str]
+    """sms and whatsapp (a session reply within 24 hours of the customer's message); an email's plain part"""
+    title: NotRequired[str]
+    """push"""
+    to: str
+    """+E.164 or a 10-digit Indian mobile (sms, whatsapp), an email address, or the device's push token"""
+    variables: NotRequired[dict[str, str]]
+    """The template's {{variables}}"""
+
+class MessageSender(TypedDict):
+    """A sender (never its credentials)"""
+    address: NotRequired[str]
+    """email: the From address"""
+    bundle_id: NotRequired[str]
+    """push (apns)"""
+    business_account_id: NotRequired[str]
+    """whatsapp: the WABA id (templates are submitted to it)"""
+    channel: Literal["sms", "whatsapp", "email", "push"]
+    created_at: str
+    dlt_entity_id: NotRequired[str]
+    """sms: the DLT principal entity id"""
+    domain: NotRequired[str]
+    """email: the domain (from address when omitted); SPF, DKIM and DMARC are checked on it"""
+    failure_reason: NotRequired[str]
+    from_name: NotRequired[str]
+    """email"""
+    has_credentials: NotRequired[bool]
+    header: NotRequired[str]
+    """sms: the 6-letter DLT sender id"""
+    key_id: NotRequired[str]
+    """push (apns): the .p8 key's id"""
+    name: str
+    phone_number: NotRequired[str]
+    """whatsapp: the business number, +E.164"""
+    phone_number_id: NotRequired[str]
+    """whatsapp: the number's id in the WhatsApp Business Account"""
+    platform: NotRequired[Literal["fcm", "apns"]]
+    """push"""
+    project_id: NotRequired[str]
+    """push (fcm): the Firebase project"""
+    reply_to: NotRequired[str]
+    """email"""
+    sandbox: NotRequired[bool]
+    """push (apns): Apple's development environment"""
+    sender_id: str
+    """snd_…"""
+    status: Literal["pending", "verified", "failed"]
+    """A message needs a verified sender (422 sender_not_verified)"""
+    team_id: NotRequired[str]
+    """push (apns)"""
+    updated_at: str
+    verification: SenderVerification
+    verified_at: NotRequired[str]
+
+class MessageSenderCreate(TypedDict):
+    """A sender"""
+    address: NotRequired[str]
+    """email: the From address"""
+    bundle_id: NotRequired[str]
+    """push (apns)"""
+    business_account_id: NotRequired[str]
+    """whatsapp: the WABA id (templates are submitted to it)"""
+    channel: Literal["sms", "whatsapp", "email", "push"]
+    credentials: NotRequired[dict[str, str]]
+    """push: service_account_json (fcm) or private_key (apns, the .p8 PEM). Sealed; never answered"""
+    dlt_entity_id: NotRequired[str]
+    """sms: the DLT principal entity id"""
+    domain: NotRequired[str]
+    """email: the domain (from address when omitted); SPF, DKIM and DMARC are checked on it"""
+    from_name: NotRequired[str]
+    """email"""
+    header: NotRequired[str]
+    """sms: the 6-letter DLT sender id"""
+    key_id: NotRequired[str]
+    """push (apns): the .p8 key's id"""
+    name: str
+    phone_number: NotRequired[str]
+    """whatsapp: the business number, +E.164"""
+    phone_number_id: NotRequired[str]
+    """whatsapp: the number's id in the WhatsApp Business Account"""
+    platform: NotRequired[Literal["fcm", "apns"]]
+    """push"""
+    project_id: NotRequired[str]
+    """push (fcm): the Firebase project"""
+    reply_to: NotRequired[str]
+    """email"""
+    sandbox: NotRequired[bool]
+    """push (apns): Apple's development environment"""
+    team_id: NotRequired[str]
+    """push (apns)"""
+
+class MessageTemplate(TypedDict):
+    """A message template"""
+    approval_status: Literal["not_required", "pending", "approved", "rejected"]
+    """WhatsApp templates are pending until Meta approves them; sms, email and push need no approval"""
+    body: NotRequired[str]
+    """sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders"""
+    buttons: NotRequired[list[MessageTemplateButton]]
+    """At most 10"""
+    category: NotRequired[Literal["marketing", "utility", "authentication"]]
+    """whatsapp: Meta's category"""
+    channel: Literal["sms", "whatsapp", "email", "push"]
+    created_at: str
+    dlt_entity_id: NotRequired[str]
+    """sms: the DLT principal entity id"""
+    dlt_template_id: NotRequired[str]
+    """sms: the DLT template id (12 to 25 digits)"""
+    footer: NotRequired[str]
+    """whatsapp"""
+    header: NotRequired[MessageTemplateHeader]
+    """whatsapp"""
+    html: NotRequired[str]
+    """email"""
+    language: str
+    """Default en"""
+    name: str
+    """Unique per channel and language"""
+    rejection_reason: NotRequired[str]
+    """Meta's reason, when rejected"""
+    sender: NotRequired[str]
+    """whatsapp: the sender whose business account approves it"""
+    subject: NotRequired[str]
+    """email"""
+    submitted_at: NotRequired[str]
+    synced_at: NotRequired[str]
+    """When the approval was last read from Meta"""
+    template_id: str
+    """mtp_…"""
+    text: NotRequired[str]
+    """email: the plain part"""
+    title: NotRequired[str]
+    """push"""
+    updated_at: str
+    variables: NotRequired[list[MessageTemplateVariable]]
+    """Declared variables (inferred from the placeholders when omitted)"""
+
+class MessageTemplateButton(TypedDict):
+    """whatsapp"""
+    phone: NotRequired[str]
+    text: str
+    type: Literal["quick_reply", "url", "phone_number"]
+    url: NotRequired[str]
+
+class MessageTemplateCreate(TypedDict):
+    """A template"""
+    body: NotRequired[str]
+    """sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders"""
+    buttons: NotRequired[list[MessageTemplateCreateButton]]
+    """At most 10"""
+    category: NotRequired[Literal["marketing", "utility", "authentication"]]
+    """whatsapp: Meta's category"""
+    channel: Literal["sms", "whatsapp", "email", "push"]
+    dlt_entity_id: NotRequired[str]
+    """sms: the DLT principal entity id"""
+    dlt_template_id: NotRequired[str]
+    """sms: the DLT template id (12 to 25 digits)"""
+    footer: NotRequired[str]
+    """whatsapp"""
+    header: NotRequired[MessageTemplateCreateHeader]
+    """whatsapp"""
+    html: NotRequired[str]
+    """email"""
+    language: NotRequired[str]
+    """Default en"""
+    name: str
+    """Unique per channel and language"""
+    sender: NotRequired[str]
+    """whatsapp: the sender whose business account approves it"""
+    subject: NotRequired[str]
+    """email"""
+    text: NotRequired[str]
+    """email: the plain part"""
+    title: NotRequired[str]
+    """push"""
+    variables: NotRequired[list[MessageTemplateCreateVariable]]
+    """Declared variables (inferred from the placeholders when omitted)"""
+
+class MessageTemplateCreateButton(TypedDict):
+    """whatsapp"""
+    phone: NotRequired[str]
+    text: str
+    type: Literal["quick_reply", "url", "phone_number"]
+    url: NotRequired[str]
+
+class MessageTemplateCreateHeader(TypedDict):
+    """whatsapp"""
+    text: NotRequired[str]
+    type: Literal["text", "image", "document", "video"]
+
+class MessageTemplateCreateVariable(TypedDict):
+    example: NotRequired[str]
+    """Required for whatsapp (Meta reviews it)"""
+    name: str
+
+class MessageTemplateHeader(TypedDict):
+    """whatsapp"""
+    text: NotRequired[str]
+    type: Literal["text", "image", "document", "video"]
+
+class MessageTemplatePatch(TypedDict):
+    """The fields to change (channel, name and language identify a template and stay); an edited WhatsApp template is submitted to Meta again"""
+    body: NotRequired[str]
+    """sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders"""
+    buttons: NotRequired[list[MessageTemplatePatchButton]]
+    """At most 10"""
+    category: NotRequired[Literal["marketing", "utility", "authentication"]]
+    """whatsapp: Meta's category"""
+    dlt_entity_id: NotRequired[str]
+    """sms: the DLT principal entity id"""
+    dlt_template_id: NotRequired[str]
+    """sms: the DLT template id (12 to 25 digits)"""
+    footer: NotRequired[str]
+    """whatsapp"""
+    header: NotRequired[MessageTemplatePatchHeader]
+    """whatsapp"""
+    html: NotRequired[str]
+    """email"""
+    sender: NotRequired[str]
+    """whatsapp: the sender whose business account approves it"""
+    subject: NotRequired[str]
+    """email"""
+    text: NotRequired[str]
+    """email: the plain part"""
+    title: NotRequired[str]
+    """push"""
+    variables: NotRequired[list[MessageTemplatePatchVariable]]
+    """Declared variables (inferred from the placeholders when omitted)"""
+
+class MessageTemplatePatchButton(TypedDict):
+    """whatsapp"""
+    phone: NotRequired[str]
+    text: str
+    type: Literal["quick_reply", "url", "phone_number"]
+    url: NotRequired[str]
+
+class MessageTemplatePatchHeader(TypedDict):
+    """whatsapp"""
+    text: NotRequired[str]
+    type: Literal["text", "image", "document", "video"]
+
+class MessageTemplatePatchVariable(TypedDict):
+    example: NotRequired[str]
+    """Required for whatsapp (Meta reviews it)"""
+    name: str
+
+class MessageTemplateVariable(TypedDict):
+    example: NotRequired[str]
+    """Required for whatsapp (Meta reviews it)"""
+    name: str
+
+class MessageTemplatesListData(TypedDict):
+    """A page; pass next_cursor as cursor for the next one (null at the end)."""
+    items: list[MessageTemplate]
+    next_cursor: Optional[str]
+
+class MessageTemplatesListQuery(TypedDict):
+    channel: NotRequired[Literal["sms", "whatsapp", "email", "push"]]
+    approval_status: NotRequired[Literal["not_required", "pending", "approved", "rejected"]]
+    name: NotRequired[str]
+    limit: NotRequired[int]
+    """Page size"""
+    cursor: NotRequired[str]
+    """next_cursor of the previous page."""
+
+class MessagesListData(TypedDict):
+    """A page; pass next_cursor as cursor for the next one (null at the end)."""
+    items: list[Message]
+    next_cursor: Optional[str]
+
+class MessagesListQuery(TypedDict):
+    channel: NotRequired[Literal["sms", "whatsapp", "email", "push"]]
+    status: NotRequired[Literal["scheduled", "queued", "sent", "delivered", "read", "failed", "undeliverable", "cancelled"]]
+    reference_id: NotRequired[str]
+    to: NotRequired[str]
+    """A recipient (needs channel)"""
+    batch_id: NotRequired[str]
+    """A batch's job id"""
+    created_after: NotRequired[str]
+    created_before: NotRequired[str]
+    limit: NotRequired[int]
+    """Page size"""
+    cursor: NotRequired[str]
+    """next_cursor of the previous page."""
+
 class OCRPage(TypedDict):
     blocks: NotRequired[list[OCRRegion]]
     confidence: float
@@ -1209,6 +1618,59 @@ class OCRResult(TypedDict):
     pages: list[OCRPage]
     text: str
     warnings: NotRequired[list[str]]
+
+class OTP(TypedDict):
+    """An OTP (never its code)"""
+    attempts_remaining: int
+    channel: Literal["sms", "whatsapp", "email", "push"]
+    created_at: str
+    expires_at: str
+    message_id: str
+    """The message carrying the latest code"""
+    otp_id: str
+    """otp_…"""
+    reference_id: NotRequired[str]
+    resend_after: NotRequired[str]
+    """Resends are 30 seconds apart"""
+    resends_remaining: int
+    status: Literal["pending", "verified", "failed", "expired"]
+    test_code: NotRequired[str]
+    """Test environment only: the code (123456, its first length digits)"""
+    to: str
+    """Masked"""
+    verified_at: NotRequired[str]
+
+class OTPResend(TypedDict):
+    otp_id: str
+
+class OTPSend(TypedDict):
+    """Send a one-time code"""
+    channel: Literal["sms", "whatsapp", "email"]
+    length: NotRequired[int]
+    max_attempts: NotRequired[int]
+    metadata: NotRequired[dict[str, str]]
+    """Your keys and values, returned in answers and webhooks"""
+    reference_id: NotRequired[str]
+    sender: NotRequired[str]
+    """Required for sms and whatsapp"""
+    template: NotRequired[str]
+    """A template with {{code}} (and optionally {{ttl_minutes}}): required for an SMS to an Indian number and for WhatsApp (an authentication template)"""
+    to: str
+    ttl_seconds: NotRequired[int]
+
+class OTPVerified(TypedDict):
+    """Verified, or why not; the last wrong attempt fails the OTP closed"""
+    attempts_remaining: int
+    otp_id: str
+    reason: NotRequired[Literal["incorrect", "expired", "attempts_exhausted", "already_verified"]]
+    reference_id: NotRequired[str]
+    status: Literal["pending", "verified", "failed", "expired"]
+    verified: bool
+    verified_at: NotRequired[str]
+
+class OTPVerify(TypedDict):
+    code: str
+    otp_id: str
 
 class OcrHandwritingParams(TypedDict):
     """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
@@ -2119,6 +2581,14 @@ class ReceiptResultMerchant(TypedDict):
     address: Field
     name: Field
 
+class ReceiptsAccepted(TypedDict):
+    """What a carrier's callback carried"""
+    applied: int
+    pending: int
+    """For a message whose send result has not arrived yet (applied when it does)"""
+    received: int
+    stale: int
+
 class RenderDocxParams(TypedDict):
     """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
     file: FileInput
@@ -2406,6 +2876,28 @@ class RetentionDefault(TypedDict):
     input_hours: int
     output_hours: int
     """0 is zero retention"""
+
+class SenderVerification(TypedDict):
+    """What verifying the sender found"""
+    checked_at: NotRequired[str]
+    checks: NotRequired[dict[str, bool]]
+    """spf, dkim, dmarc, phone_number, credentials, dlt_header"""
+    message: NotRequired[str]
+    records: NotRequired[list[DNSRecord]]
+    """email: the records to publish"""
+
+class SendersListData(TypedDict):
+    """A page; pass next_cursor as cursor for the next one (null at the end)."""
+    items: list[MessageSender]
+    next_cursor: Optional[str]
+
+class SendersListQuery(TypedDict):
+    channel: NotRequired[Literal["sms", "whatsapp", "email", "push"]]
+    status: NotRequired[Literal["pending", "verified", "failed"]]
+    limit: NotRequired[int]
+    """Page size"""
+    cursor: NotRequired[str]
+    """next_cursor of the previous page."""
 
 class Settings(TypedDict):
     alert_emails: Optional[list[str]]
@@ -3053,6 +3545,42 @@ class StoredFile(TypedDict):
     sha256: str
     source: Literal["upload", "url", "base64", "output"]
     """How the file arrived"""
+
+class Suppression(TypedDict):
+    """A suppressed recipient"""
+    channel: Literal["sms", "whatsapp", "email", "push"]
+    created_at: str
+    message_id: NotRequired[str]
+    """The message that caused it"""
+    reason: Literal["unsubscribed", "bounced", "complained", "manual"]
+    source: Literal["api", "carrier"]
+    """api: you; carrier: a bounce, complaint, opt-out or unsubscribe link"""
+    suppression_id: str
+    """sup_…"""
+    to: str
+    """Masked"""
+
+class SuppressionCreate(TypedDict):
+    """A recipient marketing must not reach on a channel"""
+    channel: Literal["sms", "whatsapp", "email", "push"]
+    reason: NotRequired[Literal["unsubscribed", "bounced", "complained", "manual"]]
+    """Default manual"""
+    to: str
+
+class SuppressionsListData(TypedDict):
+    """A page; pass next_cursor as cursor for the next one (null at the end)."""
+    items: list[Suppression]
+    next_cursor: Optional[str]
+
+class SuppressionsListQuery(TypedDict):
+    channel: NotRequired[Literal["sms", "whatsapp", "email", "push"]]
+    to: NotRequired[str]
+    """A recipient"""
+    reason: NotRequired[Literal["unsubscribed", "bounced", "complained", "manual"]]
+    limit: NotRequired[int]
+    """Page size"""
+    cursor: NotRequired[str]
+    """next_cursor of the previous page."""
 
 class TablesResult(TypedDict):
     csv: NotRequired[Output]
@@ -6157,6 +6685,87 @@ class KeysResource:
         return self._core.call("POST", f"/v1/keys/validate", query=None, json=_drop_none({"allowed_ips": allowed_ips, "environment": environment, "expires_at": expires_at, "label": label, "scopes": scopes}), idempotency_key=idempotency_key, request_id=request_id)
 
 
+class MessageTemplatesResource:
+    """."""
+
+    def __init__(self, core: Core) -> None:
+        self._core = core
+
+    def create(self, *, channel: Literal["sms", "whatsapp", "email", "push"], name: str, body: Optional[str] = None, buttons: Optional[list[MessageTemplateCreateButton]] = None, category: Optional[Literal["marketing", "utility", "authentication"]] = None, dlt_entity_id: Optional[str] = None, dlt_template_id: Optional[str] = None, footer: Optional[str] = None, header: Optional[MessageTemplateCreateHeader] = None, html: Optional[str] = None, language: Optional[str] = None, sender: Optional[str] = None, subject: Optional[str] = None, text: Optional[str] = None, title: Optional[str] = None, variables: Optional[list[MessageTemplateCreateVariable]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> MessageTemplate:
+        """Store a template (a WhatsApp template is submitted to Meta for approval)."""
+        return self._core.call("POST", f"/v1/messages/templates", query=None, json=_drop_none({"body": body, "buttons": buttons, "category": category, "channel": channel, "dlt_entity_id": dlt_entity_id, "dlt_template_id": dlt_template_id, "footer": footer, "header": header, "html": html, "language": language, "name": name, "sender": sender, "subject": subject, "text": text, "title": title, "variables": variables}), idempotency_key=idempotency_key, request_id=request_id)
+
+    def delete(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Deleted:
+        """Delete a template (messages already accepted keep it)."""
+        return self._core.call("DELETE", f"/v1/messages/templates/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def get(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> MessageTemplate:
+        """Read a template."""
+        return self._core.call("GET", f"/v1/messages/templates/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list(self, *, approval_status: Optional[Literal["not_required", "pending", "approved", "rejected"]] = None, channel: Optional[Literal["sms", "whatsapp", "email", "push"]] = None, cursor: Optional[str] = None, limit: Optional[int] = None, name: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> MessageTemplatesListData:
+        """List templates, newest first."""
+        return self._core.call("GET", f"/v1/messages/templates", query={"channel": channel, "approval_status": approval_status, "name": name, "limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list_all(self, *, channel: Optional[Literal["sms", "whatsapp", "email", "push"]] = None, approval_status: Optional[Literal["not_required", "pending", "approved", "rejected"]] = None, name: Optional[str] = None, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[MessageTemplate]:
+        """Every item of list, page after page (follows next_cursor)."""
+        return self._core.paginate(f"/v1/messages/templates", {"channel": channel, "approval_status": approval_status, "name": name, "limit": limit}, request_id=request_id)
+
+    def update(self, id: str, *, body: Optional[str] = None, buttons: Optional[list[MessageTemplatePatchButton]] = None, category: Optional[Literal["marketing", "utility", "authentication"]] = None, dlt_entity_id: Optional[str] = None, dlt_template_id: Optional[str] = None, footer: Optional[str] = None, header: Optional[MessageTemplatePatchHeader] = None, html: Optional[str] = None, sender: Optional[str] = None, subject: Optional[str] = None, text: Optional[str] = None, title: Optional[str] = None, variables: Optional[list[MessageTemplatePatchVariable]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> MessageTemplate:
+        """Change a template's content (a WhatsApp template goes back to pending)."""
+        return self._core.call("PATCH", f"/v1/messages/templates/{_seg(id)}", query=None, json=_drop_none({"body": body, "buttons": buttons, "category": category, "dlt_entity_id": dlt_entity_id, "dlt_template_id": dlt_template_id, "footer": footer, "header": header, "html": html, "sender": sender, "subject": subject, "text": text, "title": title, "variables": variables}), idempotency_key=idempotency_key, request_id=request_id)
+
+
+class MessagesResource:
+    """."""
+
+    def __init__(self, core: Core) -> None:
+        self._core = core
+
+    def cancel(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Message:
+        """Cancel a scheduled message (its usage is credited back)."""
+        return self._core.call("POST", f"/v1/messages/{_seg(id)}/cancel", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def get(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Message:
+        """Read a message with its timeline."""
+        return self._core.call("GET", f"/v1/messages/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list(self, *, batch_id: Optional[str] = None, channel: Optional[Literal["sms", "whatsapp", "email", "push"]] = None, created_after: Optional[str] = None, created_before: Optional[str] = None, cursor: Optional[str] = None, limit: Optional[int] = None, reference_id: Optional[str] = None, status: Optional[Literal["scheduled", "queued", "sent", "delivered", "read", "failed", "undeliverable", "cancelled"]] = None, to: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> MessagesListData:
+        """List messages, newest first."""
+        return self._core.call("GET", f"/v1/messages", query={"channel": channel, "status": status, "reference_id": reference_id, "to": to, "batch_id": batch_id, "created_after": created_after, "created_before": created_before, "limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list_all(self, *, channel: Optional[Literal["sms", "whatsapp", "email", "push"]] = None, status: Optional[Literal["scheduled", "queued", "sent", "delivered", "read", "failed", "undeliverable", "cancelled"]] = None, reference_id: Optional[str] = None, to: Optional[str] = None, batch_id: Optional[str] = None, created_after: Optional[str] = None, created_before: Optional[str] = None, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[Message]:
+        """Every item of list, page after page (follows next_cursor)."""
+        return self._core.paginate(f"/v1/messages", {"channel": channel, "status": status, "reference_id": reference_id, "to": to, "batch_id": batch_id, "created_after": created_after, "created_before": created_before, "limit": limit}, request_id=request_id)
+
+    def send(self, *, channel: Literal["sms", "whatsapp", "email", "push"], to: str, attachments: Optional[list[FileRef]] = None, body: Optional[str] = None, callback_url: Optional[str] = None, category: Optional[Literal["transactional", "otp", "marketing"]] = None, data: Optional[dict[str, str]] = None, html: Optional[str] = None, language: Optional[str] = None, metadata: Optional[dict[str, str]] = None, reference_id: Optional[str] = None, schedule_at: Optional[str] = None, sender: Optional[str] = None, subject: Optional[str] = None, template: Optional[str] = None, text: Optional[str] = None, title: Optional[str] = None, variables: Optional[dict[str, str]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Message:
+        """Send a message on any channel (202): queued, then sent, delivered and read from carrier receipts; 1 api_messages_<channel>."""
+        return self._core.call("POST", f"/v1/messages", query=None, json=_drop_none({"attachments": attachments, "body": body, "callback_url": callback_url, "category": category, "channel": channel, "data": data, "html": html, "language": language, "metadata": metadata, "reference_id": reference_id, "schedule_at": schedule_at, "sender": sender, "subject": subject, "template": template, "text": text, "title": title, "to": to, "variables": variables}), idempotency_key=idempotency_key, request_id=request_id)
+
+    def send_batch(self, *, messages: list[MessageSend], callback_url: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> MessageBatchAccepted:
+        """Send up to 1000 messages as one job (202)."""
+        return self._core.call("POST", f"/v1/messages/batch", query=None, json=_drop_none({"callback_url": callback_url, "messages": messages}), idempotency_key=idempotency_key, request_id=request_id)
+
+
+class OtpResource:
+    """."""
+
+    def __init__(self, core: Core) -> None:
+        self._core = core
+
+    def resend(self, *, otp_id: str, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> OTP:
+        """Send a pending OTP again with a new code (3 times, 30 seconds apart)."""
+        return self._core.call("POST", f"/v1/otp/resend", query=None, json=_drop_none({"otp_id": otp_id}), idempotency_key=idempotency_key, request_id=request_id)
+
+    def send(self, *, channel: Literal["sms", "whatsapp", "email"], to: str, length: Optional[int] = None, max_attempts: Optional[int] = None, metadata: Optional[dict[str, str]] = None, reference_id: Optional[str] = None, sender: Optional[str] = None, template: Optional[str] = None, ttl_seconds: Optional[int] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> OTP:
+        """Send a one-time code (202); the code is never answered (test: 123456)."""
+        return self._core.call("POST", f"/v1/otp/send", query=None, json=_drop_none({"channel": channel, "length": length, "max_attempts": max_attempts, "metadata": metadata, "reference_id": reference_id, "sender": sender, "template": template, "to": to, "ttl_seconds": ttl_seconds}), idempotency_key=idempotency_key, request_id=request_id)
+
+    def verify(self, *, code: str, otp_id: str, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> OTPVerified:
+        """Check a code: fails closed after max_attempts; 1 api_otp_verifications per check."""
+        return self._core.call("POST", f"/v1/otp/verify", query=None, json=_drop_none({"code": code, "otp_id": otp_id}), idempotency_key=idempotency_key, request_id=request_id)
+
+
 class RequestsResource:
     """."""
 
@@ -6166,6 +6775,37 @@ class RequestsResource:
     def get(self, request_id_: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> RequestRecord:
         """What the request log recorded for one request, and its provider path."""
         return self._core.call("GET", f"/v1/requests/{_seg(request_id_)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+
+class SendersResource:
+    """."""
+
+    def __init__(self, core: Core) -> None:
+        self._core = core
+
+    def create(self, *, channel: Literal["sms", "whatsapp", "email", "push"], name: str, address: Optional[str] = None, bundle_id: Optional[str] = None, business_account_id: Optional[str] = None, credentials: Optional[dict[str, str]] = None, dlt_entity_id: Optional[str] = None, domain: Optional[str] = None, from_name: Optional[str] = None, header: Optional[str] = None, key_id: Optional[str] = None, phone_number: Optional[str] = None, phone_number_id: Optional[str] = None, platform: Optional[Literal["fcm", "apns"]] = None, project_id: Optional[str] = None, reply_to: Optional[str] = None, sandbox: Optional[bool] = None, team_id: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> MessageSender:
+        """Add a sender (pending until verified)."""
+        return self._core.call("POST", f"/v1/messages/senders", query=None, json=_drop_none({"address": address, "bundle_id": bundle_id, "business_account_id": business_account_id, "channel": channel, "credentials": credentials, "dlt_entity_id": dlt_entity_id, "domain": domain, "from_name": from_name, "header": header, "key_id": key_id, "name": name, "phone_number": phone_number, "phone_number_id": phone_number_id, "platform": platform, "project_id": project_id, "reply_to": reply_to, "sandbox": sandbox, "team_id": team_id}), idempotency_key=idempotency_key, request_id=request_id)
+
+    def delete(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Deleted:
+        """Delete a sender and its credentials."""
+        return self._core.call("DELETE", f"/v1/messages/senders/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def get(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> MessageSender:
+        """Read a sender with what verifying it found."""
+        return self._core.call("GET", f"/v1/messages/senders/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list(self, *, channel: Optional[Literal["sms", "whatsapp", "email", "push"]] = None, cursor: Optional[str] = None, limit: Optional[int] = None, status: Optional[Literal["pending", "verified", "failed"]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SendersListData:
+        """List senders, newest first."""
+        return self._core.call("GET", f"/v1/messages/senders", query={"channel": channel, "status": status, "limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list_all(self, *, channel: Optional[Literal["sms", "whatsapp", "email", "push"]] = None, status: Optional[Literal["pending", "verified", "failed"]] = None, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[MessageSender]:
+        """Every item of list, page after page (follows next_cursor)."""
+        return self._core.paginate(f"/v1/messages/senders", {"channel": channel, "status": status, "limit": limit}, request_id=request_id)
+
+    def verify(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> MessageSender:
+        """Verify a sender (202): DNS records for an email domain, the number at the BSP, push credentials, the DLT header; at once in test."""
+        return self._core.call("POST", f"/v1/messages/senders/{_seg(id)}/verify", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
 
 class SettingsResource:
@@ -6287,6 +6927,29 @@ class SignTemplatesResource:
     def update(self, id: str, *, metadata: Optional[dict[str, str]] = None, name: Optional[str] = None, options: Optional[SignOptionsIn] = None, title: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignTemplate:
         """Change a template's name, title, options or metadata."""
         return self._core.call("PATCH", f"/v1/sign/templates/{_seg(id)}", query=None, json=_drop_none({"metadata": metadata, "name": name, "options": options, "title": title}), idempotency_key=idempotency_key, request_id=request_id)
+
+
+class SuppressionsResource:
+    """."""
+
+    def __init__(self, core: Core) -> None:
+        self._core = core
+
+    def create(self, *, channel: Literal["sms", "whatsapp", "email", "push"], to: str, reason: Optional[Literal["unsubscribed", "bounced", "complained", "manual"]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Suppression:
+        """Suppress a recipient for marketing on a channel."""
+        return self._core.call("POST", f"/v1/messages/suppressions", query=None, json=_drop_none({"channel": channel, "reason": reason, "to": to}), idempotency_key=idempotency_key, request_id=request_id)
+
+    def delete(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Deleted:
+        """Let marketing reach the recipient again."""
+        return self._core.call("DELETE", f"/v1/messages/suppressions/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list(self, *, channel: Optional[Literal["sms", "whatsapp", "email", "push"]] = None, cursor: Optional[str] = None, limit: Optional[int] = None, reason: Optional[Literal["unsubscribed", "bounced", "complained", "manual"]] = None, to: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SuppressionsListData:
+        """List suppressions, newest first."""
+        return self._core.call("GET", f"/v1/messages/suppressions", query={"channel": channel, "to": to, "reason": reason, "limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list_all(self, *, channel: Optional[Literal["sms", "whatsapp", "email", "push"]] = None, to: Optional[str] = None, reason: Optional[Literal["unsubscribed", "bounced", "complained", "manual"]] = None, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[Suppression]:
+        """Every item of list, page after page (follows next_cursor)."""
+        return self._core.paginate(f"/v1/messages/suppressions", {"channel": channel, "to": to, "reason": reason, "limit": limit}, request_id=request_id)
 
 
 class TemplatesResource:
@@ -6451,13 +7114,23 @@ class GeneratedClient:
         """Asynchronous jobs."""
         self.keys = KeysResource(core)
         """."""
+        self.messageTemplates = MessageTemplatesResource(core)
+        """."""
+        self.messages = MessagesResource(core)
+        """."""
+        self.otp = OtpResource(core)
+        """."""
         self.requests = RequestsResource(core)
+        """."""
+        self.senders = SendersResource(core)
         """."""
         self.settings = SettingsResource(core)
         """Environment settings."""
         self.sign = SignResource(core)
         """."""
         self.signTemplates = SignTemplatesResource(core)
+        """."""
+        self.suppressions = SuppressionsResource(core)
         """."""
         self.templates = TemplatesResource(core)
         """Stored render templates."""

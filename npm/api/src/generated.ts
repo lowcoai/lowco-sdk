@@ -93,7 +93,7 @@ export const ERROR_REASONS: Record<ErrorReason, { status: number; when: string; 
   key_expired: { status: 401, when: "The key passed its expiry, or the old key's overlap window after a rotation ended.", action: "Use the new key from the rotation, or create a key." },
   key_not_found: { status: 404, when: "The key has no Lowco API binding, or (key sync) no such key exists in this organisation.", action: "Create the key in the console's API keys page, or check the key id and the organisation." },
   key_revoked: { status: 401, when: "The key was revoked.", action: "Create a new key in the console." },
-  message_not_found: { status: 404, when: "No message with this id exists in this environment.", action: "Check the id and the environment of the key." },
+  message_not_found: { status: 404, when: "No message, sender, suppression or OTP with this id exists in this environment.", action: "Check the id and the environment of the key." },
   method_not_allowed: { status: 405, when: "The route exists, but not for this HTTP method.", action: "Use the method the API reference shows." },
   missing_key: { status: 401, when: "No API key or user token reached the API.", action: "Send Authorization: Bearer <key> (or X-Api-Key)." },
   missing_param: { status: 400, when: "A required parameter or input is missing; param names it.", action: "Add the parameter named in param." },
@@ -113,7 +113,7 @@ export const ERROR_REASONS: Record<ErrorReason, { status: number; when: string; 
   service_unavailable: { status: 503, when: "The service is shedding load or a dependency is down.", action: "Retry after Retry-After, with backoff." },
   suppressed: { status: 422, when: "The recipient is on the suppression list.", action: "Do not send to this recipient." },
   template_not_approved: { status: 422, when: "The message template is not approved.", action: "Wait for approval or use an approved template." },
-  template_not_found: { status: 404, when: "No render template (or version) with this id exists in this environment.", action: "List templates with GET /v1/render/templates." },
+  template_not_found: { status: 404, when: "No render template (or version), signing template or message template with this id exists in this environment.", action: "List templates with GET /v1/render/templates, /v1/sign/templates or /v1/messages/templates." },
   timeout: { status: 504, when: "An operation exceeded its deadline and could not be promoted to a job.", action: "Retry with ?mode=async to run it as a job." },
   token_expired: { status: 401, when: "The console user's token, or a signed download link, has expired.", action: "Sign in again, or ask the API for a fresh link (GET /v1/files/{id}/content)." },
   too_many_files: { status: 422, when: "More files than the operation takes.", action: "Send fewer files per call." },
@@ -407,6 +407,15 @@ export interface Colors {
   foreground?: string;
 }
 
+/** A DNS record an email domain publishes */
+export interface DNSRecord {
+  name: string;
+  purpose: "spf" | "dkim" | "dmarc" | "return_path";
+  status: "pending" | "verified" | "failed";
+  type: "TXT" | "CNAME" | "MX";
+  value: string;
+}
+
 /** The data-handling page (UI-08). Operators maintain the providers' profiles; the list follows the live routes. */
 export interface DataHandling {
   /** Per capability, the providers in rotation */
@@ -466,6 +475,8 @@ export interface DecodedCodeBbox {
 export interface Deleted {
   deleted: boolean;
   file_id?: string;
+  sender_id?: string;
+  suppression_id?: string;
   template_id?: string;
   webhook_id?: string;
 }
@@ -994,11 +1005,15 @@ export interface JobEvent {
 export interface JobInput {
   file_id?: string;
   file_ids?: string[];
+  /** A message batch's rows */
+  messages?: number;
   pages?: number;
   /** A sign bulk job's rows */
   rows?: number;
   /** A sign bulk job sends each request */
   send?: boolean;
+  /** A message batch's marketing rows to suppressed recipients, skipped */
+  skipped?: number;
   /** A sign bulk job's template */
   template_id?: string;
 }
@@ -1271,6 +1286,427 @@ export interface KeysListQuery {
   cursor?: string;
 }
 
+/** A message. The recipient is masked; the carrier is never disclosed */
+export interface Message {
+  /** Stored file ids */
+  attachments?: string[];
+  /** The batch's job, when sent in one */
+  batch_id?: string;
+  cancelled_at?: string;
+  category: "transactional" | "otp" | "marketing";
+  channel: "sms" | "whatsapp" | "email" | "push";
+  created_at: string;
+  /** The message's usage was credited back (a failure Lowco or the carrier caused, or a cancellation) */
+  credited?: boolean;
+  delivered_at?: string;
+  failed_at?: string;
+  failure?: MessageFailure;
+  language?: string;
+  /** msg_… */
+  message_id: string;
+  /** Your keys and values, returned in answers and webhooks */
+  metadata?: Record<string, string>;
+  /** The OTP it carries */
+  otp_id?: string;
+  queued_at?: string;
+  read_at?: string;
+  reference_id?: string;
+  scheduled_at: string | null;
+  sender?: string;
+  /** The carrier accepted it */
+  sent_at?: string;
+  /** scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only) */
+  status: "scheduled" | "queued" | "sent" | "delivered" | "read" | "failed" | "undeliverable" | "cancelled";
+  /** The template's name */
+  template?: string;
+  template_id?: string;
+  /** GET /v1/messages/{id} only */
+  timeline?: MessageEvent[];
+  /** Masked */
+  to: string;
+  updated_at: string;
+}
+
+/** Up to 1000 messages, accepted as one job */
+export interface MessageBatch {
+  /** https URL for the batch job's webhook */
+  callback_url?: string;
+  /** 1 to 1000; every row is checked first (all or nothing), except marketing rows to suppressed recipients, which are skipped */
+  messages: MessageSend[];
+}
+
+/** The batch's job (it succeeds once every message has left the queue) and each row */
+export interface MessageBatchAccepted {
+  accepted: number;
+  job_id: string;
+  messages: MessageBatchAcceptedMessage[];
+  skipped: MessageBatchAcceptedSkippedItem[];
+  status: "processing" | "succeeded";
+  total: number;
+}
+
+export interface MessageBatchAcceptedMessage {
+  index: number;
+  message_id: string;
+  /** scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only) */
+  status: "scheduled" | "queued" | "sent" | "delivered" | "read" | "failed" | "undeliverable" | "cancelled";
+}
+
+export interface MessageBatchAcceptedSkippedItem {
+  index: number;
+  reason: "suppressed";
+}
+
+/** A step of the message's timeline */
+export interface MessageEvent {
+  at: string;
+  provider_code?: string;
+  reason?: string;
+  /** scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only) */
+  status: "scheduled" | "queued" | "sent" | "delivered" | "read" | "failed" | "undeliverable" | "cancelled";
+}
+
+/** Why a message failed */
+export interface MessageFailure {
+  message?: string;
+  /** The carrier's own code */
+  provider_code?: string;
+  /** Credited back when Lowco or the carrier caused it: carrier_error, provider_unavailable, internal_error, expired */
+  reason: "invalid_recipient" | "blocked" | "rejected" | "expired" | "carrier_error" | "provider_unavailable" | "internal_error" | "not_on_channel" | "token_unregistered";
+}
+
+/** A message to send: a template with its variables, or the channel's raw content */
+export interface MessageSend {
+  /** email: at most 10 files (file_id, file_url or file_base64), 25 MB together */
+  attachments?: FileRef[];
+  /** push */
+  body?: string;
+  /** https URL for this message's events, instead of the environment's webhook endpoints */
+  callback_url?: string;
+  /** Default transactional. marketing to a suppressed recipient is refused (422 suppressed); WhatsApp marketing needs an approved template */
+  category?: "transactional" | "otp" | "marketing";
+  channel: "sms" | "whatsapp" | "email" | "push";
+  /** A push's data payload */
+  data?: Record<string, string>;
+  /** email (at most 500 KB) */
+  html?: string;
+  /** Picks the template in this language (default en) */
+  language?: string;
+  /** Your keys and values, returned in answers and webhooks */
+  metadata?: Record<string, string>;
+  /** Your id, to find the message by */
+  reference_id?: string;
+  /** Send later (at most 30 days ahead); cancel until then */
+  schedule_at?: string;
+  /** The sender (snd_…): required for sms, whatsapp and push; an email without one goes from Lowco's address */
+  sender?: string;
+  /** email */
+  subject?: string;
+  /** A template's id (mtp_…) or name on the channel; an SMS to an Indian number must use one (TRAI DLT) */
+  template?: string;
+  /** sms and whatsapp (a session reply within 24 hours of the customer's message); an email's plain part */
+  text?: string;
+  /** push */
+  title?: string;
+  /** +E.164 or a 10-digit Indian mobile (sms, whatsapp), an email address, or the device's push token */
+  to: string;
+  /** The template's {{variables}} */
+  variables?: Record<string, string>;
+}
+
+/** A sender (never its credentials) */
+export interface MessageSender {
+  /** email: the From address */
+  address?: string;
+  /** push (apns) */
+  bundle_id?: string;
+  /** whatsapp: the WABA id (templates are submitted to it) */
+  business_account_id?: string;
+  channel: "sms" | "whatsapp" | "email" | "push";
+  created_at: string;
+  /** sms: the DLT principal entity id */
+  dlt_entity_id?: string;
+  /** email: the domain (from address when omitted); SPF, DKIM and DMARC are checked on it */
+  domain?: string;
+  failure_reason?: string;
+  /** email */
+  from_name?: string;
+  has_credentials?: boolean;
+  /** sms: the 6-letter DLT sender id */
+  header?: string;
+  /** push (apns): the .p8 key's id */
+  key_id?: string;
+  name: string;
+  /** whatsapp: the business number, +E.164 */
+  phone_number?: string;
+  /** whatsapp: the number's id in the WhatsApp Business Account */
+  phone_number_id?: string;
+  /** push */
+  platform?: "fcm" | "apns";
+  /** push (fcm): the Firebase project */
+  project_id?: string;
+  /** email */
+  reply_to?: string;
+  /** push (apns): Apple's development environment */
+  sandbox?: boolean;
+  /** snd_… */
+  sender_id: string;
+  /** A message needs a verified sender (422 sender_not_verified) */
+  status: "pending" | "verified" | "failed";
+  /** push (apns) */
+  team_id?: string;
+  updated_at: string;
+  verification: SenderVerification;
+  verified_at?: string;
+}
+
+/** A sender */
+export interface MessageSenderCreate {
+  /** email: the From address */
+  address?: string;
+  /** push (apns) */
+  bundle_id?: string;
+  /** whatsapp: the WABA id (templates are submitted to it) */
+  business_account_id?: string;
+  channel: "sms" | "whatsapp" | "email" | "push";
+  /** push: service_account_json (fcm) or private_key (apns, the .p8 PEM). Sealed; never answered */
+  credentials?: Record<string, string>;
+  /** sms: the DLT principal entity id */
+  dlt_entity_id?: string;
+  /** email: the domain (from address when omitted); SPF, DKIM and DMARC are checked on it */
+  domain?: string;
+  /** email */
+  from_name?: string;
+  /** sms: the 6-letter DLT sender id */
+  header?: string;
+  /** push (apns): the .p8 key's id */
+  key_id?: string;
+  name: string;
+  /** whatsapp: the business number, +E.164 */
+  phone_number?: string;
+  /** whatsapp: the number's id in the WhatsApp Business Account */
+  phone_number_id?: string;
+  /** push */
+  platform?: "fcm" | "apns";
+  /** push (fcm): the Firebase project */
+  project_id?: string;
+  /** email */
+  reply_to?: string;
+  /** push (apns): Apple's development environment */
+  sandbox?: boolean;
+  /** push (apns) */
+  team_id?: string;
+}
+
+/** A message template */
+export interface MessageTemplate {
+  /** WhatsApp templates are pending until Meta approves them; sms, email and push need no approval */
+  approval_status: "not_required" | "pending" | "approved" | "rejected";
+  /** sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders */
+  body?: string;
+  /** At most 10 */
+  buttons?: MessageTemplateButton[];
+  /** whatsapp: Meta's category */
+  category?: "marketing" | "utility" | "authentication";
+  channel: "sms" | "whatsapp" | "email" | "push";
+  created_at: string;
+  /** sms: the DLT principal entity id */
+  dlt_entity_id?: string;
+  /** sms: the DLT template id (12 to 25 digits) */
+  dlt_template_id?: string;
+  /** whatsapp */
+  footer?: string;
+  /** whatsapp */
+  header?: MessageTemplateHeader;
+  /** email */
+  html?: string;
+  /** Default en */
+  language: string;
+  /** Unique per channel and language */
+  name: string;
+  /** Meta's reason, when rejected */
+  rejection_reason?: string;
+  /** whatsapp: the sender whose business account approves it */
+  sender?: string;
+  /** email */
+  subject?: string;
+  submitted_at?: string;
+  /** When the approval was last read from Meta */
+  synced_at?: string;
+  /** mtp_… */
+  template_id: string;
+  /** email: the plain part */
+  text?: string;
+  /** push */
+  title?: string;
+  updated_at: string;
+  /** Declared variables (inferred from the placeholders when omitted) */
+  variables?: MessageTemplateVariable[];
+}
+
+/** whatsapp */
+export interface MessageTemplateButton {
+  phone?: string;
+  text: string;
+  type: "quick_reply" | "url" | "phone_number";
+  url?: string;
+}
+
+/** A template */
+export interface MessageTemplateCreate {
+  /** sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders */
+  body?: string;
+  /** At most 10 */
+  buttons?: MessageTemplateCreateButton[];
+  /** whatsapp: Meta's category */
+  category?: "marketing" | "utility" | "authentication";
+  channel: "sms" | "whatsapp" | "email" | "push";
+  /** sms: the DLT principal entity id */
+  dlt_entity_id?: string;
+  /** sms: the DLT template id (12 to 25 digits) */
+  dlt_template_id?: string;
+  /** whatsapp */
+  footer?: string;
+  /** whatsapp */
+  header?: MessageTemplateCreateHeader;
+  /** email */
+  html?: string;
+  /** Default en */
+  language?: string;
+  /** Unique per channel and language */
+  name: string;
+  /** whatsapp: the sender whose business account approves it */
+  sender?: string;
+  /** email */
+  subject?: string;
+  /** email: the plain part */
+  text?: string;
+  /** push */
+  title?: string;
+  /** Declared variables (inferred from the placeholders when omitted) */
+  variables?: MessageTemplateCreateVariable[];
+}
+
+/** whatsapp */
+export interface MessageTemplateCreateButton {
+  phone?: string;
+  text: string;
+  type: "quick_reply" | "url" | "phone_number";
+  url?: string;
+}
+
+/** whatsapp */
+export interface MessageTemplateCreateHeader {
+  text?: string;
+  type: "text" | "image" | "document" | "video";
+}
+
+export interface MessageTemplateCreateVariable {
+  /** Required for whatsapp (Meta reviews it) */
+  example?: string;
+  name: string;
+}
+
+/** whatsapp */
+export interface MessageTemplateHeader {
+  text?: string;
+  type: "text" | "image" | "document" | "video";
+}
+
+/** The fields to change (channel, name and language identify a template and stay); an edited WhatsApp template is submitted to Meta again */
+export interface MessageTemplatePatch {
+  /** sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders */
+  body?: string;
+  /** At most 10 */
+  buttons?: MessageTemplatePatchButton[];
+  /** whatsapp: Meta's category */
+  category?: "marketing" | "utility" | "authentication";
+  /** sms: the DLT principal entity id */
+  dlt_entity_id?: string;
+  /** sms: the DLT template id (12 to 25 digits) */
+  dlt_template_id?: string;
+  /** whatsapp */
+  footer?: string;
+  /** whatsapp */
+  header?: MessageTemplatePatchHeader;
+  /** email */
+  html?: string;
+  /** whatsapp: the sender whose business account approves it */
+  sender?: string;
+  /** email */
+  subject?: string;
+  /** email: the plain part */
+  text?: string;
+  /** push */
+  title?: string;
+  /** Declared variables (inferred from the placeholders when omitted) */
+  variables?: MessageTemplatePatchVariable[];
+}
+
+/** whatsapp */
+export interface MessageTemplatePatchButton {
+  phone?: string;
+  text: string;
+  type: "quick_reply" | "url" | "phone_number";
+  url?: string;
+}
+
+/** whatsapp */
+export interface MessageTemplatePatchHeader {
+  text?: string;
+  type: "text" | "image" | "document" | "video";
+}
+
+export interface MessageTemplatePatchVariable {
+  /** Required for whatsapp (Meta reviews it) */
+  example?: string;
+  name: string;
+}
+
+export interface MessageTemplateVariable {
+  /** Required for whatsapp (Meta reviews it) */
+  example?: string;
+  name: string;
+}
+
+/** A page; pass next_cursor as cursor for the next one (null at the end). */
+export interface MessageTemplatesListData {
+  items: MessageTemplate[];
+  next_cursor: string | null;
+}
+
+export interface MessageTemplatesListQuery {
+  channel?: "sms" | "whatsapp" | "email" | "push";
+  approval_status?: "not_required" | "pending" | "approved" | "rejected";
+  name?: string;
+  /** Page size */
+  limit?: number;
+  /** next_cursor of the previous page. */
+  cursor?: string;
+}
+
+/** A page; pass next_cursor as cursor for the next one (null at the end). */
+export interface MessagesListData {
+  items: Message[];
+  next_cursor: string | null;
+}
+
+export interface MessagesListQuery {
+  channel?: "sms" | "whatsapp" | "email" | "push";
+  status?: "scheduled" | "queued" | "sent" | "delivered" | "read" | "failed" | "undeliverable" | "cancelled";
+  reference_id?: string;
+  /** A recipient (needs channel) */
+  to?: string;
+  /** A batch's job id */
+  batch_id?: string;
+  created_after?: string;
+  created_before?: string;
+  /** Page size */
+  limit?: number;
+  /** next_cursor of the previous page. */
+  cursor?: string;
+}
+
 export interface OCRPage {
   blocks?: OCRRegion[];
   confidence: number;
@@ -1304,6 +1740,64 @@ export interface OCRResult {
   pages: OCRPage[];
   text: string;
   warnings?: string[];
+}
+
+/** An OTP (never its code) */
+export interface OTP {
+  attempts_remaining: number;
+  channel: "sms" | "whatsapp" | "email" | "push";
+  created_at: string;
+  expires_at: string;
+  /** The message carrying the latest code */
+  message_id: string;
+  /** otp_… */
+  otp_id: string;
+  reference_id?: string;
+  /** Resends are 30 seconds apart */
+  resend_after?: string;
+  resends_remaining: number;
+  status: "pending" | "verified" | "failed" | "expired";
+  /** Test environment only: the code (123456, its first length digits) */
+  test_code?: string;
+  /** Masked */
+  to: string;
+  verified_at?: string;
+}
+
+export interface OTPResend {
+  otp_id: string;
+}
+
+/** Send a one-time code */
+export interface OTPSend {
+  channel: "sms" | "whatsapp" | "email";
+  length?: number;
+  max_attempts?: number;
+  /** Your keys and values, returned in answers and webhooks */
+  metadata?: Record<string, string>;
+  reference_id?: string;
+  /** Required for sms and whatsapp */
+  sender?: string;
+  /** A template with {{code}} (and optionally {{ttl_minutes}}): required for an SMS to an Indian number and for WhatsApp (an authentication template) */
+  template?: string;
+  to: string;
+  ttl_seconds?: number;
+}
+
+/** Verified, or why not; the last wrong attempt fails the OTP closed */
+export interface OTPVerified {
+  attempts_remaining: number;
+  otp_id: string;
+  reason?: "incorrect" | "expired" | "attempts_exhausted" | "already_verified";
+  reference_id?: string;
+  status: "pending" | "verified" | "failed" | "expired";
+  verified: boolean;
+  verified_at?: string;
+}
+
+export interface OTPVerify {
+  code: string;
+  otp_id: string;
 }
 
 /** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
@@ -2302,6 +2796,15 @@ export interface ReceiptResultMerchant {
   name: Field;
 }
 
+/** What a carrier's callback carried */
+export interface ReceiptsAccepted {
+  applied: number;
+  /** For a message whose send result has not arrived yet (applied when it does) */
+  pending: number;
+  received: number;
+  stale: number;
+}
+
 /** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
 export interface RenderDocxParams {
   /** The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers) */
@@ -2618,6 +3121,31 @@ export interface RetentionDefault {
   input_hours: number;
   /** 0 is zero retention */
   output_hours: number;
+}
+
+/** What verifying the sender found */
+export interface SenderVerification {
+  checked_at?: string;
+  /** spf, dkim, dmarc, phone_number, credentials, dlt_header */
+  checks?: Record<string, boolean>;
+  message?: string;
+  /** email: the records to publish */
+  records?: DNSRecord[];
+}
+
+/** A page; pass next_cursor as cursor for the next one (null at the end). */
+export interface SendersListData {
+  items: MessageSender[];
+  next_cursor: string | null;
+}
+
+export interface SendersListQuery {
+  channel?: "sms" | "whatsapp" | "email" | "push";
+  status?: "pending" | "verified" | "failed";
+  /** Page size */
+  limit?: number;
+  /** next_cursor of the previous page. */
+  cursor?: string;
 }
 
 export interface Settings {
@@ -3316,6 +3844,46 @@ export interface StoredFile {
   sha256: string;
   /** How the file arrived */
   source: "upload" | "url" | "base64" | "output";
+}
+
+/** A suppressed recipient */
+export interface Suppression {
+  channel: "sms" | "whatsapp" | "email" | "push";
+  created_at: string;
+  /** The message that caused it */
+  message_id?: string;
+  reason: "unsubscribed" | "bounced" | "complained" | "manual";
+  /** api: you; carrier: a bounce, complaint, opt-out or unsubscribe link */
+  source: "api" | "carrier";
+  /** sup_… */
+  suppression_id: string;
+  /** Masked */
+  to: string;
+}
+
+/** A recipient marketing must not reach on a channel */
+export interface SuppressionCreate {
+  channel: "sms" | "whatsapp" | "email" | "push";
+  /** Default manual */
+  reason?: "unsubscribed" | "bounced" | "complained" | "manual";
+  to: string;
+}
+
+/** A page; pass next_cursor as cursor for the next one (null at the end). */
+export interface SuppressionsListData {
+  items: Suppression[];
+  next_cursor: string | null;
+}
+
+export interface SuppressionsListQuery {
+  channel?: "sms" | "whatsapp" | "email" | "push";
+  /** A recipient */
+  to?: string;
+  reason?: "unsubscribed" | "bounced" | "complained" | "manual";
+  /** Page size */
+  limit?: number;
+  /** next_cursor of the previous page. */
+  cursor?: string;
 }
 
 export interface TablesResult {
@@ -5825,12 +6393,141 @@ export class KeysResource {
 }
 
 /** . */
+export class MessageTemplatesResource {
+  constructor(private readonly core: Core) {}
+
+  /** Store a template (a WhatsApp template is submitted to Meta for approval). */
+  create(body: MessageTemplateCreate, options?: RequestOptions): Promise<MessageTemplate> {
+    return this.core.call<MessageTemplate>("POST", `/v1/messages/templates`, { query: undefined, json: body }, options);
+  }
+
+  /** Delete a template (messages already accepted keep it). */
+  delete(id: string, options?: RequestOptions): Promise<Deleted> {
+    return this.core.call<Deleted>("DELETE", `/v1/messages/templates/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
+  }
+
+  /** Read a template. */
+  get(id: string, options?: RequestOptions): Promise<MessageTemplate> {
+    return this.core.call<MessageTemplate>("GET", `/v1/messages/templates/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
+  }
+
+  /** List templates, newest first. */
+  list(query?: MessageTemplatesListQuery, options?: RequestOptions): Promise<MessageTemplatesListData> {
+    return this.core.call<MessageTemplatesListData>("GET", `/v1/messages/templates`, { query: query as unknown as Record<string, unknown> | undefined, json: undefined }, options);
+  }
+
+  /** Every item of list, page after page (follows next_cursor). */
+  listAll(query?: Omit<MessageTemplatesListQuery, "cursor">, options?: RequestOptions): AsyncIterable<MessageTemplate> {
+    return this.core.paginate<MessageTemplate>(`/v1/messages/templates`, query as unknown as Record<string, unknown> | undefined, options);
+  }
+
+  /** Change a template's content (a WhatsApp template goes back to pending). */
+  update(id: string, body: MessageTemplatePatch, options?: RequestOptions): Promise<MessageTemplate> {
+    return this.core.call<MessageTemplate>("PATCH", `/v1/messages/templates/${encodeURIComponent(id)}`, { query: undefined, json: body }, options);
+  }
+
+}
+
+/** . */
+export class MessagesResource {
+  constructor(private readonly core: Core) {}
+
+  /** Cancel a scheduled message (its usage is credited back). */
+  cancel(id: string, options?: RequestOptions): Promise<Message> {
+    return this.core.call<Message>("POST", `/v1/messages/${encodeURIComponent(id)}/cancel`, { query: undefined, json: undefined }, options);
+  }
+
+  /** Read a message with its timeline. */
+  get(id: string, options?: RequestOptions): Promise<Message> {
+    return this.core.call<Message>("GET", `/v1/messages/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
+  }
+
+  /** List messages, newest first. */
+  list(query?: MessagesListQuery, options?: RequestOptions): Promise<MessagesListData> {
+    return this.core.call<MessagesListData>("GET", `/v1/messages`, { query: query as unknown as Record<string, unknown> | undefined, json: undefined }, options);
+  }
+
+  /** Every item of list, page after page (follows next_cursor). */
+  listAll(query?: Omit<MessagesListQuery, "cursor">, options?: RequestOptions): AsyncIterable<Message> {
+    return this.core.paginate<Message>(`/v1/messages`, query as unknown as Record<string, unknown> | undefined, options);
+  }
+
+  /** Send a message on any channel (202): queued, then sent, delivered and read from carrier receipts; 1 api_messages_<channel>. */
+  send(body: MessageSend, options?: RequestOptions): Promise<Message> {
+    return this.core.call<Message>("POST", `/v1/messages`, { query: undefined, json: body }, options);
+  }
+
+  /** Send up to 1000 messages as one job (202). */
+  sendBatch(body: MessageBatch, options?: RequestOptions): Promise<MessageBatchAccepted> {
+    return this.core.call<MessageBatchAccepted>("POST", `/v1/messages/batch`, { query: undefined, json: body }, options);
+  }
+
+}
+
+/** . */
+export class OtpResource {
+  constructor(private readonly core: Core) {}
+
+  /** Send a pending OTP again with a new code (3 times, 30 seconds apart). */
+  resend(body: OTPResend, options?: RequestOptions): Promise<OTP> {
+    return this.core.call<OTP>("POST", `/v1/otp/resend`, { query: undefined, json: body }, options);
+  }
+
+  /** Send a one-time code (202); the code is never answered (test: 123456). */
+  send(body: OTPSend, options?: RequestOptions): Promise<OTP> {
+    return this.core.call<OTP>("POST", `/v1/otp/send`, { query: undefined, json: body }, options);
+  }
+
+  /** Check a code: fails closed after max_attempts; 1 api_otp_verifications per check. */
+  verify(body: OTPVerify, options?: RequestOptions): Promise<OTPVerified> {
+    return this.core.call<OTPVerified>("POST", `/v1/otp/verify`, { query: undefined, json: body }, options);
+  }
+
+}
+
+/** . */
 export class RequestsResource {
   constructor(private readonly core: Core) {}
 
   /** What the request log recorded for one request, and its provider path. */
   get(requestId: string, options?: RequestOptions): Promise<RequestRecord> {
     return this.core.call<RequestRecord>("GET", `/v1/requests/${encodeURIComponent(requestId)}`, { query: undefined, json: undefined }, options);
+  }
+
+}
+
+/** . */
+export class SendersResource {
+  constructor(private readonly core: Core) {}
+
+  /** Add a sender (pending until verified). */
+  create(body: MessageSenderCreate, options?: RequestOptions): Promise<MessageSender> {
+    return this.core.call<MessageSender>("POST", `/v1/messages/senders`, { query: undefined, json: body }, options);
+  }
+
+  /** Delete a sender and its credentials. */
+  delete(id: string, options?: RequestOptions): Promise<Deleted> {
+    return this.core.call<Deleted>("DELETE", `/v1/messages/senders/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
+  }
+
+  /** Read a sender with what verifying it found. */
+  get(id: string, options?: RequestOptions): Promise<MessageSender> {
+    return this.core.call<MessageSender>("GET", `/v1/messages/senders/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
+  }
+
+  /** List senders, newest first. */
+  list(query?: SendersListQuery, options?: RequestOptions): Promise<SendersListData> {
+    return this.core.call<SendersListData>("GET", `/v1/messages/senders`, { query: query as unknown as Record<string, unknown> | undefined, json: undefined }, options);
+  }
+
+  /** Every item of list, page after page (follows next_cursor). */
+  listAll(query?: Omit<SendersListQuery, "cursor">, options?: RequestOptions): AsyncIterable<MessageSender> {
+    return this.core.paginate<MessageSender>(`/v1/messages/senders`, query as unknown as Record<string, unknown> | undefined, options);
+  }
+
+  /** Verify a sender (202): DNS records for an email domain, the number at the BSP, push credentials, the DLT header; at once in test. */
+  verify(id: string, options?: RequestOptions): Promise<MessageSender> {
+    return this.core.call<MessageSender>("POST", `/v1/messages/senders/${encodeURIComponent(id)}/verify`, { query: undefined, json: undefined }, options);
   }
 
 }
@@ -5974,6 +6671,32 @@ export class SignTemplatesResource {
   /** Change a template's name, title, options or metadata. */
   update(id: string, body: SignTemplatePatch, options?: RequestOptions): Promise<SignTemplate> {
     return this.core.call<SignTemplate>("PATCH", `/v1/sign/templates/${encodeURIComponent(id)}`, { query: undefined, json: body }, options);
+  }
+
+}
+
+/** . */
+export class SuppressionsResource {
+  constructor(private readonly core: Core) {}
+
+  /** Suppress a recipient for marketing on a channel. */
+  create(body: SuppressionCreate, options?: RequestOptions): Promise<Suppression> {
+    return this.core.call<Suppression>("POST", `/v1/messages/suppressions`, { query: undefined, json: body }, options);
+  }
+
+  /** Let marketing reach the recipient again. */
+  delete(id: string, options?: RequestOptions): Promise<Deleted> {
+    return this.core.call<Deleted>("DELETE", `/v1/messages/suppressions/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
+  }
+
+  /** List suppressions, newest first. */
+  list(query?: SuppressionsListQuery, options?: RequestOptions): Promise<SuppressionsListData> {
+    return this.core.call<SuppressionsListData>("GET", `/v1/messages/suppressions`, { query: query as unknown as Record<string, unknown> | undefined, json: undefined }, options);
+  }
+
+  /** Every item of list, page after page (follows next_cursor). */
+  listAll(query?: Omit<SuppressionsListQuery, "cursor">, options?: RequestOptions): AsyncIterable<Suppression> {
+    return this.core.paginate<Suppression>(`/v1/messages/suppressions`, query as unknown as Record<string, unknown> | undefined, options);
   }
 
 }
@@ -6151,13 +6874,23 @@ export class GeneratedClient {
   /** . */
   readonly keys: KeysResource;
   /** . */
+  readonly messageTemplates: MessageTemplatesResource;
+  /** . */
+  readonly messages: MessagesResource;
+  /** . */
+  readonly otp: OtpResource;
+  /** . */
   readonly requests: RequestsResource;
+  /** . */
+  readonly senders: SendersResource;
   /** Environment settings. */
   readonly settings: SettingsResource;
   /** . */
   readonly sign: SignResource;
   /** . */
   readonly signTemplates: SignTemplatesResource;
+  /** . */
+  readonly suppressions: SuppressionsResource;
   /** Stored render templates. */
   readonly templates: TemplatesResource;
   /** Usage and balance. */
@@ -6177,10 +6910,15 @@ export class GeneratedClient {
     this.files = new FilesResource(core);
     this.jobs = new JobsResource(core);
     this.keys = new KeysResource(core);
+    this.messageTemplates = new MessageTemplatesResource(core);
+    this.messages = new MessagesResource(core);
+    this.otp = new OtpResource(core);
     this.requests = new RequestsResource(core);
+    this.senders = new SendersResource(core);
     this.settings = new SettingsResource(core);
     this.sign = new SignResource(core);
     this.signTemplates = new SignTemplatesResource(core);
+    this.suppressions = new SuppressionsResource(core);
     this.templates = new TemplatesResource(core);
     this.usage = new UsageResource(core);
     this.webhooks = new WebhooksResource(core);

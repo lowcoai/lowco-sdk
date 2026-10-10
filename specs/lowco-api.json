@@ -1096,6 +1096,51 @@
         },
         "type": "object"
       },
+      "DNSRecord": {
+        "additionalProperties": false,
+        "description": "A DNS record an email domain publishes",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "spf",
+              "dkim",
+              "dmarc",
+              "return_path"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "verified",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "TXT",
+              "CNAME",
+              "MX"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "purpose",
+          "status",
+          "type",
+          "value"
+        ],
+        "type": "object"
+      },
       "DataHandling": {
         "additionalProperties": false,
         "description": "The data-handling page (UI-08). Operators maintain the providers' profiles; the list follows the live routes.",
@@ -1273,6 +1318,12 @@
             "type": "boolean"
           },
           "file_id": {
+            "type": "string"
+          },
+          "sender_id": {
+            "type": "string"
+          },
+          "suppression_id": {
             "type": "string"
           },
           "template_id": {
@@ -2328,7 +2379,7 @@
           "message_not_found": {
             "action": "Check the id and the environment of the key.",
             "status": 404,
-            "when": "No message with this id exists in this environment."
+            "when": "No message, sender, suppression or OTP with this id exists in this environment."
           },
           "method_not_allowed": {
             "action": "Use the method the API reference shows.",
@@ -2426,9 +2477,9 @@
             "when": "The message template is not approved."
           },
           "template_not_found": {
-            "action": "List templates with GET /v1/render/templates.",
+            "action": "List templates with GET /v1/render/templates, /v1/sign/templates or /v1/messages/templates.",
             "status": 404,
-            "when": "No render template (or version) with this id exists in this environment."
+            "when": "No render template (or version), signing template or message template with this id exists in this environment."
           },
           "timeout": {
             "action": "Retry with ?mode=async to run it as a job.",
@@ -3052,6 +3103,10 @@
                 },
                 "type": "array"
               },
+              "messages": {
+                "description": "A message batch's rows",
+                "type": "integer"
+              },
               "pages": {
                 "type": "integer"
               },
@@ -3062,6 +3117,10 @@
               "send": {
                 "description": "A sign bulk job sends each request",
                 "type": "boolean"
+              },
+              "skipped": {
+                "description": "A message batch's marketing rows to suppressed recipients, skipped",
+                "type": "integer"
               },
               "template_id": {
                 "description": "A sign bulk job's template",
@@ -4010,6 +4069,1154 @@
         ],
         "type": "object"
       },
+      "Message": {
+        "additionalProperties": false,
+        "description": "A message. The recipient is masked; the carrier is never disclosed",
+        "properties": {
+          "attachments": {
+            "description": "Stored file ids",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "batch_id": {
+            "description": "The batch's job, when sent in one",
+            "type": "string"
+          },
+          "cancelled_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "transactional",
+              "otp",
+              "marketing"
+            ],
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "sms",
+              "whatsapp",
+              "email",
+              "push"
+            ],
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "credited": {
+            "description": "The message's usage was credited back (a failure Lowco or the carrier caused, or a cancellation)",
+            "type": "boolean"
+          },
+          "delivered_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "failed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "failure": {
+            "$ref": "#/components/schemas/MessageFailure"
+          },
+          "language": {
+            "type": "string"
+          },
+          "message_id": {
+            "description": "msg_…",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "maxLength": 500,
+              "type": "string"
+            },
+            "description": "Your keys and values, returned in answers and webhooks",
+            "maxProperties": 20,
+            "type": "object"
+          },
+          "otp_id": {
+            "description": "The OTP it carries",
+            "type": "string"
+          },
+          "queued_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "read_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reference_id": {
+            "type": "string"
+          },
+          "scheduled_at": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "sent_at": {
+            "description": "The carrier accepted it",
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "description": "scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only)",
+            "enum": [
+              "scheduled",
+              "queued",
+              "sent",
+              "delivered",
+              "read",
+              "failed",
+              "undeliverable",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "template": {
+            "description": "The template's name",
+            "type": "string"
+          },
+          "template_id": {
+            "type": "string"
+          },
+          "timeline": {
+            "description": "GET /v1/messages/{id} only",
+            "items": {
+              "$ref": "#/components/schemas/MessageEvent"
+            },
+            "type": "array"
+          },
+          "to": {
+            "description": "Masked",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "channel",
+          "created_at",
+          "message_id",
+          "scheduled_at",
+          "status",
+          "to",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "MessageBatch": {
+        "additionalProperties": false,
+        "description": "Up to 1000 messages, accepted as one job",
+        "properties": {
+          "callback_url": {
+            "description": "https URL for the batch job's webhook",
+            "type": "string"
+          },
+          "messages": {
+            "description": "1 to 1000; every row is checked first (all or nothing), except marketing rows to suppressed recipients, which are skipped",
+            "items": {
+              "$ref": "#/components/schemas/MessageSend"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "messages"
+        ],
+        "type": "object"
+      },
+      "MessageBatchAccepted": {
+        "additionalProperties": false,
+        "description": "The batch's job (it succeeds once every message has left the queue) and each row",
+        "properties": {
+          "accepted": {
+            "type": "integer"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "messages": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "status": {
+                  "description": "scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only)",
+                  "enum": [
+                    "scheduled",
+                    "queued",
+                    "sent",
+                    "delivered",
+                    "read",
+                    "failed",
+                    "undeliverable",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "message_id",
+                "status"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "skipped": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "reason": {
+                  "enum": [
+                    "suppressed"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "reason"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "processing",
+              "succeeded"
+            ],
+            "type": "string"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted",
+          "job_id",
+          "messages",
+          "skipped",
+          "status",
+          "total"
+        ],
+        "type": "object"
+      },
+      "MessageEvent": {
+        "additionalProperties": false,
+        "description": "A step of the message's timeline",
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "provider_code": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "description": "scheduled → queued → sent → delivered → read; or failed, undeliverable, cancelled (scheduled only)",
+            "enum": [
+              "scheduled",
+              "queued",
+              "sent",
+              "delivered",
+              "read",
+              "failed",
+              "undeliverable",
+              "cancelled"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "status"
+        ],
+        "type": "object"
+      },
+      "MessageFailure": {
+        "additionalProperties": false,
+        "description": "Why a message failed",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "provider_code": {
+            "description": "The carrier's own code",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Credited back when Lowco or the carrier caused it: carrier_error, provider_unavailable, internal_error, expired",
+            "enum": [
+              "invalid_recipient",
+              "blocked",
+              "rejected",
+              "expired",
+              "carrier_error",
+              "provider_unavailable",
+              "internal_error",
+              "not_on_channel",
+              "token_unregistered"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "MessageSend": {
+        "additionalProperties": false,
+        "description": "A message to send: a template with its variables, or the channel's raw content",
+        "properties": {
+          "attachments": {
+            "description": "email: at most 10 files (file_id, file_url or file_base64), 25 MB together",
+            "items": {
+              "$ref": "#/components/schemas/FileRef"
+            },
+            "type": "array"
+          },
+          "body": {
+            "description": "push",
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "callback_url": {
+            "description": "https URL for this message's events, instead of the environment's webhook endpoints",
+            "type": "string"
+          },
+          "category": {
+            "description": "Default transactional. marketing to a suppressed recipient is refused (422 suppressed); WhatsApp marketing needs an approved template",
+            "enum": [
+              "transactional",
+              "otp",
+              "marketing"
+            ],
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "sms",
+              "whatsapp",
+              "email",
+              "push"
+            ],
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "A push's data payload",
+            "maxProperties": 20,
+            "type": "object"
+          },
+          "html": {
+            "description": "email (at most 500 KB)",
+            "type": "string"
+          },
+          "language": {
+            "description": "Picks the template in this language (default en)",
+            "pattern": "^[a-z]{2}(_[A-Z]{2})?$",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "maxLength": 500,
+              "type": "string"
+            },
+            "description": "Your keys and values, returned in answers and webhooks",
+            "maxProperties": 20,
+            "type": "object"
+          },
+          "reference_id": {
+            "description": "Your id, to find the message by",
+            "maxLength": 120,
+            "type": "string"
+          },
+          "schedule_at": {
+            "description": "Send later (at most 30 days ahead); cancel until then",
+            "format": "date-time",
+            "type": "string"
+          },
+          "sender": {
+            "description": "The sender (snd_…): required for sms, whatsapp and push; an email without one goes from Lowco's address",
+            "type": "string"
+          },
+          "subject": {
+            "description": "email",
+            "maxLength": 300,
+            "type": "string"
+          },
+          "template": {
+            "description": "A template's id (mtp_…) or name on the channel; an SMS to an Indian number must use one (TRAI DLT)",
+            "type": "string"
+          },
+          "text": {
+            "description": "sms and whatsapp (a session reply within 24 hours of the customer's message); an email's plain part",
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "title": {
+            "description": "push",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "to": {
+            "description": "+E.164 or a 10-digit Indian mobile (sms, whatsapp), an email address, or the device's push token",
+            "type": "string"
+          },
+          "variables": {
+            "additionalProperties": {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            "description": "The template's {{variables}}",
+            "maxProperties": 50,
+            "type": "object"
+          }
+        },
+        "required": [
+          "channel",
+          "to"
+        ],
+        "type": "object"
+      },
+      "MessageSender": {
+        "additionalProperties": false,
+        "description": "A sender (never its credentials)",
+        "properties": {
+          "address": {
+            "description": "email: the From address",
+            "type": "string"
+          },
+          "bundle_id": {
+            "description": "push (apns)",
+            "type": "string"
+          },
+          "business_account_id": {
+            "description": "whatsapp: the WABA id (templates are submitted to it)",
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "sms",
+              "whatsapp",
+              "email",
+              "push"
+            ],
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "dlt_entity_id": {
+            "description": "sms: the DLT principal entity id",
+            "type": "string"
+          },
+          "domain": {
+            "description": "email: the domain (from address when omitted); SPF, DKIM and DMARC are checked on it",
+            "type": "string"
+          },
+          "failure_reason": {
+            "type": "string"
+          },
+          "from_name": {
+            "description": "email",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "has_credentials": {
+            "type": "boolean"
+          },
+          "header": {
+            "description": "sms: the 6-letter DLT sender id",
+            "pattern": "^[A-Z]{6}$",
+            "type": "string"
+          },
+          "key_id": {
+            "description": "push (apns): the .p8 key's id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "phone_number": {
+            "description": "whatsapp: the business number, +E.164",
+            "type": "string"
+          },
+          "phone_number_id": {
+            "description": "whatsapp: the number's id in the WhatsApp Business Account",
+            "type": "string"
+          },
+          "platform": {
+            "description": "push",
+            "enum": [
+              "fcm",
+              "apns"
+            ],
+            "type": "string"
+          },
+          "project_id": {
+            "description": "push (fcm): the Firebase project",
+            "type": "string"
+          },
+          "reply_to": {
+            "description": "email",
+            "type": "string"
+          },
+          "sandbox": {
+            "description": "push (apns): Apple's development environment",
+            "type": "boolean"
+          },
+          "sender_id": {
+            "description": "snd_…",
+            "type": "string"
+          },
+          "status": {
+            "description": "A message needs a verified sender (422 sender_not_verified)",
+            "enum": [
+              "pending",
+              "verified",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "team_id": {
+            "description": "push (apns)",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/SenderVerification"
+          },
+          "verified_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel",
+          "created_at",
+          "name",
+          "sender_id",
+          "status",
+          "updated_at",
+          "verification"
+        ],
+        "type": "object"
+      },
+      "MessageSenderCreate": {
+        "additionalProperties": false,
+        "description": "A sender",
+        "properties": {
+          "address": {
+            "description": "email: the From address",
+            "type": "string"
+          },
+          "bundle_id": {
+            "description": "push (apns)",
+            "type": "string"
+          },
+          "business_account_id": {
+            "description": "whatsapp: the WABA id (templates are submitted to it)",
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "sms",
+              "whatsapp",
+              "email",
+              "push"
+            ],
+            "type": "string"
+          },
+          "credentials": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "push: service_account_json (fcm) or private_key (apns, the .p8 PEM). Sealed; never answered",
+            "type": "object",
+            "writeOnly": true
+          },
+          "dlt_entity_id": {
+            "description": "sms: the DLT principal entity id",
+            "type": "string"
+          },
+          "domain": {
+            "description": "email: the domain (from address when omitted); SPF, DKIM and DMARC are checked on it",
+            "type": "string"
+          },
+          "from_name": {
+            "description": "email",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "header": {
+            "description": "sms: the 6-letter DLT sender id",
+            "pattern": "^[A-Z]{6}$",
+            "type": "string"
+          },
+          "key_id": {
+            "description": "push (apns): the .p8 key's id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "phone_number": {
+            "description": "whatsapp: the business number, +E.164",
+            "type": "string"
+          },
+          "phone_number_id": {
+            "description": "whatsapp: the number's id in the WhatsApp Business Account",
+            "type": "string"
+          },
+          "platform": {
+            "description": "push",
+            "enum": [
+              "fcm",
+              "apns"
+            ],
+            "type": "string"
+          },
+          "project_id": {
+            "description": "push (fcm): the Firebase project",
+            "type": "string"
+          },
+          "reply_to": {
+            "description": "email",
+            "type": "string"
+          },
+          "sandbox": {
+            "description": "push (apns): Apple's development environment",
+            "type": "boolean"
+          },
+          "team_id": {
+            "description": "push (apns)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel",
+          "name"
+        ],
+        "type": "object"
+      },
+      "MessageTemplate": {
+        "additionalProperties": false,
+        "description": "A message template",
+        "properties": {
+          "approval_status": {
+            "description": "WhatsApp templates are pending until Meta approves them; sms, email and push need no approval",
+            "enum": [
+              "not_required",
+              "pending",
+              "approved",
+              "rejected"
+            ],
+            "type": "string"
+          },
+          "body": {
+            "description": "sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders",
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "buttons": {
+            "description": "At most 10",
+            "items": {
+              "additionalProperties": false,
+              "description": "whatsapp",
+              "properties": {
+                "phone": {
+                  "type": "string"
+                },
+                "text": {
+                  "maxLength": 25,
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "quick_reply",
+                    "url",
+                    "phone_number"
+                  ],
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "type"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "category": {
+            "description": "whatsapp: Meta's category",
+            "enum": [
+              "marketing",
+              "utility",
+              "authentication"
+            ],
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "sms",
+              "whatsapp",
+              "email",
+              "push"
+            ],
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "dlt_entity_id": {
+            "description": "sms: the DLT principal entity id",
+            "type": "string"
+          },
+          "dlt_template_id": {
+            "description": "sms: the DLT template id (12 to 25 digits)",
+            "type": "string"
+          },
+          "footer": {
+            "description": "whatsapp",
+            "maxLength": 60,
+            "type": "string"
+          },
+          "header": {
+            "additionalProperties": false,
+            "description": "whatsapp",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "text",
+                  "image",
+                  "document",
+                  "video"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          "html": {
+            "description": "email",
+            "type": "string"
+          },
+          "language": {
+            "description": "Default en",
+            "pattern": "^[a-z]{2}(_[A-Z]{2})?$",
+            "type": "string"
+          },
+          "name": {
+            "description": "Unique per channel and language",
+            "pattern": "^[a-z0-9_]{1,100}$",
+            "type": "string"
+          },
+          "rejection_reason": {
+            "description": "Meta's reason, when rejected",
+            "type": "string"
+          },
+          "sender": {
+            "description": "whatsapp: the sender whose business account approves it",
+            "type": "string"
+          },
+          "subject": {
+            "description": "email",
+            "maxLength": 300,
+            "type": "string"
+          },
+          "submitted_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "synced_at": {
+            "description": "When the approval was last read from Meta",
+            "format": "date-time",
+            "type": "string"
+          },
+          "template_id": {
+            "description": "mtp_…",
+            "type": "string"
+          },
+          "text": {
+            "description": "email: the plain part",
+            "type": "string"
+          },
+          "title": {
+            "description": "push",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "variables": {
+            "description": "Declared variables (inferred from the placeholders when omitted)",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "example": {
+                  "description": "Required for whatsapp (Meta reviews it)",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "approval_status",
+          "channel",
+          "created_at",
+          "language",
+          "name",
+          "template_id",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "MessageTemplateCreate": {
+        "additionalProperties": false,
+        "description": "A template",
+        "properties": {
+          "body": {
+            "description": "sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders",
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "buttons": {
+            "description": "At most 10",
+            "items": {
+              "additionalProperties": false,
+              "description": "whatsapp",
+              "properties": {
+                "phone": {
+                  "type": "string"
+                },
+                "text": {
+                  "maxLength": 25,
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "quick_reply",
+                    "url",
+                    "phone_number"
+                  ],
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "type"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "category": {
+            "description": "whatsapp: Meta's category",
+            "enum": [
+              "marketing",
+              "utility",
+              "authentication"
+            ],
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "sms",
+              "whatsapp",
+              "email",
+              "push"
+            ],
+            "type": "string"
+          },
+          "dlt_entity_id": {
+            "description": "sms: the DLT principal entity id",
+            "type": "string"
+          },
+          "dlt_template_id": {
+            "description": "sms: the DLT template id (12 to 25 digits)",
+            "type": "string"
+          },
+          "footer": {
+            "description": "whatsapp",
+            "maxLength": 60,
+            "type": "string"
+          },
+          "header": {
+            "additionalProperties": false,
+            "description": "whatsapp",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "text",
+                  "image",
+                  "document",
+                  "video"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          "html": {
+            "description": "email",
+            "type": "string"
+          },
+          "language": {
+            "description": "Default en",
+            "pattern": "^[a-z]{2}(_[A-Z]{2})?$",
+            "type": "string"
+          },
+          "name": {
+            "description": "Unique per channel and language",
+            "pattern": "^[a-z0-9_]{1,100}$",
+            "type": "string"
+          },
+          "sender": {
+            "description": "whatsapp: the sender whose business account approves it",
+            "type": "string"
+          },
+          "subject": {
+            "description": "email",
+            "maxLength": 300,
+            "type": "string"
+          },
+          "text": {
+            "description": "email: the plain part",
+            "type": "string"
+          },
+          "title": {
+            "description": "push",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "variables": {
+            "description": "Declared variables (inferred from the placeholders when omitted)",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "example": {
+                  "description": "Required for whatsapp (Meta reviews it)",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "channel",
+          "name"
+        ],
+        "type": "object"
+      },
+      "MessageTemplatePatch": {
+        "additionalProperties": false,
+        "description": "The fields to change (channel, name and language identify a template and stay); an edited WhatsApp template is submitted to Meta again",
+        "properties": {
+          "body": {
+            "description": "sms: the text registered on DLT; whatsapp: the body; push: the notification's body. {{name}} placeholders",
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "buttons": {
+            "description": "At most 10",
+            "items": {
+              "additionalProperties": false,
+              "description": "whatsapp",
+              "properties": {
+                "phone": {
+                  "type": "string"
+                },
+                "text": {
+                  "maxLength": 25,
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "quick_reply",
+                    "url",
+                    "phone_number"
+                  ],
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "type"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "category": {
+            "description": "whatsapp: Meta's category",
+            "enum": [
+              "marketing",
+              "utility",
+              "authentication"
+            ],
+            "type": "string"
+          },
+          "dlt_entity_id": {
+            "description": "sms: the DLT principal entity id",
+            "type": "string"
+          },
+          "dlt_template_id": {
+            "description": "sms: the DLT template id (12 to 25 digits)",
+            "type": "string"
+          },
+          "footer": {
+            "description": "whatsapp",
+            "maxLength": 60,
+            "type": "string"
+          },
+          "header": {
+            "additionalProperties": false,
+            "description": "whatsapp",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "text",
+                  "image",
+                  "document",
+                  "video"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          "html": {
+            "description": "email",
+            "type": "string"
+          },
+          "sender": {
+            "description": "whatsapp: the sender whose business account approves it",
+            "type": "string"
+          },
+          "subject": {
+            "description": "email",
+            "maxLength": 300,
+            "type": "string"
+          },
+          "text": {
+            "description": "email: the plain part",
+            "type": "string"
+          },
+          "title": {
+            "description": "push",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "variables": {
+            "description": "Declared variables (inferred from the placeholders when omitted)",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "example": {
+                  "description": "Required for whatsapp (Meta reviews it)",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "OCRPage": {
         "additionalProperties": false,
         "properties": {
@@ -4152,6 +5359,221 @@
           "page_count",
           "pages",
           "text"
+        ],
+        "type": "object"
+      },
+      "OTP": {
+        "additionalProperties": false,
+        "description": "An OTP (never its code)",
+        "properties": {
+          "attempts_remaining": {
+            "type": "integer"
+          },
+          "channel": {
+            "enum": [
+              "sms",
+              "whatsapp",
+              "email",
+              "push"
+            ],
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "message_id": {
+            "description": "The message carrying the latest code",
+            "type": "string"
+          },
+          "otp_id": {
+            "description": "otp_…",
+            "type": "string"
+          },
+          "reference_id": {
+            "type": "string"
+          },
+          "resend_after": {
+            "description": "Resends are 30 seconds apart",
+            "format": "date-time",
+            "type": "string"
+          },
+          "resends_remaining": {
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "verified",
+              "failed",
+              "expired"
+            ],
+            "type": "string"
+          },
+          "test_code": {
+            "description": "Test environment only: the code (123456, its first length digits)",
+            "type": "string"
+          },
+          "to": {
+            "description": "Masked",
+            "type": "string"
+          },
+          "verified_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attempts_remaining",
+          "channel",
+          "created_at",
+          "expires_at",
+          "message_id",
+          "otp_id",
+          "resends_remaining",
+          "status",
+          "to"
+        ],
+        "type": "object"
+      },
+      "OTPResend": {
+        "additionalProperties": false,
+        "properties": {
+          "otp_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "otp_id"
+        ],
+        "type": "object"
+      },
+      "OTPSend": {
+        "additionalProperties": false,
+        "description": "Send a one-time code",
+        "properties": {
+          "channel": {
+            "enum": [
+              "sms",
+              "whatsapp",
+              "email"
+            ],
+            "type": "string"
+          },
+          "length": {
+            "default": 6,
+            "maximum": 8,
+            "minimum": 4,
+            "type": "integer"
+          },
+          "max_attempts": {
+            "default": 3,
+            "maximum": 5,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "maxLength": 500,
+              "type": "string"
+            },
+            "description": "Your keys and values, returned in answers and webhooks",
+            "maxProperties": 20,
+            "type": "object"
+          },
+          "reference_id": {
+            "maxLength": 120,
+            "type": "string"
+          },
+          "sender": {
+            "description": "Required for sms and whatsapp",
+            "type": "string"
+          },
+          "template": {
+            "description": "A template with {{code}} (and optionally {{ttl_minutes}}): required for an SMS to an Indian number and for WhatsApp (an authentication template)",
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "ttl_seconds": {
+            "default": 300,
+            "maximum": 900,
+            "minimum": 60,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "channel",
+          "to"
+        ],
+        "type": "object"
+      },
+      "OTPVerified": {
+        "additionalProperties": false,
+        "description": "Verified, or why not; the last wrong attempt fails the OTP closed",
+        "properties": {
+          "attempts_remaining": {
+            "type": "integer"
+          },
+          "otp_id": {
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "incorrect",
+              "expired",
+              "attempts_exhausted",
+              "already_verified"
+            ],
+            "type": "string"
+          },
+          "reference_id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "verified",
+              "failed",
+              "expired"
+            ],
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "verified_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attempts_remaining",
+          "otp_id",
+          "status",
+          "verified"
+        ],
+        "type": "object"
+      },
+      "OTPVerify": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "pattern": "^[0-9]{4,8}$",
+            "type": "string"
+          },
+          "otp_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "otp_id"
         ],
         "type": "object"
       },
@@ -6587,6 +8009,32 @@
         ],
         "type": "object"
       },
+      "ReceiptsAccepted": {
+        "additionalProperties": false,
+        "description": "What a carrier's callback carried",
+        "properties": {
+          "applied": {
+            "type": "integer"
+          },
+          "pending": {
+            "description": "For a message whose send result has not arrived yet (applied when it does)",
+            "type": "integer"
+          },
+          "received": {
+            "type": "integer"
+          },
+          "stale": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "applied",
+          "pending",
+          "received",
+          "stale"
+        ],
+        "type": "object"
+      },
       "RenderDocxRequest": {
         "additionalProperties": false,
         "description": "Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.",
@@ -7369,6 +8817,34 @@
           "input_hours",
           "output_hours"
         ],
+        "type": "object"
+      },
+      "SenderVerification": {
+        "additionalProperties": false,
+        "description": "What verifying the sender found",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "checks": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "description": "spf, dkim, dmarc, phone_number, credentials, dlt_header",
+            "type": "object"
+          },
+          "message": {
+            "type": "string"
+          },
+          "records": {
+            "description": "email: the records to publish",
+            "items": {
+              "$ref": "#/components/schemas/DNSRecord"
+            },
+            "type": "array"
+          }
+        },
         "type": "object"
       },
       "Settings": {
@@ -9492,6 +10968,96 @@
             "type": "integer"
           }
         },
+        "type": "object"
+      },
+      "Suppression": {
+        "additionalProperties": false,
+        "description": "A suppressed recipient",
+        "properties": {
+          "channel": {
+            "enum": [
+              "sms",
+              "whatsapp",
+              "email",
+              "push"
+            ],
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "message_id": {
+            "description": "The message that caused it",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "unsubscribed",
+              "bounced",
+              "complained",
+              "manual"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "description": "api: you; carrier: a bounce, complaint, opt-out or unsubscribe link",
+            "enum": [
+              "api",
+              "carrier"
+            ],
+            "type": "string"
+          },
+          "suppression_id": {
+            "description": "sup_…",
+            "type": "string"
+          },
+          "to": {
+            "description": "Masked",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel",
+          "created_at",
+          "reason",
+          "source",
+          "suppression_id",
+          "to"
+        ],
+        "type": "object"
+      },
+      "SuppressionCreate": {
+        "additionalProperties": false,
+        "description": "A recipient marketing must not reach on a channel",
+        "properties": {
+          "channel": {
+            "enum": [
+              "sms",
+              "whatsapp",
+              "email",
+              "push"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "description": "Default manual",
+            "enum": [
+              "unsubscribed",
+              "bounced",
+              "complained",
+              "manual"
+            ],
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel",
+          "to"
+        ],
         "type": "object"
       },
       "TablesResult": {
@@ -21267,6 +22833,3616 @@
         "x-lowco-scope": "api.platform.settings.write"
       }
     },
+    "/v1/messages": {
+      "get": {
+        "operationId": "messages_list",
+        "parameters": [
+          {
+            "description": "",
+            "in": "query",
+            "name": "channel",
+            "schema": {
+              "enum": [
+                "sms",
+                "whatsapp",
+                "email",
+                "push"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "",
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "enum": [
+                "scheduled",
+                "queued",
+                "sent",
+                "delivered",
+                "read",
+                "failed",
+                "undeliverable",
+                "cancelled"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "",
+            "in": "query",
+            "name": "reference_id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A recipient (needs channel)",
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A batch's job id",
+            "in": "query",
+            "name": "batch_id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "",
+            "in": "query",
+            "name": "created_after",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "",
+            "in": "query",
+            "name": "created_before",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "page": {
+                    "summary": "A page",
+                    "value": {
+                      "data": {
+                        "items": [
+                          {
+                            "category": "transactional",
+                            "channel": "sms",
+                            "created_at": "2027-01-10T09:00:00Z",
+                            "delivered_at": "2027-01-10T09:00:04Z",
+                            "language": "en",
+                            "message_id": "msg_01JC1A2B3C4D5E6F7G8H9J0K1M",
+                            "metadata": {
+                              "employee_id": "E-1042"
+                            },
+                            "queued_at": "2027-01-10T09:00:00Z",
+                            "reference_id": "emp-1042",
+                            "scheduled_at": null,
+                            "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N",
+                            "sent_at": "2027-01-10T09:00:01Z",
+                            "status": "delivered",
+                            "template": "payslip_ready",
+                            "template_id": "mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K",
+                            "to": "+91******3210",
+                            "updated_at": "2027-01-10T09:00:04Z"
+                          }
+                        ],
+                        "next_cursor": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "description": "A page; pass next_cursor as cursor for the next one (null at the end).",
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "$ref": "#/components/schemas/Message"
+                          },
+                          "type": "array"
+                        },
+                        "next_cursor": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "next_cursor"
+                      ],
+                      "type": "object"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "A page",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "to": {
+                    "summary": "to without channel",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_param",
+                        "message": "Filtering by to needs channel.",
+                        "param": "to",
+                        "reason": "invalid_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "List messages, newest first",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.read"
+      },
+      "post": {
+        "operationId": "messages_send",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "email_raw": {
+                  "summary": "An email with an attachment",
+                  "value": {
+                    "attachments": [
+                      {
+                        "file_id": "file_01JA9C2M7Q4V8X3K6T1R5N0W2E"
+                      }
+                    ],
+                    "channel": "email",
+                    "html": "\u003cp\u003eYour invoice is attached.\u003c/p\u003e",
+                    "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0K",
+                    "subject": "Your invoice INV-1042",
+                    "to": "asha@example.in"
+                  }
+                },
+                "push": {
+                  "summary": "A push to an Android device",
+                  "value": {
+                    "body": "A-1042 arrives Friday",
+                    "channel": "push",
+                    "data": {
+                      "order": "A-1042"
+                    },
+                    "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0J",
+                    "title": "Order shipped",
+                    "to": "fcm-device-token-eXampleToken1234567890abcdef"
+                  }
+                },
+                "sms_template": {
+                  "summary": "An SMS from a DLT template",
+                  "value": {
+                    "channel": "sms",
+                    "metadata": {
+                      "employee_id": "E-1042"
+                    },
+                    "reference_id": "emp-1042",
+                    "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N",
+                    "template": "payslip_ready",
+                    "to": "+919876543210",
+                    "variables": {
+                      "month": "September",
+                      "name": "Asha"
+                    }
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/MessageSend"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "queued": {
+                    "summary": "Queued",
+                    "value": {
+                      "data": {
+                        "category": "transactional",
+                        "channel": "sms",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "language": "en",
+                        "message_id": "msg_01JC1A2B3C4D5E6F7G8H9J0K1M",
+                        "metadata": {
+                          "employee_id": "E-1042"
+                        },
+                        "queued_at": "2027-01-10T09:00:00Z",
+                        "reference_id": "emp-1042",
+                        "scheduled_at": null,
+                        "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N",
+                        "status": "queued",
+                        "template": "payslip_ready",
+                        "template_id": "mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K",
+                        "to": "+91******3210",
+                        "updated_at": "2027-01-10T09:00:00Z"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Message"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Accepted",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "dlt": {
+                    "summary": "An Indian SMS without a template",
+                    "value": {
+                      "error": {
+                        "code": 422,
+                        "details": [
+                          {
+                            "message": "An SMS to an Indian number must use a DLT-registered template.",
+                            "param": "template",
+                            "reason": "missing_param"
+                          }
+                        ],
+                        "doc_url": "https://docs.lowco.ai/api/errors#validation_failed",
+                        "message": "1 parameter is invalid. See details.",
+                        "param": "template",
+                        "reason": "validation_failed",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  },
+                  "not_approved": {
+                    "summary": "The WhatsApp template is pending",
+                    "value": {
+                      "error": {
+                        "code": 422,
+                        "doc_url": "https://docs.lowco.ai/api/errors#template_not_approved",
+                        "message": "Template order_shipped (mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K) is pending. WhatsApp sends only templates Meta approved.",
+                        "param": "template",
+                        "reason": "template_not_approved",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  },
+                  "not_verified": {
+                    "summary": "The sender is not verified",
+                    "value": {
+                      "error": {
+                        "code": 422,
+                        "doc_url": "https://docs.lowco.ai/api/errors#sender_not_verified",
+                        "message": "Sender snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N is pending. Verify it with POST /v1/messages/senders/snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N/verify before sending.",
+                        "param": "sender",
+                        "reason": "sender_not_verified",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  },
+                  "suppressed": {
+                    "summary": "Marketing to a suppressed address",
+                    "value": {
+                      "error": {
+                        "code": 422,
+                        "doc_url": "https://docs.lowco.ai/api/errors#suppressed",
+                        "message": "a***@example.in is suppressed on email (unsubscribed); marketing messages to it are refused.",
+                        "param": "to",
+                        "reason": "suppressed",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: consent_required, document_not_recognised, file_corrupt, file_rejected, file_url_forbidden, file_url_unreachable, idempotency_key_reused, invalid_identifier, invalid_password, password_required, schema_invalid, sender_not_verified, suppressed, template_not_approved, too_many_files, too_many_pages, validation_failed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Send a message on any channel (202): queued, then sent, delivered and read from carrier receipts; 1 api_messages_\u003cchannel\u003e",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.send"
+      }
+    },
+    "/v1/messages/batch": {
+      "post": {
+        "operationId": "messages_batch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "marketing": {
+                  "summary": "Three marketing emails",
+                  "value": {
+                    "callback_url": "https://acme.example/hooks/lowco",
+                    "messages": [
+                      {
+                        "category": "marketing",
+                        "channel": "email",
+                        "template": "festive_offer",
+                        "to": "asha@example.in",
+                        "variables": {
+                          "name": "Asha"
+                        }
+                      },
+                      {
+                        "category": "marketing",
+                        "channel": "email",
+                        "template": "festive_offer",
+                        "to": "optout@example.in",
+                        "variables": {
+                          "name": "Ravi"
+                        }
+                      },
+                      {
+                        "category": "marketing",
+                        "channel": "email",
+                        "template": "festive_offer",
+                        "to": "meera@example.in",
+                        "variables": {
+                          "name": "Meera"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/MessageBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "accepted": {
+                    "summary": "Two accepted, one suppressed row skipped",
+                    "value": {
+                      "data": {
+                        "accepted": 2,
+                        "job_id": "job_01JC1D2E3F4G5H6J7K8M9N0P1Q",
+                        "messages": [
+                          {
+                            "index": 0,
+                            "message_id": "msg_01JC1A2B3C4D5E6F7G8H9J0K1M",
+                            "status": "queued"
+                          },
+                          {
+                            "index": 2,
+                            "message_id": "msg_01JC1A2B3C4D5E6F7G8H9J0K1N",
+                            "status": "queued"
+                          }
+                        ],
+                        "skipped": [
+                          {
+                            "index": 1,
+                            "reason": "suppressed"
+                          }
+                        ],
+                        "status": "processing",
+                        "total": 3
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessageBatchAccepted"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Accepted",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "row": {
+                    "summary": "A row missing a variable",
+                    "value": {
+                      "error": {
+                        "code": 422,
+                        "details": [
+                          {
+                            "index": 2,
+                            "message": "The template needs \"name\".",
+                            "param": "messages[2].variables.name",
+                            "reason": "missing_param"
+                          }
+                        ],
+                        "doc_url": "https://docs.lowco.ai/api/errors#validation_failed",
+                        "message": "1 messages cannot be sent. See details.",
+                        "param": "messages[2].variables.name",
+                        "reason": "validation_failed",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: consent_required, document_not_recognised, file_corrupt, file_rejected, file_url_forbidden, file_url_unreachable, idempotency_key_reused, invalid_identifier, invalid_password, password_required, schema_invalid, sender_not_verified, suppressed, template_not_approved, too_many_files, too_many_pages, validation_failed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Send up to 1000 messages as one job (202)",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.send"
+      }
+    },
+    "/v1/messages/receipts/{provider}": {
+      "get": {
+        "operationId": "messages_receipts_challenge",
+        "parameters": [
+          {
+            "description": "The carrier's name in the carriers file (meta, resend, an SMS vendor)",
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "",
+            "in": "query",
+            "name": "hub.mode",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "",
+            "in": "query",
+            "name": "hub.verify_token",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "",
+            "in": "query",
+            "name": "hub.challenge",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "hub.challenge"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "token": {
+                    "summary": "A wrong verify token",
+                    "value": {
+                      "error": {
+                        "code": 401,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_key",
+                        "message": "The verify token does not match.",
+                        "reason": "invalid_key",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_key, key_expired, key_revoked, missing_key, token_expired.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "security": [],
+        "summary": "Meta's webhook subscription handshake (hub.challenge)",
+        "tags": [
+          "messages"
+        ]
+      },
+      "post": {
+        "operationId": "messages_receipts",
+        "parameters": [
+          {
+            "description": "The carrier's name in the carriers file (meta, resend, an SMS vendor)",
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "An SMS vendor's callback token, when it sends it in the query",
+            "in": "query",
+            "name": "token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "applied": {
+                    "summary": "Applied",
+                    "value": {
+                      "data": {
+                        "applied": 2,
+                        "pending": 0,
+                        "received": 2,
+                        "stale": 0
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ReceiptsAccepted"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Received",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "signature": {
+                    "summary": "A forged callback",
+                    "value": {
+                      "error": {
+                        "code": 401,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_key",
+                        "message": "The callback's signature does not verify.",
+                        "reason": "invalid_key",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_key, key_expired, key_revoked, missing_key, token_expired.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "security": [],
+        "summary": "A carrier's delivery receipts (no API key; the carrier's signature)",
+        "tags": [
+          "messages"
+        ]
+      }
+    },
+    "/v1/messages/senders": {
+      "get": {
+        "operationId": "message_senders_list",
+        "parameters": [
+          {
+            "description": "",
+            "in": "query",
+            "name": "channel",
+            "schema": {
+              "enum": [
+                "sms",
+                "whatsapp",
+                "email",
+                "push"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "",
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "enum": [
+                "pending",
+                "verified",
+                "failed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "page": {
+                    "summary": "A page",
+                    "value": {
+                      "data": {
+                        "items": [
+                          {
+                            "channel": "sms",
+                            "created_at": "2027-01-10T09:00:00Z",
+                            "dlt_entity_id": "1101161234567890123",
+                            "header": "ACMEHR",
+                            "name": "Acme HR",
+                            "sender_id": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N",
+                            "status": "verified",
+                            "updated_at": "2027-01-10T09:00:00Z",
+                            "verification": {
+                              "checked_at": "2027-01-10T09:00:00Z",
+                              "checks": {
+                                "dlt_header": true
+                              },
+                              "message": "The SMS vendor knows header ACMEHR."
+                            },
+                            "verified_at": "2027-01-10T09:00:00Z"
+                          },
+                          {
+                            "address": "billing@acme.example",
+                            "channel": "email",
+                            "created_at": "2027-01-10T09:00:00Z",
+                            "domain": "acme.example",
+                            "from_name": "Acme Billing",
+                            "name": "Acme billing",
+                            "sender_id": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0K",
+                            "status": "pending",
+                            "updated_at": "2027-01-10T09:00:00Z",
+                            "verification": {
+                              "checked_at": "2027-01-10T09:00:00Z",
+                              "checks": {
+                                "dkim": false,
+                                "dmarc": true,
+                                "spf": false
+                              },
+                              "message": "Publish the records below, then call verify again; DNS changes can take a few hours.",
+                              "records": [
+                                {
+                                  "name": "send.acme.example",
+                                  "purpose": "return_path",
+                                  "status": "pending",
+                                  "type": "MX",
+                                  "value": "feedback-smtp.ap-south-1.amazonses.com"
+                                },
+                                {
+                                  "name": "send.acme.example",
+                                  "purpose": "spf",
+                                  "status": "pending",
+                                  "type": "TXT",
+                                  "value": "v=spf1 include:amazonses.com ~all"
+                                },
+                                {
+                                  "name": "resend._domainkey.acme.example",
+                                  "purpose": "dkim",
+                                  "status": "pending",
+                                  "type": "TXT",
+                                  "value": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC…"
+                                },
+                                {
+                                  "name": "_dmarc.acme.example",
+                                  "purpose": "dmarc",
+                                  "status": "verified",
+                                  "type": "TXT",
+                                  "value": "v=DMARC1; p=none; rua=mailto:dmarc@acme.example"
+                                }
+                              ]
+                            }
+                          }
+                        ],
+                        "next_cursor": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "description": "A page; pass next_cursor as cursor for the next one (null at the end).",
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "$ref": "#/components/schemas/MessageSender"
+                          },
+                          "type": "array"
+                        },
+                        "next_cursor": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "next_cursor"
+                      ],
+                      "type": "object"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "A page",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "status": {
+                    "summary": "An unknown status",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_param",
+                        "message": "status is pending, verified or failed.",
+                        "param": "status",
+                        "reason": "invalid_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "List senders, newest first",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.senders.read"
+      },
+      "post": {
+        "operationId": "message_senders_create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "email": {
+                  "summary": "An email address on your domain",
+                  "value": {
+                    "address": "billing@acme.example",
+                    "channel": "email",
+                    "from_name": "Acme Billing",
+                    "name": "Acme billing"
+                  }
+                },
+                "push": {
+                  "summary": "An APNs app",
+                  "value": {
+                    "bundle_id": "example.acme.app",
+                    "channel": "push",
+                    "credentials": {
+                      "private_key": "-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMG…\n-----END PRIVATE KEY-----"
+                    },
+                    "key_id": "KEY1234567",
+                    "name": "Acme iOS",
+                    "platform": "apns",
+                    "team_id": "TEAM123456"
+                  }
+                },
+                "sms": {
+                  "summary": "A DLT header",
+                  "value": {
+                    "channel": "sms",
+                    "dlt_entity_id": "1101161234567890123",
+                    "header": "ACMEHR",
+                    "name": "Acme HR"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/MessageSenderCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "email": {
+                    "summary": "Pending: the records to publish",
+                    "value": {
+                      "data": {
+                        "address": "billing@acme.example",
+                        "channel": "email",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "domain": "acme.example",
+                        "from_name": "Acme Billing",
+                        "name": "Acme billing",
+                        "sender_id": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0K",
+                        "status": "pending",
+                        "updated_at": "2027-01-10T09:00:00Z",
+                        "verification": {
+                          "checked_at": "2027-01-10T09:00:00Z",
+                          "checks": {
+                            "dkim": false,
+                            "dmarc": true,
+                            "spf": false
+                          },
+                          "message": "Publish the records below, then call verify again; DNS changes can take a few hours.",
+                          "records": [
+                            {
+                              "name": "send.acme.example",
+                              "purpose": "return_path",
+                              "status": "pending",
+                              "type": "MX",
+                              "value": "feedback-smtp.ap-south-1.amazonses.com"
+                            },
+                            {
+                              "name": "send.acme.example",
+                              "purpose": "spf",
+                              "status": "pending",
+                              "type": "TXT",
+                              "value": "v=spf1 include:amazonses.com ~all"
+                            },
+                            {
+                              "name": "resend._domainkey.acme.example",
+                              "purpose": "dkim",
+                              "status": "pending",
+                              "type": "TXT",
+                              "value": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC…"
+                            },
+                            {
+                              "name": "_dmarc.acme.example",
+                              "purpose": "dmarc",
+                              "status": "verified",
+                              "type": "TXT",
+                              "value": "v=DMARC1; p=none; rua=mailto:dmarc@acme.example"
+                            }
+                          ]
+                        }
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessageSender"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The sender",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "header": {
+                    "summary": "A bad header",
+                    "value": {
+                      "error": {
+                        "code": 422,
+                        "details": [
+                          {
+                            "message": "header is the 6-letter DLT sender id (ACMEHR).",
+                            "param": "header",
+                            "reason": "invalid_param"
+                          }
+                        ],
+                        "doc_url": "https://docs.lowco.ai/api/errors#validation_failed",
+                        "message": "1 parameter is invalid. See details.",
+                        "param": "header",
+                        "reason": "validation_failed",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: consent_required, document_not_recognised, file_corrupt, file_rejected, file_url_forbidden, file_url_unreachable, idempotency_key_reused, invalid_identifier, invalid_password, password_required, schema_invalid, sender_not_verified, suppressed, template_not_approved, too_many_files, too_many_pages, validation_failed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Add a sender (pending until verified)",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.senders.write"
+      }
+    },
+    "/v1/messages/senders/{id}": {
+      "delete": {
+        "operationId": "message_senders_delete",
+        "parameters": [
+          {
+            "description": "snd_…",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "deleted": {
+                    "summary": "Deleted",
+                    "value": {
+                      "data": {
+                        "deleted": true,
+                        "sender_id": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Deleted"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Deleted",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "missing": {
+                    "summary": "No such sender",
+                    "value": {
+                      "error": {
+                        "code": 404,
+                        "doc_url": "https://docs.lowco.ai/api/errors#message_not_found",
+                        "message": "No sender snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N in this environment.",
+                        "param": "id",
+                        "reason": "message_not_found",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: delivery_not_found, file_not_found, job_not_found, key_not_found, message_not_found, request_not_found, route_not_found, template_not_found, webhook_not_found.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Delete a sender and its credentials",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.senders.write"
+      },
+      "get": {
+        "operationId": "message_senders_get",
+        "parameters": [
+          {
+            "description": "snd_…",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "verified": {
+                    "summary": "Verified",
+                    "value": {
+                      "data": {
+                        "channel": "sms",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "dlt_entity_id": "1101161234567890123",
+                        "header": "ACMEHR",
+                        "name": "Acme HR",
+                        "sender_id": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N",
+                        "status": "verified",
+                        "updated_at": "2027-01-10T09:00:00Z",
+                        "verification": {
+                          "checked_at": "2027-01-10T09:00:00Z",
+                          "checks": {
+                            "dlt_header": true
+                          },
+                          "message": "The SMS vendor knows header ACMEHR."
+                        },
+                        "verified_at": "2027-01-10T09:00:00Z"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessageSender"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The sender",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "missing": {
+                    "summary": "No such sender",
+                    "value": {
+                      "error": {
+                        "code": 404,
+                        "doc_url": "https://docs.lowco.ai/api/errors#message_not_found",
+                        "message": "No sender snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N in this environment.",
+                        "param": "id",
+                        "reason": "message_not_found",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: delivery_not_found, file_not_found, job_not_found, key_not_found, message_not_found, request_not_found, route_not_found, template_not_found, webhook_not_found.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Read a sender with what verifying it found",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.senders.read"
+      }
+    },
+    "/v1/messages/senders/{id}/verify": {
+      "post": {
+        "operationId": "message_senders_verify",
+        "parameters": [
+          {
+            "description": "snd_…",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "checking": {
+                    "summary": "Checking the domain's records",
+                    "value": {
+                      "data": {
+                        "address": "billing@acme.example",
+                        "channel": "email",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "domain": "acme.example",
+                        "from_name": "Acme Billing",
+                        "name": "Acme billing",
+                        "sender_id": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0K",
+                        "status": "pending",
+                        "updated_at": "2027-01-10T09:00:00Z",
+                        "verification": {
+                          "checked_at": "2027-01-10T09:00:00Z",
+                          "checks": {
+                            "dkim": false,
+                            "dmarc": true,
+                            "spf": false
+                          },
+                          "message": "Publish the records below, then call verify again; DNS changes can take a few hours.",
+                          "records": [
+                            {
+                              "name": "send.acme.example",
+                              "purpose": "return_path",
+                              "status": "pending",
+                              "type": "MX",
+                              "value": "feedback-smtp.ap-south-1.amazonses.com"
+                            },
+                            {
+                              "name": "send.acme.example",
+                              "purpose": "spf",
+                              "status": "pending",
+                              "type": "TXT",
+                              "value": "v=spf1 include:amazonses.com ~all"
+                            },
+                            {
+                              "name": "resend._domainkey.acme.example",
+                              "purpose": "dkim",
+                              "status": "pending",
+                              "type": "TXT",
+                              "value": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC…"
+                            },
+                            {
+                              "name": "_dmarc.acme.example",
+                              "purpose": "dmarc",
+                              "status": "verified",
+                              "type": "TXT",
+                              "value": "v=DMARC1; p=none; rua=mailto:dmarc@acme.example"
+                            }
+                          ]
+                        }
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessageSender"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Checking (or, in test, verified)",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "missing": {
+                    "summary": "No such sender",
+                    "value": {
+                      "error": {
+                        "code": 404,
+                        "doc_url": "https://docs.lowco.ai/api/errors#message_not_found",
+                        "message": "No sender snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N in this environment.",
+                        "param": "id",
+                        "reason": "message_not_found",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: delivery_not_found, file_not_found, job_not_found, key_not_found, message_not_found, request_not_found, route_not_found, template_not_found, webhook_not_found.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Verify a sender (202): DNS records for an email domain, the number at the BSP, push credentials, the DLT header; at once in test",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.senders.write"
+      }
+    },
+    "/v1/messages/suppressions": {
+      "get": {
+        "operationId": "message_suppressions_list",
+        "parameters": [
+          {
+            "description": "",
+            "in": "query",
+            "name": "channel",
+            "schema": {
+              "enum": [
+                "sms",
+                "whatsapp",
+                "email",
+                "push"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A recipient",
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "",
+            "in": "query",
+            "name": "reason",
+            "schema": {
+              "enum": [
+                "unsubscribed",
+                "bounced",
+                "complained",
+                "manual"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "page": {
+                    "summary": "A page",
+                    "value": {
+                      "data": {
+                        "items": [
+                          {
+                            "channel": "email",
+                            "created_at": "2027-01-10T09:00:00Z",
+                            "reason": "unsubscribed",
+                            "source": "api",
+                            "suppression_id": "sup_01JC1C2D3E4F5G6H7J8K9M0N1P",
+                            "to": "a***@example.in"
+                          }
+                        ],
+                        "next_cursor": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "description": "A page; pass next_cursor as cursor for the next one (null at the end).",
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "$ref": "#/components/schemas/Suppression"
+                          },
+                          "type": "array"
+                        },
+                        "next_cursor": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "next_cursor"
+                      ],
+                      "type": "object"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "A page",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "reason": {
+                    "summary": "An unknown reason",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_param",
+                        "message": "reason is one of unsubscribed, bounced, complained, manual.",
+                        "param": "reason",
+                        "reason": "invalid_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "List suppressions, newest first",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.suppressions.read"
+      },
+      "post": {
+        "operationId": "message_suppressions_create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "unsubscribed": {
+                  "summary": "From your own unsubscribe page",
+                  "value": {
+                    "channel": "email",
+                    "reason": "unsubscribed",
+                    "to": "asha@example.in"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/SuppressionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "created": {
+                    "summary": "Suppressed",
+                    "value": {
+                      "data": {
+                        "channel": "email",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "reason": "unsubscribed",
+                        "source": "api",
+                        "suppression_id": "sup_01JC1C2D3E4F5G6H7J8K9M0N1P",
+                        "to": "a***@example.in"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Suppression"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The suppression",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "to": {
+                    "summary": "Not an address",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_param",
+                        "message": "to is not a recipient of the email channel.",
+                        "param": "to",
+                        "reason": "invalid_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Suppress a recipient for marketing on a channel",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.suppressions.write"
+      }
+    },
+    "/v1/messages/suppressions/{id}": {
+      "delete": {
+        "operationId": "message_suppressions_delete",
+        "parameters": [
+          {
+            "description": "sup_…",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "deleted": {
+                    "summary": "Deleted",
+                    "value": {
+                      "data": {
+                        "deleted": true,
+                        "suppression_id": "sup_01JC1C2D3E4F5G6H7J8K9M0N1P"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Deleted"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Deleted",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "missing": {
+                    "summary": "No such suppression",
+                    "value": {
+                      "error": {
+                        "code": 404,
+                        "doc_url": "https://docs.lowco.ai/api/errors#message_not_found",
+                        "message": "No suppression sup_01JC1C2D3E4F5G6H7J8K9M0N1P in this environment.",
+                        "param": "id",
+                        "reason": "message_not_found",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: delivery_not_found, file_not_found, job_not_found, key_not_found, message_not_found, request_not_found, route_not_found, template_not_found, webhook_not_found.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Let marketing reach the recipient again",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.suppressions.write"
+      }
+    },
+    "/v1/messages/templates": {
+      "get": {
+        "operationId": "message_templates_list",
+        "parameters": [
+          {
+            "description": "",
+            "in": "query",
+            "name": "channel",
+            "schema": {
+              "enum": [
+                "sms",
+                "whatsapp",
+                "email",
+                "push"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "",
+            "in": "query",
+            "name": "approval_status",
+            "schema": {
+              "enum": [
+                "not_required",
+                "pending",
+                "approved",
+                "rejected"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "",
+            "in": "query",
+            "name": "name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "page": {
+                    "summary": "A page",
+                    "value": {
+                      "data": {
+                        "items": [
+                          {
+                            "approval_status": "pending",
+                            "body": "Your order {{order}} has shipped and arrives by {{eta}}.",
+                            "buttons": [
+                              {
+                                "text": "Track",
+                                "type": "url",
+                                "url": "https://acme.example/track"
+                              }
+                            ],
+                            "category": "utility",
+                            "channel": "whatsapp",
+                            "created_at": "2027-01-10T09:00:00Z",
+                            "language": "en",
+                            "name": "order_shipped",
+                            "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0M",
+                            "submitted_at": "2027-01-10T09:00:00Z",
+                            "template_id": "mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K",
+                            "updated_at": "2027-01-10T09:00:00Z",
+                            "variables": [
+                              {
+                                "example": "A-1042",
+                                "name": "order"
+                              },
+                              {
+                                "example": "Friday",
+                                "name": "eta"
+                              }
+                            ]
+                          },
+                          {
+                            "approval_status": "not_required",
+                            "body": "Hi {{name}}, your payslip for {{month}} is ready. -ACMEHR",
+                            "channel": "sms",
+                            "created_at": "2027-01-10T09:00:00Z",
+                            "dlt_entity_id": "1101161234567890123",
+                            "dlt_template_id": "1107161234567890001",
+                            "language": "en",
+                            "name": "payslip_ready",
+                            "template_id": "mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K",
+                            "updated_at": "2027-01-10T09:00:00Z",
+                            "variables": [
+                              {
+                                "name": "month"
+                              },
+                              {
+                                "name": "name"
+                              }
+                            ]
+                          }
+                        ],
+                        "next_cursor": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "description": "A page; pass next_cursor as cursor for the next one (null at the end).",
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "$ref": "#/components/schemas/MessageTemplate"
+                          },
+                          "type": "array"
+                        },
+                        "next_cursor": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "next_cursor"
+                      ],
+                      "type": "object"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "A page",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "channel": {
+                    "summary": "An unknown channel",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_param",
+                        "message": "channel is sms, whatsapp, email or push.",
+                        "param": "channel",
+                        "reason": "invalid_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "List templates, newest first",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.templates.read"
+      },
+      "post": {
+        "operationId": "message_templates_create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "sms": {
+                  "summary": "An SMS template with its DLT ids",
+                  "value": {
+                    "body": "Hi {{name}}, your payslip for {{month}} is ready. -ACMEHR",
+                    "channel": "sms",
+                    "dlt_entity_id": "1101161234567890123",
+                    "dlt_template_id": "1107161234567890001",
+                    "name": "payslip_ready"
+                  }
+                },
+                "whatsapp": {
+                  "summary": "A WhatsApp template for Meta's review",
+                  "value": {
+                    "body": "Your order {{order}} has shipped and arrives by {{eta}}.",
+                    "buttons": [
+                      {
+                        "text": "Track",
+                        "type": "url",
+                        "url": "https://acme.example/track"
+                      }
+                    ],
+                    "category": "utility",
+                    "channel": "whatsapp",
+                    "name": "order_shipped",
+                    "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0M",
+                    "variables": [
+                      {
+                        "example": "A-1042",
+                        "name": "order"
+                      },
+                      {
+                        "example": "Friday",
+                        "name": "eta"
+                      }
+                    ]
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/MessageTemplateCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "sms": {
+                    "summary": "Stored",
+                    "value": {
+                      "data": {
+                        "approval_status": "not_required",
+                        "body": "Hi {{name}}, your payslip for {{month}} is ready. -ACMEHR",
+                        "channel": "sms",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "dlt_entity_id": "1101161234567890123",
+                        "dlt_template_id": "1107161234567890001",
+                        "language": "en",
+                        "name": "payslip_ready",
+                        "template_id": "mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K",
+                        "updated_at": "2027-01-10T09:00:00Z",
+                        "variables": [
+                          {
+                            "name": "month"
+                          },
+                          {
+                            "name": "name"
+                          }
+                        ]
+                      },
+                      "status": 1
+                    }
+                  },
+                  "whatsapp": {
+                    "summary": "Submitted to Meta",
+                    "value": {
+                      "data": {
+                        "approval_status": "pending",
+                        "body": "Your order {{order}} has shipped and arrives by {{eta}}.",
+                        "buttons": [
+                          {
+                            "text": "Track",
+                            "type": "url",
+                            "url": "https://acme.example/track"
+                          }
+                        ],
+                        "category": "utility",
+                        "channel": "whatsapp",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "language": "en",
+                        "name": "order_shipped",
+                        "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0M",
+                        "submitted_at": "2027-01-10T09:00:00Z",
+                        "template_id": "mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K",
+                        "updated_at": "2027-01-10T09:00:00Z",
+                        "variables": [
+                          {
+                            "example": "A-1042",
+                            "name": "order"
+                          },
+                          {
+                            "example": "Friday",
+                            "name": "eta"
+                          }
+                        ]
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessageTemplate"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The template",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "exists": {
+                    "summary": "The name is taken",
+                    "value": {
+                      "error": {
+                        "code": 409,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_state",
+                        "message": "A sms template named \"payslip_ready\" in en already exists; update it with PATCH instead.",
+                        "param": "name",
+                        "reason": "invalid_state",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: already_sent, idempotency_in_progress, invalid_state.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Store a template (a WhatsApp template is submitted to Meta for approval)",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.templates.write"
+      }
+    },
+    "/v1/messages/templates/{id}": {
+      "delete": {
+        "operationId": "message_templates_delete",
+        "parameters": [
+          {
+            "description": "mtp_…",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "deleted": {
+                    "summary": "Deleted",
+                    "value": {
+                      "data": {
+                        "deleted": true,
+                        "template_id": "mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Deleted"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Deleted",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "missing": {
+                    "summary": "No such template",
+                    "value": {
+                      "error": {
+                        "code": 404,
+                        "doc_url": "https://docs.lowco.ai/api/errors#template_not_found",
+                        "message": "No message template mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K in this environment.",
+                        "param": "id",
+                        "reason": "template_not_found",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: delivery_not_found, file_not_found, job_not_found, key_not_found, message_not_found, request_not_found, route_not_found, template_not_found, webhook_not_found.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Delete a template (messages already accepted keep it)",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.templates.write"
+      },
+      "get": {
+        "operationId": "message_templates_get",
+        "parameters": [
+          {
+            "description": "mtp_…",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "approved": {
+                    "summary": "Approved by Meta",
+                    "value": {
+                      "data": {
+                        "approval_status": "approved",
+                        "body": "Your order {{order}} has shipped and arrives by {{eta}}.",
+                        "buttons": [
+                          {
+                            "text": "Track",
+                            "type": "url",
+                            "url": "https://acme.example/track"
+                          }
+                        ],
+                        "category": "utility",
+                        "channel": "whatsapp",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "language": "en",
+                        "name": "order_shipped",
+                        "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0M",
+                        "submitted_at": "2027-01-10T09:00:00Z",
+                        "synced_at": "2027-01-10T09:10:00Z",
+                        "template_id": "mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K",
+                        "updated_at": "2027-01-10T09:00:00Z",
+                        "variables": [
+                          {
+                            "example": "A-1042",
+                            "name": "order"
+                          },
+                          {
+                            "example": "Friday",
+                            "name": "eta"
+                          }
+                        ]
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessageTemplate"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The template",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "missing": {
+                    "summary": "No such template",
+                    "value": {
+                      "error": {
+                        "code": 404,
+                        "doc_url": "https://docs.lowco.ai/api/errors#template_not_found",
+                        "message": "No message template mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K in this environment.",
+                        "param": "id",
+                        "reason": "template_not_found",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: delivery_not_found, file_not_found, job_not_found, key_not_found, message_not_found, request_not_found, route_not_found, template_not_found, webhook_not_found.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Read a template",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.templates.read"
+      },
+      "patch": {
+        "operationId": "message_templates_update",
+        "parameters": [
+          {
+            "description": "mtp_…",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "body": {
+                  "summary": "A new body",
+                  "value": {
+                    "body": "Order {{order}} is on its way; it arrives by {{eta}}."
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/MessageTemplatePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "pending": {
+                    "summary": "Pending again",
+                    "value": {
+                      "data": {
+                        "approval_status": "pending",
+                        "body": "Your order {{order}} has shipped and arrives by {{eta}}.",
+                        "buttons": [
+                          {
+                            "text": "Track",
+                            "type": "url",
+                            "url": "https://acme.example/track"
+                          }
+                        ],
+                        "category": "utility",
+                        "channel": "whatsapp",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "language": "en",
+                        "name": "order_shipped",
+                        "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0M",
+                        "submitted_at": "2027-01-10T09:00:00Z",
+                        "template_id": "mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K",
+                        "updated_at": "2027-01-10T09:00:00Z",
+                        "variables": [
+                          {
+                            "example": "A-1042",
+                            "name": "order"
+                          },
+                          {
+                            "example": "Friday",
+                            "name": "eta"
+                          }
+                        ]
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessageTemplate"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The template",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "rename": {
+                    "summary": "A rename",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_param",
+                        "message": "name identifies a template and cannot change; create a new template instead.",
+                        "param": "name",
+                        "reason": "invalid_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Change a template's content (a WhatsApp template goes back to pending)",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.templates.write"
+      }
+    },
+    "/v1/messages/unsubscribe/{token}": {
+      "get": {
+        "operationId": "messages_unsubscribe_page",
+        "parameters": [
+          {
+            "description": "The token in the email's List-Unsubscribe link",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "An HTML page"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "internal": {
+                    "summary": "An internal error",
+                    "value": {
+                      "error": {
+                        "code": 500,
+                        "doc_url": "https://docs.lowco.ai/api/errors#internal_error",
+                        "message": "Something went wrong.",
+                        "reason": "internal_error",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: internal_error.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "security": [],
+        "summary": "The unsubscribe confirmation page (a marketing email's link)",
+        "tags": [
+          "messages"
+        ]
+      },
+      "post": {
+        "operationId": "messages_unsubscribe",
+        "parameters": [
+          {
+            "description": "The token in the email's List-Unsubscribe link",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "An HTML page"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "jm": {
+                    "summary": "The Job Manager is unavailable",
+                    "value": {
+                      "error": {
+                        "code": 503,
+                        "doc_url": "https://docs.lowco.ai/api/errors#service_unavailable",
+                        "message": "The job manager is unavailable.",
+                        "reason": "service_unavailable",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: provider_unavailable, service_unavailable.",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          }
+        },
+        "security": [],
+        "summary": "Unsubscribe (RFC 8058 one-click): the recipient is suppressed for marketing email",
+        "tags": [
+          "messages"
+        ]
+      }
+    },
+    "/v1/messages/{id}": {
+      "get": {
+        "operationId": "messages_get",
+        "parameters": [
+          {
+            "description": "msg_…",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "delivered": {
+                    "summary": "Delivered, with its timeline",
+                    "value": {
+                      "data": {
+                        "category": "transactional",
+                        "channel": "sms",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "delivered_at": "2027-01-10T09:00:04Z",
+                        "language": "en",
+                        "message_id": "msg_01JC1A2B3C4D5E6F7G8H9J0K1M",
+                        "metadata": {
+                          "employee_id": "E-1042"
+                        },
+                        "queued_at": "2027-01-10T09:00:00Z",
+                        "reference_id": "emp-1042",
+                        "scheduled_at": null,
+                        "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N",
+                        "sent_at": "2027-01-10T09:00:01Z",
+                        "status": "delivered",
+                        "template": "payslip_ready",
+                        "template_id": "mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K",
+                        "timeline": [
+                          {
+                            "at": "2027-01-10T09:00:00Z",
+                            "status": "queued"
+                          },
+                          {
+                            "at": "2027-01-10T09:00:01Z",
+                            "status": "sent"
+                          },
+                          {
+                            "at": "2027-01-10T09:00:04Z",
+                            "status": "delivered"
+                          }
+                        ],
+                        "to": "+91******3210",
+                        "updated_at": "2027-01-10T09:00:04Z"
+                      },
+                      "status": 1
+                    }
+                  },
+                  "failed": {
+                    "summary": "Failed at the carrier; credited back",
+                    "value": {
+                      "data": {
+                        "category": "transactional",
+                        "channel": "sms",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "credited": true,
+                        "failed_at": "2027-01-10T09:00:30Z",
+                        "failure": {
+                          "message": "Network failure",
+                          "provider_code": "E32",
+                          "reason": "carrier_error"
+                        },
+                        "language": "en",
+                        "message_id": "msg_01JC1A2B3C4D5E6F7G8H9J0K1M",
+                        "metadata": {
+                          "employee_id": "E-1042"
+                        },
+                        "queued_at": "2027-01-10T09:00:00Z",
+                        "reference_id": "emp-1042",
+                        "scheduled_at": null,
+                        "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N",
+                        "sent_at": "2027-01-10T09:00:01Z",
+                        "status": "failed",
+                        "template": "payslip_ready",
+                        "template_id": "mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K",
+                        "to": "+91******3210",
+                        "updated_at": "2027-01-10T09:00:00Z"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Message"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The message",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "missing": {
+                    "summary": "No such message",
+                    "value": {
+                      "error": {
+                        "code": 404,
+                        "doc_url": "https://docs.lowco.ai/api/errors#message_not_found",
+                        "message": "No message msg_01JC1A2B3C4D5E6F7G8H9J0K1M in this environment.",
+                        "param": "id",
+                        "reason": "message_not_found",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: delivery_not_found, file_not_found, job_not_found, key_not_found, message_not_found, request_not_found, route_not_found, template_not_found, webhook_not_found.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Read a message with its timeline",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.read"
+      }
+    },
+    "/v1/messages/{id}/cancel": {
+      "post": {
+        "operationId": "messages_cancel",
+        "parameters": [
+          {
+            "description": "msg_…",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "cancelled": {
+                    "summary": "Cancelled",
+                    "value": {
+                      "data": {
+                        "cancelled_at": "2027-01-10T09:01:00Z",
+                        "category": "transactional",
+                        "channel": "sms",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "credited": true,
+                        "language": "en",
+                        "message_id": "msg_01JC1A2B3C4D5E6F7G8H9J0K1M",
+                        "metadata": {
+                          "employee_id": "E-1042"
+                        },
+                        "reference_id": "emp-1042",
+                        "scheduled_at": "2027-01-11T09:00:00Z",
+                        "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N",
+                        "status": "cancelled",
+                        "template": "payslip_ready",
+                        "template_id": "mtp_01JC0Y1A2B3C4D5E6F7G8H9J0K",
+                        "to": "+91******3210",
+                        "updated_at": "2027-01-10T09:00:00Z"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Message"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Cancelled",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "sent": {
+                    "summary": "Not scheduled",
+                    "value": {
+                      "error": {
+                        "code": 409,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_state",
+                        "message": "Only a scheduled message can be cancelled; msg_01JC1A2B3C4D5E6F7G8H9J0K1M is sent.",
+                        "reason": "invalid_state",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: already_sent, idempotency_in_progress, invalid_state.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Cancel a scheduled message (its usage is credited back)",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.messages.send"
+      }
+    },
     "/v1/ocr/handwriting": {
       "post": {
         "description": "Handwritten text. Always asynchronous: answers 202 with a job. A body field callback_url (public https) receives the job's webhook instead of the environment's default endpoints.",
@@ -21886,6 +27062,511 @@
           "billed": false,
           "notes": "engine fast runs Tesseract for real; accurate (and handwriting) is answered by the OCR fixture, which reads with the local Tesseract, so no paid provider is called."
         }
+      }
+    },
+    "/v1/otp/resend": {
+      "post": {
+        "operationId": "otp_resend",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "otp": {
+                  "summary": "The OTP",
+                  "value": {
+                    "otp_id": "otp_01JC1B2C3D4E5F6G7H8J9K0M1N"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/OTPResend"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "resent": {
+                    "summary": "A new code",
+                    "value": {
+                      "data": {
+                        "attempts_remaining": 3,
+                        "channel": "sms",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "expires_at": "2027-01-10T09:05:00Z",
+                        "message_id": "msg_01JC1A2B3C4D5E6F7G8H9J0K1M",
+                        "otp_id": "otp_01JC1B2C3D4E5F6G7H8J9K0M1N",
+                        "reference_id": "login-77",
+                        "resend_after": "2027-01-10T09:00:30Z",
+                        "resends_remaining": 2,
+                        "status": "pending",
+                        "to": "+91******3210"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OTP"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Resent",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "soon": {
+                    "summary": "Within 30 seconds",
+                    "value": {
+                      "error": {
+                        "code": 429,
+                        "doc_url": "https://docs.lowco.ai/api/errors#rate_limited",
+                        "message": "Resend after 21 seconds.",
+                        "reason": "rate_limited",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: concurrency_exceeded, rate_limited.",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Send a pending OTP again with a new code (3 times, 30 seconds apart)",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.otp.send"
+      }
+    },
+    "/v1/otp/send": {
+      "post": {
+        "operationId": "otp_send",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "sms": {
+                  "summary": "A login code by SMS",
+                  "value": {
+                    "channel": "sms",
+                    "length": 6,
+                    "max_attempts": 3,
+                    "reference_id": "login-77",
+                    "sender": "snd_01JC0Z9Y8X7W6V5T4S3R2Q1P0N",
+                    "template": "login_otp",
+                    "to": "+919876543210",
+                    "ttl_seconds": 300
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/OTPSend"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "sent": {
+                    "summary": "Sent",
+                    "value": {
+                      "data": {
+                        "attempts_remaining": 3,
+                        "channel": "sms",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "expires_at": "2027-01-10T09:05:00Z",
+                        "message_id": "msg_01JC1A2B3C4D5E6F7G8H9J0K1N",
+                        "otp_id": "otp_01JC1B2C3D4E5F6G7H8J9K0M1N",
+                        "reference_id": "login-77",
+                        "resend_after": "2027-01-10T09:00:30Z",
+                        "resends_remaining": 3,
+                        "status": "pending",
+                        "to": "+91******3210"
+                      },
+                      "status": 1
+                    }
+                  },
+                  "test": {
+                    "summary": "A test key: the code is answered",
+                    "value": {
+                      "data": {
+                        "attempts_remaining": 3,
+                        "channel": "sms",
+                        "created_at": "2027-01-10T09:00:00Z",
+                        "expires_at": "2027-01-10T09:05:00Z",
+                        "message_id": "msg_01JC1A2B3C4D5E6F7G8H9J0K1N",
+                        "otp_id": "otp_01JC1B2C3D4E5F6G7H8J9K0M1N",
+                        "reference_id": "login-77",
+                        "resend_after": "2027-01-10T09:00:30Z",
+                        "resends_remaining": 3,
+                        "status": "pending",
+                        "test_code": "123456",
+                        "to": "+91******3210"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OTP"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Sent",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "flood": {
+                    "summary": "Too many OTPs to one recipient",
+                    "value": {
+                      "error": {
+                        "code": 429,
+                        "doc_url": "https://docs.lowco.ai/api/errors#rate_limited",
+                        "message": "At most 5 OTPs per recipient in 15 minutes. Wait before sending another.",
+                        "reason": "rate_limited",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: concurrency_exceeded, rate_limited.",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Send a one-time code (202); the code is never answered (test: 123456)",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.otp.send"
+      }
+    },
+    "/v1/otp/verify": {
+      "post": {
+        "operationId": "otp_verify",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "code": {
+                  "summary": "The code",
+                  "value": {
+                    "code": "482913",
+                    "otp_id": "otp_01JC1B2C3D4E5F6G7H8J9K0M1N"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/OTPVerify"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "exhausted": {
+                    "summary": "The last wrong attempt: failed closed",
+                    "value": {
+                      "data": {
+                        "attempts_remaining": 0,
+                        "otp_id": "otp_01JC1B2C3D4E5F6G7H8J9K0M1N",
+                        "reason": "attempts_exhausted",
+                        "reference_id": "login-77",
+                        "status": "failed",
+                        "verified": false
+                      },
+                      "status": 1
+                    }
+                  },
+                  "incorrect": {
+                    "summary": "A wrong code",
+                    "value": {
+                      "data": {
+                        "attempts_remaining": 2,
+                        "otp_id": "otp_01JC1B2C3D4E5F6G7H8J9K0M1N",
+                        "reason": "incorrect",
+                        "reference_id": "login-77",
+                        "status": "pending",
+                        "verified": false
+                      },
+                      "status": 1
+                    }
+                  },
+                  "verified": {
+                    "summary": "Verified",
+                    "value": {
+                      "data": {
+                        "attempts_remaining": 2,
+                        "otp_id": "otp_01JC1B2C3D4E5F6G7H8J9K0M1N",
+                        "reference_id": "login-77",
+                        "status": "verified",
+                        "verified": true,
+                        "verified_at": "2027-01-10T09:01:00Z"
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OTPVerified"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The outcome",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "missing": {
+                    "summary": "No such OTP",
+                    "value": {
+                      "error": {
+                        "code": 404,
+                        "doc_url": "https://docs.lowco.ai/api/errors#message_not_found",
+                        "message": "No OTP otp_01JC1B2C3D4E5F6G7H8J9K0M1N in this environment.",
+                        "param": "otp_id",
+                        "reason": "message_not_found",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: delivery_not_found, file_not_found, job_not_found, key_not_found, message_not_found, request_not_found, route_not_found, template_not_found, webhook_not_found.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Check a code: fails closed after max_attempts; 1 api_otp_verifications per check",
+        "tags": [
+          "messages"
+        ],
+        "x-lowco-scope": "api.otp.verify"
       }
     },
     "/v1/overview": {
@@ -46657,6 +52338,10 @@
     {
       "description": "Signing requests: documents, signers and fields, sent, signed on the signer page, sealed with an audit certificate; templates and bulk send; the signer link's routes.",
       "name": "sign"
+    },
+    {
+      "description": "SMS (TRAI DLT), WhatsApp (Meta Cloud API), email and push from one POST /v1/messages; each message tracked from carrier receipts; templates, senders, suppressions, batch and OTP.",
+      "name": "messages"
     },
     {
       "description": "Upload files once and pass file_id; signed downloads.",
