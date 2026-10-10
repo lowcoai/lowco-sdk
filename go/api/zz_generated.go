@@ -1114,6 +1114,12 @@ type JobInput struct {
 	FileID  *string  `json:"file_id,omitempty"`
 	FileIds []string `json:"file_ids,omitempty"`
 	Pages   *int     `json:"pages,omitempty"`
+	// A sign bulk job's rows
+	Rows *int `json:"rows,omitempty"`
+	// A sign bulk job sends each request
+	Send *bool `json:"send,omitempty"`
+	// A sign bulk job's template
+	TemplateID *string `json:"template_id,omitempty"`
 }
 
 // JobLinks is a Lowco API object.
@@ -2830,7 +2836,11 @@ type Settings struct {
 	MonthlyCreditCap    *string `json:"monthly_credit_cap"`
 	RetentionInputHours int     `json:"retention_input_hours"`
 	// 0 is zero retention
-	RetentionOutputHours     int    `json:"retention_output_hours"`
+	RetentionOutputHours int `json:"retention_output_hours"`
+	// Delete signed files after sign_retention_days; off (the default) keeps them while the request exists
+	SignAutoDelete bool `json:"sign_auto_delete"`
+	// Days completed requests' signed files are kept when sign_auto_delete is on (default 2555, 7 years)
+	SignRetentionDays        int    `json:"sign_retention_days"`
 	UpdatedAt                string `json:"updated_at"`
 	VerifyAuditRetentionDays int    `json:"verify_audit_retention_days"`
 }
@@ -2850,7 +2860,11 @@ type SettingsPatch struct {
 	MonthlyCreditCap    *string `json:"monthly_credit_cap,omitempty"`
 	RetentionInputHours *int    `json:"retention_input_hours,omitempty"`
 	// 0 is zero retention
-	RetentionOutputHours     *int `json:"retention_output_hours,omitempty"`
+	RetentionOutputHours *int `json:"retention_output_hours,omitempty"`
+	// Delete completed requests' signed files after sign_retention_days
+	SignAutoDelete *bool `json:"sign_auto_delete,omitempty"`
+	// Days signed files are kept with sign_auto_delete
+	SignRetentionDays        *int `json:"sign_retention_days,omitempty"`
 	VerifyAuditRetentionDays *int `json:"verify_audit_retention_days,omitempty"`
 }
 
@@ -2858,6 +2872,660 @@ type SettingsPatch struct {
 type SettingsPurgeQuery struct {
 	// The calling environment, to confirm One of: live, test.
 	Confirm string `json:"confirm"`
+}
+
+// The audit trail: the certificate's facts and every event with its hash
+type SignAudit struct {
+	// The first event that does not verify
+	ChainError *string `json:"chain_error,omitempty"`
+	// Every event verifies against its hash and the previous one
+	ChainValid  bool           `json:"chain_valid"`
+	CompletedAt *string        `json:"completed_at,omitempty"`
+	CreatedAt   string         `json:"created_at"`
+	Documents   []SignDocument `json:"documents"`
+	// One of: live, test.
+	Environment string      `json:"environment"`
+	Events      []SignEvent `json:"events"`
+	GeneratedAt string      `json:"generated_at"`
+	// The last event's hash
+	HeadHash  string            `json:"head_hash"`
+	RequestID string            `json:"request_id"`
+	SentAt    *string           `json:"sent_at,omitempty"`
+	Signers   []SignAuditSigner `json:"signers"`
+	// draft → sent → in_progress → completed; or declined (a signer declined), voided (by you), expired One of: draft, sent, in_progress, completed, declined, voided, expired.
+	Status string  `json:"status"`
+	Title  *string `json:"title,omitempty"`
+}
+
+// A signer in the audit trail
+type SignAuditSigner struct {
+	// One of: otp_email, otp_sms, aadhaar_esign, none.
+	Auth          string  `json:"auth"`
+	DeclineReason *string `json:"decline_reason,omitempty"`
+	DeclinedAt    *string `json:"declined_at"`
+	Email         *string `json:"email,omitempty"`
+	IP            *string `json:"ip,omitempty"`
+	Name          string  `json:"name"`
+	Order         int     `json:"order"`
+	Phone         *string `json:"phone,omitempty"`
+	Role          *string `json:"role,omitempty"`
+	// One of: , drawn, typed, uploaded.
+	SignatureKind *string `json:"signature_kind,omitempty"`
+	SignedAt      *string `json:"signed_at"`
+	SignerID      string  `json:"signer_id"`
+	// One of: pending, notified, viewed, signed, declined.
+	Status     string  `json:"status"`
+	UserAgent  *string `json:"user_agent,omitempty"`
+	VerifiedAt *string `json:"verified_at"`
+	ViewedAt   *string `json:"viewed_at"`
+}
+
+// Up to 500 rows, one request each, made as one job
+type SignBulk struct {
+	// https URL for the job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// 1 to 500 (each row's send is ignored)
+	Rows []SignFromTemplate `json:"rows"`
+	// Send each request (default true)
+	Send *bool `json:"send,omitempty"`
+}
+
+// SignDecline is a Lowco API object.
+type SignDecline struct {
+	Reason string `json:"reason"`
+}
+
+// A document
+type SignDocument struct {
+	// The PDF signed (a DOCX was converted)
+	FileID   string `json:"file_id"`
+	Filename string `json:"filename"`
+	Index    int    `json:"index"`
+	Pages    int    `json:"pages"`
+	// SHA-256 of the signed copy (completed)
+	SHA256After *string `json:"sha256_after,omitempty"`
+	// SHA-256 of the document as sent
+	SHA256Before string `json:"sha256_before"`
+	// The signed copy (completed)
+	SignedFileID *string `json:"signed_file_id,omitempty"`
+}
+
+// An audit-trail event, hash-chained
+type SignEvent struct {
+	// With microseconds (the hash covers them)
+	At     string         `json:"at"`
+	Detail map[string]any `json:"detail"`
+	// sge_…
+	EventID string `json:"event_id"`
+	// SHA-256 over prev_hash and the event's fields
+	Hash string `json:"hash"`
+	// The previous event's hash (empty for the first)
+	PrevHash string `json:"prev_hash"`
+	// From 1, without gaps
+	Seq      int     `json:"seq"`
+	SignerID *string `json:"signer_id,omitempty"`
+	// request.sent, signer.opened, signer.verified, signer.signed, …
+	Type string `json:"type"`
+}
+
+// SignEventsData is a Lowco API object.
+type SignEventsData struct {
+	Items []SignEvent `json:"items"`
+}
+
+// A placed field
+type SignField struct {
+	Default       *string `json:"default,omitempty"`
+	DocumentIndex int     `json:"document_index"`
+	// sgf_…
+	FieldID   string  `json:"field_id"`
+	FilledAt  *string `json:"filled_at"`
+	H         float64 `json:"h"`
+	Label     *string `json:"label,omitempty"`
+	Page      int     `json:"page"`
+	Required  bool    `json:"required"`
+	SignerID  string  `json:"signer_id"`
+	SignerRef string  `json:"signer_ref"`
+	// One of: signature, initials, date, text, checkbox, stamp.
+	Type string `json:"type"`
+	// What the signer filled (signature fields: drawn, typed or uploaded)
+	Value *string `json:"value"`
+	W     float64 `json:"w"`
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+}
+
+// A place to fill
+type SignFieldInput struct {
+	// Place over every occurrence of this text in the document's text layer, e.g. {{sign_here}} (instead of page, x and y)
+	Anchor *string `json:"anchor,omitempty"`
+	// Points right of the anchor
+	AnchorOffsetX *float64 `json:"anchor_offset_x,omitempty"`
+	// Points below the anchor (negative: above)
+	AnchorOffsetY *float64 `json:"anchor_offset_y,omitempty"`
+	// A text or date's value unless the signer changes it; a checkbox's "true"/"false"; {{name}} takes a template's merge data
+	Default *string `json:"default,omitempty"`
+	// The document's position in documents[], from 0
+	DocumentIndex int      `json:"document_index"`
+	H             *float64 `json:"h,omitempty"`
+	Label         *string  `json:"label,omitempty"`
+	// With x and y
+	Page *int `json:"page,omitempty"`
+	// Default true for signature, initials and stamp
+	Required *bool `json:"required,omitempty"`
+	// The signer's ref (default its role, or its position from 1)
+	SignerRef string `json:"signer_ref"`
+	// One of: signature, initials, date, text, checkbox, stamp.
+	Type string   `json:"type"`
+	W    *float64 `json:"w,omitempty"`
+	// Points from the page's left
+	X *float64 `json:"x,omitempty"`
+	// Points from the page's top
+	Y *float64 `json:"y,omitempty"`
+}
+
+// A request from a template: who fills each role, merge data
+type SignFromTemplate struct {
+	// Replaces {{name}} in the title, message and field defaults
+	Data map[string]string `json:"data,omitempty"`
+	// Your keys and values, returned in answers and webhooks
+	Metadata map[string]string `json:"metadata,omitempty"`
+	Options  *SignOptionsIn    `json:"options,omitempty"`
+	// Role name → person
+	Roles map[string]SignPerson `json:"roles"`
+	// Send at once (default: a draft)
+	Send  *bool   `json:"send,omitempty"`
+	Title *string `json:"title,omitempty"`
+}
+
+// A signer's link
+type SignLink struct {
+	Embedded  bool   `json:"embedded"`
+	ExpiresAt string `json:"expires_at"`
+	SignerID  string `json:"signer_id"`
+	URL       string `json:"url"`
+}
+
+// A page; pass next_cursor as cursor for the next one (null at the end).
+type SignListData struct {
+	Items      []SignRequestSummary `json:"items"`
+	NextCursor *string              `json:"next_cursor"`
+}
+
+// SignListQuery is a Lowco API object.
+type SignListQuery struct {
+	// One of: draft, sent, in_progress, completed, declined, voided, expired.
+	Status        *string `json:"status,omitempty"`
+	TemplateID    *string `json:"template_id,omitempty"`
+	CreatedAfter  *string `json:"created_after,omitempty"`
+	CreatedBefore *string `json:"created_before,omitempty"`
+	// Page size
+	Limit *int `json:"limit,omitempty"`
+	// next_cursor of the previous page.
+	Cursor *string `json:"cursor,omitempty"`
+}
+
+// SignOTPResult is a Lowco API object.
+type SignOTPResult struct {
+	AttemptsLeft int  `json:"attempts_left"`
+	Verified     bool `json:"verified"`
+}
+
+// SignOTPSent is a Lowco API object.
+type SignOTPSent struct {
+	// One of: email, sms.
+	Channel string `json:"channel"`
+	// Test environment only: the code (always 123456)
+	Code *string `json:"code,omitempty"`
+	// Masked
+	Destination string `json:"destination"`
+	ExpiresAt   string `json:"expires_at"`
+}
+
+// SignOTPVerify is a Lowco API object.
+type SignOTPVerify struct {
+	Code string `json:"code"`
+}
+
+// Request options
+type SignOptions struct {
+	// Append the audit certificate page to the sealed PDF
+	AttachAuditCertificate *bool `json:"attach_audit_certificate,omitempty"`
+	// What signers see of the sender
+	Branding *SignOptionsBranding `json:"branding,omitempty"`
+	// Links for an iframe, allowed only on the environment's allowed_origins
+	Embedded *bool `json:"embedded,omitempty"`
+	// Default 30
+	ExpiresInDays *int `json:"expires_in_days,omitempty"`
+	// Shown to signers and in their email
+	Message *string `json:"message,omitempty"`
+	// https URL the signer goes to after signing
+	RedirectURL *string `json:"redirect_url,omitempty"`
+	// Automatic reminders
+	Reminders *SignOptionsReminders `json:"reminders,omitempty"`
+	// Signers must view every page before signing
+	RequireViewAllPages *bool `json:"require_view_all_pages,omitempty"`
+	// Signers sign in order (order, else list order); otherwise all at once
+	Sequential *bool `json:"sequential,omitempty"`
+}
+
+// What signers see of the sender
+type SignOptionsBranding struct {
+	Color *string `json:"color,omitempty"`
+	// The stored logo (answers)
+	LogoFileID *string `json:"logo_file_id,omitempty"`
+	SenderName *string `json:"sender_name,omitempty"`
+}
+
+// Request options
+type SignOptionsIn struct {
+	// Append the audit certificate page to the sealed PDF
+	AttachAuditCertificate *bool `json:"attach_audit_certificate,omitempty"`
+	// What signers see of the sender
+	Branding *SignOptionsInBranding `json:"branding,omitempty"`
+	// Links for an iframe, allowed only on the environment's allowed_origins
+	Embedded *bool `json:"embedded,omitempty"`
+	// Default 30
+	ExpiresInDays *int `json:"expires_in_days,omitempty"`
+	// Shown to signers and in their email
+	Message *string `json:"message,omitempty"`
+	// https URL the signer goes to after signing
+	RedirectURL *string `json:"redirect_url,omitempty"`
+	// Automatic reminders
+	Reminders *SignOptionsInReminders `json:"reminders,omitempty"`
+	// Signers must view every page before signing
+	RequireViewAllPages *bool `json:"require_view_all_pages,omitempty"`
+	// Signers sign in order (order, else list order); otherwise all at once
+	Sequential *bool `json:"sequential,omitempty"`
+}
+
+// What signers see of the sender
+type SignOptionsInBranding struct {
+	Color *string  `json:"color,omitempty"`
+	Logo  *FileRef `json:"logo,omitempty"`
+	// The stored logo (answers)
+	LogoFileID *string `json:"logo_file_id,omitempty"`
+	SenderName *string `json:"sender_name,omitempty"`
+}
+
+// Automatic reminders
+type SignOptionsInReminders struct {
+	// Days after sending
+	AfterDays int `json:"after_days"`
+	// Then every this many days (0: one reminder)
+	EveryDays *int `json:"every_days,omitempty"`
+	// At most this many (default 1, or 3 with every_days)
+	Max *int `json:"max,omitempty"`
+}
+
+// Automatic reminders
+type SignOptionsReminders struct {
+	// Days after sending
+	AfterDays int `json:"after_days"`
+	// Then every this many days (0: one reminder)
+	EveryDays *int `json:"every_days,omitempty"`
+	// At most this many (default 1, or 3 with every_days)
+	Max *int `json:"max,omitempty"`
+}
+
+// The person filling a role
+type SignPerson struct {
+	// One of: otp_email, otp_sms, aadhaar_esign, none.
+	Auth  *string `json:"auth,omitempty"`
+	Email *string `json:"email,omitempty"`
+	// One of: en, hi.
+	Language *string `json:"language,omitempty"`
+	Name     string  `json:"name"`
+	Phone    *string `json:"phone,omitempty"`
+}
+
+// A signing request
+type SignRequest struct {
+	// The audit certificate (completed)
+	CertificateFileID *string        `json:"certificate_file_id,omitempty"`
+	CompletedAt       *string        `json:"completed_at"`
+	CreatedAt         string         `json:"created_at"`
+	DeclinedAt        *string        `json:"declined_at"`
+	Documents         []SignDocument `json:"documents"`
+	// One of: live, test.
+	Environment string      `json:"environment"`
+	ExpiredAt   *string     `json:"expired_at"`
+	ExpiresAt   *string     `json:"expires_at"`
+	Fields      []SignField `json:"fields"`
+	// Your keys and values, returned in answers and webhooks
+	Metadata       map[string]string `json:"metadata"`
+	NextReminderAt *string           `json:"next_reminder_at"`
+	Options        SignOptions       `json:"options"`
+	// Automatic reminders sent
+	RemindersSent int `json:"reminders_sent"`
+	// sgn_…
+	RequestID string  `json:"request_id"`
+	SealJobID *string `json:"seal_job_id,omitempty"`
+	// Every document and the audit certificate, sealed (completed)
+	SealedFileID *string `json:"sealed_file_id,omitempty"`
+	// Everyone has signed and the sealed PDF is being made
+	Sealing bool         `json:"sealing"`
+	SentAt  *string      `json:"sent_at"`
+	Signers []SignSigner `json:"signers"`
+	// draft → sent → in_progress → completed; or declined (a signer declined), voided (by you), expired One of: draft, sent, in_progress, completed, declined, voided, expired.
+	Status     string  `json:"status"`
+	TemplateID *string `json:"template_id,omitempty"`
+	Title      *string `json:"title,omitempty"`
+	UpdatedAt  string  `json:"updated_at"`
+	VoidReason *string `json:"void_reason,omitempty"`
+	VoidedAt   *string `json:"voided_at"`
+}
+
+// A signing request
+type SignRequestCreate struct {
+	// 1 to 10 PDFs or DOCX files (converted to PDF), up to 25 MB and 200 pages each
+	Documents []FileRef `json:"documents"`
+	// Up to 200; a signer with no signature field gets one on the last page
+	Fields []SignFieldInput `json:"fields,omitempty"`
+	// Your keys and values, returned in answers and webhooks
+	Metadata map[string]string `json:"metadata,omitempty"`
+	Options  *SignOptionsIn    `json:"options,omitempty"`
+	// Send at once (default: a draft, sent with POST …/send)
+	Send *bool `json:"send,omitempty"`
+	// 1 to 20
+	Signers []SignSignerInput `json:"signers"`
+	Title   *string           `json:"title,omitempty"`
+}
+
+// A request in a list
+type SignRequestSummary struct {
+	CompletedAt *string `json:"completed_at"`
+	CreatedAt   string  `json:"created_at"`
+	Documents   int     `json:"documents"`
+	ExpiresAt   *string `json:"expires_at"`
+	// Your keys and values, returned in answers and webhooks
+	Metadata  map[string]string `json:"metadata"`
+	RequestID string            `json:"request_id"`
+	SentAt    *string           `json:"sent_at"`
+	Signed    int               `json:"signed"`
+	Signers   int               `json:"signers"`
+	// draft → sent → in_progress → completed; or declined (a signer declined), voided (by you), expired One of: draft, sent, in_progress, completed, declined, voided, expired.
+	Status     string  `json:"status"`
+	TemplateID *string `json:"template_id,omitempty"`
+	Title      *string `json:"title,omitempty"`
+}
+
+// A template role: who will sign, given per request
+type SignRole struct {
+	// One of: otp_email, otp_sms, aadhaar_esign, none.
+	Auth *string `json:"auth,omitempty"`
+	// One of: en, hi.
+	Language *string `json:"language,omitempty"`
+	Order    *int    `json:"order,omitempty"`
+	Role     string  `json:"role"`
+}
+
+// The signer's view of the request
+type SignSession struct {
+	// Embedded: the origins the page may be framed by
+	AllowedOrigins []string `json:"allowed_origins,omitempty"`
+	BrandColor     *string  `json:"brand_color,omitempty"`
+	// Where the code goes, masked
+	ContactHint *string               `json:"contact_hint,omitempty"`
+	Documents   []SignSessionDocument `json:"documents"`
+	Embedded    *bool                 `json:"embedded,omitempty"`
+	// One of: live, test.
+	Environment *string `json:"environment,omitempty"`
+	// This signer's fields
+	Fields        []SignField `json:"fields"`
+	LinkExpiresAt *string     `json:"link_expires_at,omitempty"`
+	LogoFileID    *string     `json:"logo_file_id,omitempty"`
+	Message       *string     `json:"message,omitempty"`
+	// Document index → pages seen
+	PagesViewed map[string][]int `json:"pages_viewed,omitempty"`
+	RedirectURL *string          `json:"redirect_url,omitempty"`
+	RequestID   string           `json:"request_id"`
+	// sealing: signed by everyone, the sealed PDF is being made One of: draft, sent, in_progress, completed, declined, voided, expired, sealing.
+	RequestStatus       string  `json:"request_status"`
+	RequireViewAllPages *bool   `json:"require_view_all_pages,omitempty"`
+	SealedFileID        *string `json:"sealed_file_id,omitempty"`
+	SenderName          *string `json:"sender_name,omitempty"`
+	// Send it in X-Sign-Session on every later call (one session per signer: opening the link again ends the others)
+	SessionID     string     `json:"session_id"`
+	Signer        SignSigner `json:"signer"`
+	SignersSigned int        `json:"signers_signed"`
+	SignersTotal  int        `json:"signers_total"`
+	// test_sign completed the request
+	TestCompleted *bool   `json:"test_completed,omitempty"`
+	Title         *string `json:"title,omitempty"`
+	// The signer proved who they are (or needs not)
+	Verified bool `json:"verified"`
+}
+
+// SignSessionDocument is a Lowco API object.
+type SignSessionDocument struct {
+	Filename  string                             `json:"filename"`
+	Index     int                                `json:"index"`
+	PageSizes []SignSessionDocumentsItemPageSize `json:"page_sizes"`
+	Pages     int                                `json:"pages"`
+}
+
+// Page size in points
+type SignSessionDocumentsItemPageSize struct {
+	H float64 `json:"h"`
+	W float64 `json:"w"`
+}
+
+// A signer
+type SignSigner struct {
+	// One of: otp_email, otp_sms, aadhaar_esign, none.
+	Auth          string  `json:"auth"`
+	DeclineReason *string `json:"decline_reason,omitempty"`
+	DeclinedAt    *string `json:"declined_at"`
+	Email         *string `json:"email,omitempty"`
+	// One of: en, hi.
+	Language string `json:"language"`
+	// The link works until then (7 days; a reminder resets it)
+	LinkExpiresAt *string `json:"link_expires_at,omitempty"`
+	Name          string  `json:"name"`
+	NotifiedAt    *string `json:"notified_at"`
+	Order         int     `json:"order"`
+	Phone         *string `json:"phone,omitempty"`
+	Ref           string  `json:"ref"`
+	Role          *string `json:"role,omitempty"`
+	SignedAt      *string `json:"signed_at"`
+	// sgs_…
+	SignerID string `json:"signer_id"`
+	// The signer's link: only in the answers of create with send, send, remind and template requests, for the signers whose turn it is
+	SigningURL *string `json:"signing_url,omitempty"`
+	// pending: not yet reached; notified: sent the link; viewed: opened and verified; signed; declined One of: pending, notified, viewed, signed, declined.
+	Status   string  `json:"status"`
+	ViewedAt *string `json:"viewed_at"`
+}
+
+// A person who signs
+type SignSignerInput struct {
+	// How the signer proves who they are: a code by email or SMS, Aadhaar eSign at the ESP, or none (default: otp_email with an email, otp_sms with a phone, else none) One of: otp_email, otp_sms, aadhaar_esign, none.
+	Auth  *string `json:"auth,omitempty"`
+	Email *string `json:"email,omitempty"`
+	// The signer page's language One of: en, hi.
+	Language *string `json:"language,omitempty"`
+	Name     string  `json:"name"`
+	Order    *int    `json:"order,omitempty"`
+	// +E.164, or a 10-digit Indian mobile number
+	Phone *string `json:"phone,omitempty"`
+	// How fields name this signer; default the role, or the position from 1
+	Ref  *string `json:"ref,omitempty"`
+	Role *string `json:"role,omitempty"`
+}
+
+// The signature
+type SignSubmit struct {
+	// Must be true: the signer agrees to sign electronically (422 consent_required otherwise)
+	Agree bool `json:"agree"`
+	// Values of the signer's text, date and checkbox fields (a date defaults to today, IST)
+	Fields    []SignSubmitField   `json:"fields,omitempty"`
+	Signature SignSubmitSignature `json:"signature"`
+}
+
+// SignSubmitField is a Lowco API object.
+type SignSubmitField struct {
+	FieldID string `json:"field_id"`
+	Value   string `json:"value"`
+}
+
+// SignSubmitSignature is a Lowco API object.
+type SignSubmitSignature struct {
+	// drawn or uploaded: a PNG or JPEG, at most 1 MB, 20x10 to 4000x2000 pixels
+	ImageBase64 *string `json:"image_base64,omitempty"`
+	// One of: drawn, typed, uploaded.
+	Kind string `json:"kind"`
+	// typed: the name as typed
+	Text *string `json:"text,omitempty"`
+}
+
+// A template: roles, placed fields, documents
+type SignTemplate struct {
+	CreatedAt string         `json:"created_at"`
+	Documents []SignDocument `json:"documents"`
+	// One of: live, test.
+	Environment string              `json:"environment"`
+	Fields      []SignTemplateField `json:"fields"`
+	// Your keys and values, returned in answers and webhooks
+	Metadata map[string]string `json:"metadata"`
+	Name     string            `json:"name"`
+	Options  SignOptions       `json:"options"`
+	Roles    []SignRole        `json:"roles"`
+	// sgt_…
+	TemplateID string  `json:"template_id"`
+	Title      *string `json:"title,omitempty"`
+	UpdatedAt  string  `json:"updated_at"`
+	// Requests made from it
+	Uses int `json:"uses"`
+}
+
+// A template
+type SignTemplateCreate struct {
+	// 1 to 10 PDFs or DOCX files
+	Documents []FileRef `json:"documents"`
+	// Fields name a role
+	Fields []SignTemplateCreateField `json:"fields,omitempty"`
+	// Your keys and values, returned in answers and webhooks
+	Metadata map[string]string `json:"metadata,omitempty"`
+	Name     string            `json:"name"`
+	Options  *SignOptionsIn    `json:"options,omitempty"`
+	// 1 to 20
+	Roles []SignRole `json:"roles"`
+	Title *string    `json:"title,omitempty"`
+}
+
+// A place to fill
+type SignTemplateCreateField struct {
+	// Place over every occurrence of this text in the document's text layer, e.g. {{sign_here}} (instead of page, x and y)
+	Anchor *string `json:"anchor,omitempty"`
+	// Points right of the anchor
+	AnchorOffsetX *float64 `json:"anchor_offset_x,omitempty"`
+	// Points below the anchor (negative: above)
+	AnchorOffsetY *float64 `json:"anchor_offset_y,omitempty"`
+	// A text or date's value unless the signer changes it; a checkbox's "true"/"false"; {{name}} takes a template's merge data
+	Default *string `json:"default,omitempty"`
+	// The document's position in documents[], from 0
+	DocumentIndex int      `json:"document_index"`
+	H             *float64 `json:"h,omitempty"`
+	Label         *string  `json:"label,omitempty"`
+	// With x and y
+	Page *int `json:"page,omitempty"`
+	// Default true for signature, initials and stamp
+	Required *bool `json:"required,omitempty"`
+	// The template role that fills it
+	Role string `json:"role"`
+	// One of: signature, initials, date, text, checkbox, stamp.
+	Type string   `json:"type"`
+	W    *float64 `json:"w,omitempty"`
+	// Points from the page's left
+	X *float64 `json:"x,omitempty"`
+	// Points from the page's top
+	Y *float64 `json:"y,omitempty"`
+}
+
+// A place to fill
+type SignTemplateField struct {
+	// Place over every occurrence of this text in the document's text layer, e.g. {{sign_here}} (instead of page, x and y)
+	Anchor *string `json:"anchor,omitempty"`
+	// Points right of the anchor
+	AnchorOffsetX *float64 `json:"anchor_offset_x,omitempty"`
+	// Points below the anchor (negative: above)
+	AnchorOffsetY *float64 `json:"anchor_offset_y,omitempty"`
+	// The placed box
+	Box SignTemplateFieldBox `json:"box"`
+	// A text or date's value unless the signer changes it; a checkbox's "true"/"false"; {{name}} takes a template's merge data
+	Default *string `json:"default,omitempty"`
+	// The document's position in documents[], from 0
+	DocumentIndex int      `json:"document_index"`
+	H             *float64 `json:"h,omitempty"`
+	Label         *string  `json:"label,omitempty"`
+	// With x and y
+	Page *int `json:"page,omitempty"`
+	// Default true for signature, initials and stamp
+	Required *bool `json:"required,omitempty"`
+	// The template role that fills it
+	Role string `json:"role"`
+	// One of: signature, initials, date, text, checkbox, stamp.
+	Type string   `json:"type"`
+	W    *float64 `json:"w,omitempty"`
+	// Points from the page's left
+	X *float64 `json:"x,omitempty"`
+	// Points from the page's top
+	Y *float64 `json:"y,omitempty"`
+}
+
+// The placed box
+type SignTemplateFieldBox struct {
+	H    float64 `json:"h"`
+	Page int     `json:"page"`
+	W    float64 `json:"w"`
+	X    float64 `json:"x"`
+	Y    float64 `json:"y"`
+}
+
+// Name, title, options or metadata (documents and fields are fixed: a different layout is a new template)
+type SignTemplatePatch struct {
+	// Your keys and values, returned in answers and webhooks
+	Metadata map[string]string `json:"metadata,omitempty"`
+	Name     *string           `json:"name,omitempty"`
+	Options  *SignOptionsIn    `json:"options,omitempty"`
+	Title    *string           `json:"title,omitempty"`
+}
+
+// A page; pass next_cursor as cursor for the next one (null at the end).
+type SignTemplatesListData struct {
+	Items      []SignTemplate `json:"items"`
+	NextCursor *string        `json:"next_cursor"`
+}
+
+// SignTemplatesListQuery is a Lowco API object.
+type SignTemplatesListQuery struct {
+	// Page size
+	Limit *int `json:"limit,omitempty"`
+	// next_cursor of the previous page.
+	Cursor *string `json:"cursor,omitempty"`
+}
+
+// Pages the signer has seen
+type SignViewed struct {
+	DocumentIndex *int  `json:"document_index,omitempty"`
+	Pages         []int `json:"pages"`
+}
+
+// SignVoid is a Lowco API object.
+type SignVoid struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+// A contact correction before the signer signs; a new email or phone rotates the link
+type SignerPatch struct {
+	Email *string `json:"email,omitempty"`
+	// One of: en, hi.
+	Language *string `json:"language,omitempty"`
+	Name     *string `json:"name,omitempty"`
+	// Send the corrected signer their link now (default true when it is their turn)
+	Notify *bool   `json:"notify,omitempty"`
+	Phone  *string `json:"phone,omitempty"`
 }
 
 // Where the value was read: page and box (empty when the page does not show it)
@@ -5758,6 +6426,185 @@ func (r *SettingsResource) Update(ctx context.Context, body SettingsPatch, opts 
 	return &out, nil
 }
 
+// SignResource: .
+type SignResource struct{ c *core }
+
+// Audit: The audit trail: signers, methods, timestamps, IPs, document hashes and every event, with the hash chain verified.
+func (r *SignResource) Audit(ctx context.Context, id string, opts ...RequestOption) (*SignAudit, error) {
+	var out SignAudit
+	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/sign/requests/%s/audit", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CertificateURL: Redirect to the audit certificate (completed requests).
+func (r *SignResource) CertificateURL(ctx context.Context, id string, opts ...RequestOption) (string, error) {
+	return r.c.redirect(ctx, sprintf("/v1/sign/requests/%s/certificate", url.PathEscape(id)), opts)
+}
+
+// Create: Create a signing request (a draft, or sent with send: true).
+func (r *SignResource) Create(ctx context.Context, body SignRequestCreate, opts ...RequestOption) (*SignRequest, error) {
+	var out SignRequest
+	if err := r.c.call(ctx, http.MethodPost, "/v1/sign/requests", toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Events: The request's audit-trail events, oldest first.
+func (r *SignResource) Events(ctx context.Context, id string, opts ...RequestOption) (*SignEventsData, error) {
+	var out SignEventsData
+	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/sign/requests/%s/events", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Get: Read a signing request.
+func (r *SignResource) Get(ctx context.Context, id string, opts ...RequestOption) (*SignRequest, error) {
+	var out SignRequest
+	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/sign/requests/%s", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// List: List signing requests, newest first.
+func (r *SignResource) List(ctx context.Context, query *SignListQuery, opts ...RequestOption) (*SignListData, error) {
+	var out SignListData
+	if err := r.c.call(ctx, http.MethodGet, "/v1/sign/requests", toQuery(query), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListAll pages through List, following next_cursor.
+func (r *SignResource) ListAll(ctx context.Context, query *SignListQuery, opts ...RequestOption) *Pager[SignRequestSummary] {
+	return newPager[SignRequestSummary](r.c, "/v1/sign/requests", toQuery(query), opts)
+}
+
+// Remind: Send the signers whose turn it is their link again (validity reset to 7 days); free.
+func (r *SignResource) Remind(ctx context.Context, id string, opts ...RequestOption) (*SignRequest, error) {
+	var out SignRequest
+	if err := r.c.call(ctx, http.MethodPost, sprintf("/v1/sign/requests/%s/remind", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Send: Send a draft: the signers whose turn it is get their link (1 api_sign_requests).
+func (r *SignResource) Send(ctx context.Context, id string, opts ...RequestOption) (*SignRequest, error) {
+	var out SignRequest
+	if err := r.c.call(ctx, http.MethodPost, sprintf("/v1/sign/requests/%s/send", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SignedDocumentURL: Redirect to a signed document (completed requests).
+func (r *SignResource) SignedDocumentURL(ctx context.Context, id string, n string, opts ...RequestOption) (string, error) {
+	return r.c.redirect(ctx, sprintf("/v1/sign/requests/%s/documents/%s/signed", url.PathEscape(id), url.PathEscape(n)), opts)
+}
+
+// SignerLink: A signer's link (for an embedded page or your own email), valid 7 days.
+func (r *SignResource) SignerLink(ctx context.Context, id string, signerId string, opts ...RequestOption) (*SignLink, error) {
+	var out SignLink
+	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/sign/requests/%s/signers/%s/link", url.PathEscape(id), url.PathEscape(signerId)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateSigner: Correct a signer's contact details before they sign (a new email or phone rotates the link).
+func (r *SignResource) UpdateSigner(ctx context.Context, id string, signerId string, body SignerPatch, opts ...RequestOption) (*SignRequest, error) {
+	var out SignRequest
+	if err := r.c.call(ctx, http.MethodPatch, sprintf("/v1/sign/requests/%s/signers/%s", url.PathEscape(id), url.PathEscape(signerId)), toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Void: Void a request: refused once it is completed (409 invalid_state).
+func (r *SignResource) Void(ctx context.Context, id string, body SignVoid, opts ...RequestOption) (*SignRequest, error) {
+	var out SignRequest
+	if err := r.c.call(ctx, http.MethodPost, sprintf("/v1/sign/requests/%s/void", url.PathEscape(id)), toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SignTemplatesResource: .
+type SignTemplatesResource struct{ c *core }
+
+// BulkSend: Bulk send: up to 500 rows, one request each, as one job (202).
+func (r *SignTemplatesResource) BulkSend(ctx context.Context, id string, body SignBulk, opts ...RequestOption) (*Job, error) {
+	var out Job
+	if err := r.c.call(ctx, http.MethodPost, sprintf("/v1/sign/templates/%s/bulk", url.PathEscape(id)), toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Create: Store a template: documents, roles and placed fields.
+func (r *SignTemplatesResource) Create(ctx context.Context, body SignTemplateCreate, opts ...RequestOption) (*SignTemplate, error) {
+	var out SignTemplate
+	if err := r.c.call(ctx, http.MethodPost, "/v1/sign/templates", toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateRequest: Make a request from a template: a person per role, merge data.
+func (r *SignTemplatesResource) CreateRequest(ctx context.Context, id string, body SignFromTemplate, opts ...RequestOption) (*SignRequest, error) {
+	var out SignRequest
+	if err := r.c.call(ctx, http.MethodPost, sprintf("/v1/sign/templates/%s/requests", url.PathEscape(id)), toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Delete: Delete a template (requests made from it are not affected).
+func (r *SignTemplatesResource) Delete(ctx context.Context, id string, opts ...RequestOption) (*Deleted, error) {
+	var out Deleted
+	if err := r.c.call(ctx, http.MethodDelete, sprintf("/v1/sign/templates/%s", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Get: Read a template.
+func (r *SignTemplatesResource) Get(ctx context.Context, id string, opts ...RequestOption) (*SignTemplate, error) {
+	var out SignTemplate
+	if err := r.c.call(ctx, http.MethodGet, sprintf("/v1/sign/templates/%s", url.PathEscape(id)), toQuery(nil), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// List: List templates, newest first.
+func (r *SignTemplatesResource) List(ctx context.Context, query *SignTemplatesListQuery, opts ...RequestOption) (*SignTemplatesListData, error) {
+	var out SignTemplatesListData
+	if err := r.c.call(ctx, http.MethodGet, "/v1/sign/templates", toQuery(query), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListAll pages through List, following next_cursor.
+func (r *SignTemplatesResource) ListAll(ctx context.Context, query *SignTemplatesListQuery, opts ...RequestOption) *Pager[SignTemplate] {
+	return newPager[SignTemplate](r.c, "/v1/sign/templates", toQuery(query), opts)
+}
+
+// Update: Change a template's name, title, options or metadata.
+func (r *SignTemplatesResource) Update(ctx context.Context, id string, body SignTemplatePatch, opts ...RequestOption) (*SignTemplate, error) {
+	var out SignTemplate
+	if err := r.c.call(ctx, http.MethodPatch, sprintf("/v1/sign/templates/%s", url.PathEscape(id)), toQuery(nil), body, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // TemplatesResource: Stored render templates.
 type TemplatesResource struct{ c *core }
 
@@ -6009,6 +6856,10 @@ type services struct {
 	Requests *RequestsResource
 	// Settings: Environment settings.
 	Settings *SettingsResource
+	// Sign: .
+	Sign *SignResource
+	// SignTemplates: .
+	SignTemplates *SignTemplatesResource
 	// Templates: Stored render templates.
 	Templates *TemplatesResource
 	// Usage: Usage and balance.
@@ -6019,21 +6870,23 @@ type services struct {
 
 func newServices(c *core) services {
 	return services{
-		Barcode:   &BarcodeService{c},
-		DocAI:     &DocAIService{c},
-		OCR:       &OCRService{c},
-		PDF:       &PDFService{c},
-		QR:        &QRService{c},
-		Render:    &RenderService{c},
-		Verify:    &VerifyService{c},
-		Audit:     &AuditResource{c},
-		Files:     &FilesResource{c},
-		Jobs:      &JobsResource{c},
-		Keys:      &KeysResource{c},
-		Requests:  &RequestsResource{c},
-		Settings:  &SettingsResource{c},
-		Templates: &TemplatesResource{c},
-		Usage:     &UsageResource{c},
-		Webhooks:  &WebhooksResource{c},
+		Barcode:       &BarcodeService{c},
+		DocAI:         &DocAIService{c},
+		OCR:           &OCRService{c},
+		PDF:           &PDFService{c},
+		QR:            &QRService{c},
+		Render:        &RenderService{c},
+		Verify:        &VerifyService{c},
+		Audit:         &AuditResource{c},
+		Files:         &FilesResource{c},
+		Jobs:          &JobsResource{c},
+		Keys:          &KeysResource{c},
+		Requests:      &RequestsResource{c},
+		Settings:      &SettingsResource{c},
+		Sign:          &SignResource{c},
+		SignTemplates: &SignTemplatesResource{c},
+		Templates:     &TemplatesResource{c},
+		Usage:         &UsageResource{c},
+		Webhooks:      &WebhooksResource{c},
 	}
 }

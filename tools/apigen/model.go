@@ -113,10 +113,22 @@ var resourceNames = map[string][2]string{
 	"usage_get": {"usage", "get"}, "usage_alerts": {"usage", "alerts"}, "overview": {"usage", "overview"},
 	"audit_list": {"audit", "list"}, "verify_audit_list": {"audit", "listVerify"},
 	"keys_list": {"keys", "list"}, "keys_validate": {"keys", "validate"}, "keys_sync": {"keys", "sync"},
+	"sign_requests_create": {"sign", "create"}, "sign_requests_list": {"sign", "list"}, "sign_requests_get": {"sign", "get"},
+	"sign_requests_send": {"sign", "send"}, "sign_requests_remind": {"sign", "remind"}, "sign_requests_void": {"sign", "void"},
+	"sign_requests_events": {"sign", "events"}, "sign_requests_audit": {"sign", "audit"},
+	"sign_requests_signer_link": {"sign", "signerLink"}, "sign_requests_signer_update": {"sign", "updateSigner"},
+	"sign_requests_signed_document": {"sign", "signedDocumentUrl"}, "sign_requests_certificate": {"sign", "certificateUrl"},
+	"sign_templates_create": {"signTemplates", "create"}, "sign_templates_list": {"signTemplates", "list"},
+	"sign_templates_get": {"signTemplates", "get"}, "sign_templates_update": {"signTemplates", "update"},
+	"sign_templates_delete": {"signTemplates", "delete"}, "sign_templates_request": {"signTemplates", "createRequest"},
+	"sign_templates_bulk": {"signTemplates", "bulkSend"},
 }
 
-// skipped operationIds: the signed download is a plain URL (Client.download).
-var skipped = map[string]bool{"files_download": true}
+// skipped operationIds: the signed download is a plain URL (Client.download);
+// the signer link's routes are the signer page's, not a developer's.
+var skipped = map[string]bool{"files_download": true, "sign_session_open": true, "sign_session_state": true, "sign_session_otp": true,
+	"sign_session_otp_verify": true, "sign_session_viewed": true, "sign_session_sign": true, "sign_session_decline": true,
+	"sign_session_document": true, "sign_session_logo": true}
 
 func load(path string) (*Model, error) {
 	b, err := os.ReadFile(path)

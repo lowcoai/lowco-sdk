@@ -995,6 +995,12 @@ export interface JobInput {
   file_id?: string;
   file_ids?: string[];
   pages?: number;
+  /** A sign bulk job's rows */
+  rows?: number;
+  /** A sign bulk job sends each request */
+  send?: boolean;
+  /** A sign bulk job's template */
+  template_id?: string;
 }
 
 export interface JobLinks {
@@ -2630,6 +2636,10 @@ export interface Settings {
   retention_input_hours: number;
   /** 0 is zero retention */
   retention_output_hours: number;
+  /** Delete signed files after sign_retention_days; off (the default) keeps them while the request exists */
+  sign_auto_delete: boolean;
+  /** Days completed requests' signed files are kept when sign_auto_delete is on (default 2555, 7 years) */
+  sign_retention_days: number;
   updated_at: string;
   verify_audit_retention_days: number;
 }
@@ -2649,12 +2659,638 @@ export interface SettingsPatch {
   retention_input_hours?: number;
   /** 0 is zero retention */
   retention_output_hours?: number;
+  /** Delete completed requests' signed files after sign_retention_days */
+  sign_auto_delete?: boolean;
+  /** Days signed files are kept with sign_auto_delete */
+  sign_retention_days?: number;
   verify_audit_retention_days?: number;
 }
 
 export interface SettingsPurgeQuery {
   /** The calling environment, to confirm */
   confirm: "live" | "test";
+}
+
+/** The audit trail: the certificate's facts and every event with its hash */
+export interface SignAudit {
+  /** The first event that does not verify */
+  chain_error?: string;
+  /** Every event verifies against its hash and the previous one */
+  chain_valid: boolean;
+  completed_at?: string | null;
+  created_at: string;
+  documents: SignDocument[];
+  environment: "live" | "test";
+  events: SignEvent[];
+  generated_at: string;
+  /** The last event's hash */
+  head_hash: string;
+  request_id: string;
+  sent_at?: string | null;
+  signers: SignAuditSigner[];
+  /** draft → sent → in_progress → completed; or declined (a signer declined), voided (by you), expired */
+  status: "draft" | "sent" | "in_progress" | "completed" | "declined" | "voided" | "expired";
+  title?: string;
+}
+
+/** A signer in the audit trail */
+export interface SignAuditSigner {
+  auth: "otp_email" | "otp_sms" | "aadhaar_esign" | "none";
+  decline_reason?: string;
+  declined_at: string | null;
+  email?: string;
+  ip?: string;
+  name: string;
+  order: number;
+  phone?: string;
+  role?: string;
+  signature_kind?: "" | "drawn" | "typed" | "uploaded";
+  signed_at: string | null;
+  signer_id: string;
+  status: "pending" | "notified" | "viewed" | "signed" | "declined";
+  user_agent?: string;
+  verified_at: string | null;
+  viewed_at: string | null;
+}
+
+/** Up to 500 rows, one request each, made as one job */
+export interface SignBulk {
+  /** https URL for the job's webhook */
+  callback_url?: string;
+  /** 1 to 500 (each row's send is ignored) */
+  rows: SignFromTemplate[];
+  /** Send each request (default true) */
+  send?: boolean;
+}
+
+export interface SignDecline {
+  reason: string;
+}
+
+/** A document */
+export interface SignDocument {
+  /** The PDF signed (a DOCX was converted) */
+  file_id: string;
+  filename: string;
+  index: number;
+  pages: number;
+  /** SHA-256 of the signed copy (completed) */
+  sha256_after?: string;
+  /** SHA-256 of the document as sent */
+  sha256_before: string;
+  /** The signed copy (completed) */
+  signed_file_id?: string;
+}
+
+/** An audit-trail event, hash-chained */
+export interface SignEvent {
+  /** With microseconds (the hash covers them) */
+  at: string;
+  detail: Record<string, unknown>;
+  /** sge_… */
+  event_id: string;
+  /** SHA-256 over prev_hash and the event's fields */
+  hash: string;
+  /** The previous event's hash (empty for the first) */
+  prev_hash: string;
+  /** From 1, without gaps */
+  seq: number;
+  signer_id?: string;
+  /** request.sent, signer.opened, signer.verified, signer.signed, … */
+  type: string;
+}
+
+export interface SignEventsData {
+  items: SignEvent[];
+}
+
+/** A placed field */
+export interface SignField {
+  default?: string;
+  document_index: number;
+  /** sgf_… */
+  field_id: string;
+  filled_at: string | null;
+  h: number;
+  label?: string;
+  page: number;
+  required: boolean;
+  signer_id: string;
+  signer_ref: string;
+  type: "signature" | "initials" | "date" | "text" | "checkbox" | "stamp";
+  /** What the signer filled (signature fields: drawn, typed or uploaded) */
+  value: string | null;
+  w: number;
+  x: number;
+  y: number;
+}
+
+/** A place to fill */
+export interface SignFieldInput {
+  /** Place over every occurrence of this text in the document's text layer, e.g. {{sign_here}} (instead of page, x and y) */
+  anchor?: string;
+  /** Points right of the anchor */
+  anchor_offset_x?: number;
+  /** Points below the anchor (negative: above) */
+  anchor_offset_y?: number;
+  /** A text or date's value unless the signer changes it; a checkbox's "true"/"false"; {{name}} takes a template's merge data */
+  default?: string;
+  /** The document's position in documents[], from 0 */
+  document_index: number;
+  h?: number;
+  label?: string;
+  /** With x and y */
+  page?: number;
+  /** Default true for signature, initials and stamp */
+  required?: boolean;
+  /** The signer's ref (default its role, or its position from 1) */
+  signer_ref: string;
+  type: "signature" | "initials" | "date" | "text" | "checkbox" | "stamp";
+  w?: number;
+  /** Points from the page's left */
+  x?: number;
+  /** Points from the page's top */
+  y?: number;
+}
+
+/** A request from a template: who fills each role, merge data */
+export interface SignFromTemplate {
+  /** Replaces {{name}} in the title, message and field defaults */
+  data?: Record<string, string>;
+  /** Your keys and values, returned in answers and webhooks */
+  metadata?: Record<string, string>;
+  options?: SignOptionsIn;
+  /** Role name → person */
+  roles: Record<string, SignPerson>;
+  /** Send at once (default: a draft) */
+  send?: boolean;
+  title?: string;
+}
+
+/** A signer's link */
+export interface SignLink {
+  embedded: boolean;
+  expires_at: string;
+  signer_id: string;
+  url: string;
+}
+
+/** A page; pass next_cursor as cursor for the next one (null at the end). */
+export interface SignListData {
+  items: SignRequestSummary[];
+  next_cursor: string | null;
+}
+
+export interface SignListQuery {
+  status?: "draft" | "sent" | "in_progress" | "completed" | "declined" | "voided" | "expired";
+  template_id?: string;
+  created_after?: string;
+  created_before?: string;
+  /** Page size */
+  limit?: number;
+  /** next_cursor of the previous page. */
+  cursor?: string;
+}
+
+export interface SignOTPResult {
+  attempts_left: number;
+  verified: boolean;
+}
+
+export interface SignOTPSent {
+  channel: "email" | "sms";
+  /** Test environment only: the code (always 123456) */
+  code?: string;
+  /** Masked */
+  destination: string;
+  expires_at: string;
+}
+
+export interface SignOTPVerify {
+  code: string;
+}
+
+/** Request options */
+export interface SignOptions {
+  /** Append the audit certificate page to the sealed PDF */
+  attach_audit_certificate?: boolean;
+  /** What signers see of the sender */
+  branding?: SignOptionsBranding;
+  /** Links for an iframe, allowed only on the environment's allowed_origins */
+  embedded?: boolean;
+  /** Default 30 */
+  expires_in_days?: number;
+  /** Shown to signers and in their email */
+  message?: string;
+  /** https URL the signer goes to after signing */
+  redirect_url?: string;
+  /** Automatic reminders */
+  reminders?: SignOptionsReminders;
+  /** Signers must view every page before signing */
+  require_view_all_pages?: boolean;
+  /** Signers sign in order (order, else list order); otherwise all at once */
+  sequential?: boolean;
+}
+
+/** What signers see of the sender */
+export interface SignOptionsBranding {
+  color?: string;
+  /** The stored logo (answers) */
+  logo_file_id?: string;
+  sender_name?: string;
+}
+
+/** Request options */
+export interface SignOptionsIn {
+  /** Append the audit certificate page to the sealed PDF */
+  attach_audit_certificate?: boolean;
+  /** What signers see of the sender */
+  branding?: SignOptionsInBranding;
+  /** Links for an iframe, allowed only on the environment's allowed_origins */
+  embedded?: boolean;
+  /** Default 30 */
+  expires_in_days?: number;
+  /** Shown to signers and in their email */
+  message?: string;
+  /** https URL the signer goes to after signing */
+  redirect_url?: string;
+  /** Automatic reminders */
+  reminders?: SignOptionsInReminders;
+  /** Signers must view every page before signing */
+  require_view_all_pages?: boolean;
+  /** Signers sign in order (order, else list order); otherwise all at once */
+  sequential?: boolean;
+}
+
+/** What signers see of the sender */
+export interface SignOptionsInBranding {
+  color?: string;
+  logo?: FileRef;
+  /** The stored logo (answers) */
+  logo_file_id?: string;
+  sender_name?: string;
+}
+
+/** Automatic reminders */
+export interface SignOptionsInReminders {
+  /** Days after sending */
+  after_days: number;
+  /** Then every this many days (0: one reminder) */
+  every_days?: number;
+  /** At most this many (default 1, or 3 with every_days) */
+  max?: number;
+}
+
+/** Automatic reminders */
+export interface SignOptionsReminders {
+  /** Days after sending */
+  after_days: number;
+  /** Then every this many days (0: one reminder) */
+  every_days?: number;
+  /** At most this many (default 1, or 3 with every_days) */
+  max?: number;
+}
+
+/** The person filling a role */
+export interface SignPerson {
+  auth?: "otp_email" | "otp_sms" | "aadhaar_esign" | "none";
+  email?: string;
+  language?: "en" | "hi";
+  name: string;
+  phone?: string;
+}
+
+/** A signing request */
+export interface SignRequest {
+  /** The audit certificate (completed) */
+  certificate_file_id?: string;
+  completed_at: string | null;
+  created_at: string;
+  declined_at: string | null;
+  documents: SignDocument[];
+  environment: "live" | "test";
+  expired_at: string | null;
+  expires_at: string | null;
+  fields: SignField[];
+  /** Your keys and values, returned in answers and webhooks */
+  metadata: Record<string, string>;
+  next_reminder_at: string | null;
+  options: SignOptions;
+  /** Automatic reminders sent */
+  reminders_sent: number;
+  /** sgn_… */
+  request_id: string;
+  seal_job_id?: string;
+  /** Every document and the audit certificate, sealed (completed) */
+  sealed_file_id?: string;
+  /** Everyone has signed and the sealed PDF is being made */
+  sealing: boolean;
+  sent_at: string | null;
+  signers: SignSigner[];
+  /** draft → sent → in_progress → completed; or declined (a signer declined), voided (by you), expired */
+  status: "draft" | "sent" | "in_progress" | "completed" | "declined" | "voided" | "expired";
+  template_id?: string;
+  title?: string;
+  updated_at: string;
+  void_reason?: string;
+  voided_at: string | null;
+}
+
+/** A signing request */
+export interface SignRequestCreate {
+  /** 1 to 10 PDFs or DOCX files (converted to PDF), up to 25 MB and 200 pages each */
+  documents: FileRef[];
+  /** Up to 200; a signer with no signature field gets one on the last page */
+  fields?: SignFieldInput[];
+  /** Your keys and values, returned in answers and webhooks */
+  metadata?: Record<string, string>;
+  options?: SignOptionsIn;
+  /** Send at once (default: a draft, sent with POST …/send) */
+  send?: boolean;
+  /** 1 to 20 */
+  signers: SignSignerInput[];
+  title?: string;
+}
+
+/** A request in a list */
+export interface SignRequestSummary {
+  completed_at: string | null;
+  created_at: string;
+  documents: number;
+  expires_at: string | null;
+  /** Your keys and values, returned in answers and webhooks */
+  metadata: Record<string, string>;
+  request_id: string;
+  sent_at: string | null;
+  signed: number;
+  signers: number;
+  /** draft → sent → in_progress → completed; or declined (a signer declined), voided (by you), expired */
+  status: "draft" | "sent" | "in_progress" | "completed" | "declined" | "voided" | "expired";
+  template_id?: string;
+  title?: string;
+}
+
+/** A template role: who will sign, given per request */
+export interface SignRole {
+  auth?: "otp_email" | "otp_sms" | "aadhaar_esign" | "none";
+  language?: "en" | "hi";
+  order?: number;
+  role: string;
+}
+
+/** The signer's view of the request */
+export interface SignSession {
+  /** Embedded: the origins the page may be framed by */
+  allowed_origins?: string[];
+  brand_color?: string;
+  /** Where the code goes, masked */
+  contact_hint?: string;
+  documents: SignSessionDocument[];
+  embedded?: boolean;
+  environment?: "live" | "test";
+  /** This signer's fields */
+  fields: SignField[];
+  link_expires_at?: string;
+  logo_file_id?: string;
+  message?: string;
+  /** Document index → pages seen */
+  pages_viewed?: Record<string, number[]>;
+  redirect_url?: string;
+  request_id: string;
+  /** sealing: signed by everyone, the sealed PDF is being made */
+  request_status: "draft" | "sent" | "in_progress" | "completed" | "declined" | "voided" | "expired" | "sealing";
+  require_view_all_pages?: boolean;
+  sealed_file_id?: string;
+  sender_name?: string;
+  /** Send it in X-Sign-Session on every later call (one session per signer: opening the link again ends the others) */
+  session_id: string;
+  signer: SignSigner;
+  signers_signed: number;
+  signers_total: number;
+  /** test_sign completed the request */
+  test_completed?: boolean;
+  title?: string;
+  /** The signer proved who they are (or needs not) */
+  verified: boolean;
+}
+
+export interface SignSessionDocument {
+  filename: string;
+  index: number;
+  page_sizes: SignSessionDocumentsItemPageSize[];
+  pages: number;
+}
+
+/** Page size in points */
+export interface SignSessionDocumentsItemPageSize {
+  h: number;
+  w: number;
+}
+
+/** A signer */
+export interface SignSigner {
+  auth: "otp_email" | "otp_sms" | "aadhaar_esign" | "none";
+  decline_reason?: string;
+  declined_at: string | null;
+  email?: string;
+  language: "en" | "hi";
+  /** The link works until then (7 days; a reminder resets it) */
+  link_expires_at?: string | null;
+  name: string;
+  notified_at: string | null;
+  order: number;
+  phone?: string;
+  ref: string;
+  role?: string;
+  signed_at: string | null;
+  /** sgs_… */
+  signer_id: string;
+  /** The signer's link: only in the answers of create with send, send, remind and template requests, for the signers whose turn it is */
+  signing_url?: string;
+  /** pending: not yet reached; notified: sent the link; viewed: opened and verified; signed; declined */
+  status: "pending" | "notified" | "viewed" | "signed" | "declined";
+  viewed_at: string | null;
+}
+
+/** A person who signs */
+export interface SignSignerInput {
+  /** How the signer proves who they are: a code by email or SMS, Aadhaar eSign at the ESP, or none (default: otp_email with an email, otp_sms with a phone, else none) */
+  auth?: "otp_email" | "otp_sms" | "aadhaar_esign" | "none";
+  email?: string;
+  /** The signer page's language */
+  language?: "en" | "hi";
+  name: string;
+  order?: number;
+  /** +E.164, or a 10-digit Indian mobile number */
+  phone?: string;
+  /** How fields name this signer; default the role, or the position from 1 */
+  ref?: string;
+  role?: string;
+}
+
+/** The signature */
+export interface SignSubmit {
+  /** Must be true: the signer agrees to sign electronically (422 consent_required otherwise) */
+  agree: boolean;
+  /** Values of the signer's text, date and checkbox fields (a date defaults to today, IST) */
+  fields?: SignSubmitField[];
+  signature: SignSubmitSignature;
+}
+
+export interface SignSubmitField {
+  field_id: string;
+  value: string;
+}
+
+export interface SignSubmitSignature {
+  /** drawn or uploaded: a PNG or JPEG, at most 1 MB, 20x10 to 4000x2000 pixels */
+  image_base64?: string;
+  kind: "drawn" | "typed" | "uploaded";
+  /** typed: the name as typed */
+  text?: string;
+}
+
+/** A template: roles, placed fields, documents */
+export interface SignTemplate {
+  created_at: string;
+  documents: SignDocument[];
+  environment: "live" | "test";
+  fields: SignTemplateField[];
+  /** Your keys and values, returned in answers and webhooks */
+  metadata: Record<string, string>;
+  name: string;
+  options: SignOptions;
+  roles: SignRole[];
+  /** sgt_… */
+  template_id: string;
+  title?: string;
+  updated_at: string;
+  /** Requests made from it */
+  uses: number;
+}
+
+/** A template */
+export interface SignTemplateCreate {
+  /** 1 to 10 PDFs or DOCX files */
+  documents: FileRef[];
+  /** Fields name a role */
+  fields?: SignTemplateCreateField[];
+  /** Your keys and values, returned in answers and webhooks */
+  metadata?: Record<string, string>;
+  name: string;
+  options?: SignOptionsIn;
+  /** 1 to 20 */
+  roles: SignRole[];
+  title?: string;
+}
+
+/** A place to fill */
+export interface SignTemplateCreateField {
+  /** Place over every occurrence of this text in the document's text layer, e.g. {{sign_here}} (instead of page, x and y) */
+  anchor?: string;
+  /** Points right of the anchor */
+  anchor_offset_x?: number;
+  /** Points below the anchor (negative: above) */
+  anchor_offset_y?: number;
+  /** A text or date's value unless the signer changes it; a checkbox's "true"/"false"; {{name}} takes a template's merge data */
+  default?: string;
+  /** The document's position in documents[], from 0 */
+  document_index: number;
+  h?: number;
+  label?: string;
+  /** With x and y */
+  page?: number;
+  /** Default true for signature, initials and stamp */
+  required?: boolean;
+  /** The template role that fills it */
+  role: string;
+  type: "signature" | "initials" | "date" | "text" | "checkbox" | "stamp";
+  w?: number;
+  /** Points from the page's left */
+  x?: number;
+  /** Points from the page's top */
+  y?: number;
+}
+
+/** A place to fill */
+export interface SignTemplateField {
+  /** Place over every occurrence of this text in the document's text layer, e.g. {{sign_here}} (instead of page, x and y) */
+  anchor?: string;
+  /** Points right of the anchor */
+  anchor_offset_x?: number;
+  /** Points below the anchor (negative: above) */
+  anchor_offset_y?: number;
+  /** The placed box */
+  box: SignTemplateFieldBox;
+  /** A text or date's value unless the signer changes it; a checkbox's "true"/"false"; {{name}} takes a template's merge data */
+  default?: string;
+  /** The document's position in documents[], from 0 */
+  document_index: number;
+  h?: number;
+  label?: string;
+  /** With x and y */
+  page?: number;
+  /** Default true for signature, initials and stamp */
+  required?: boolean;
+  /** The template role that fills it */
+  role: string;
+  type: "signature" | "initials" | "date" | "text" | "checkbox" | "stamp";
+  w?: number;
+  /** Points from the page's left */
+  x?: number;
+  /** Points from the page's top */
+  y?: number;
+}
+
+/** The placed box */
+export interface SignTemplateFieldBox {
+  h: number;
+  page: number;
+  w: number;
+  x: number;
+  y: number;
+}
+
+/** Name, title, options or metadata (documents and fields are fixed: a different layout is a new template) */
+export interface SignTemplatePatch {
+  /** Your keys and values, returned in answers and webhooks */
+  metadata?: Record<string, string>;
+  name?: string;
+  options?: SignOptionsIn;
+  title?: string;
+}
+
+/** A page; pass next_cursor as cursor for the next one (null at the end). */
+export interface SignTemplatesListData {
+  items: SignTemplate[];
+  next_cursor: string | null;
+}
+
+export interface SignTemplatesListQuery {
+  /** Page size */
+  limit?: number;
+  /** next_cursor of the previous page. */
+  cursor?: string;
+}
+
+/** Pages the signer has seen */
+export interface SignViewed {
+  document_index?: number;
+  pages: number[];
+}
+
+export interface SignVoid {
+  reason?: string;
+}
+
+/** A contact correction before the signer signs; a new email or phone rotates the link */
+export interface SignerPatch {
+  email?: string;
+  language?: "en" | "hi";
+  name?: string;
+  /** Send the corrected signer their link now (default true when it is their turn) */
+  notify?: boolean;
+  phone?: string;
 }
 
 /** Where the value was read: page and box (empty when the page does not show it) */
@@ -5223,6 +5859,123 @@ export class SettingsResource {
 
 }
 
+/** . */
+export class SignResource {
+  constructor(private readonly core: Core) {}
+
+  /** The audit trail: signers, methods, timestamps, IPs, document hashes and every event, with the hash chain verified. */
+  audit(id: string, options?: RequestOptions): Promise<SignAudit> {
+    return this.core.call<SignAudit>("GET", `/v1/sign/requests/${encodeURIComponent(id)}/audit`, { query: undefined, json: undefined }, options);
+  }
+
+  /** Redirect to the audit certificate (completed requests). */
+  certificateUrl(id: string, options?: RequestOptions): Promise<string> {
+    return this.core.redirect(`/v1/sign/requests/${encodeURIComponent(id)}/certificate`, options);
+  }
+
+  /** Create a signing request (a draft, or sent with send: true). */
+  create(body: SignRequestCreate, options?: RequestOptions): Promise<SignRequest> {
+    return this.core.call<SignRequest>("POST", `/v1/sign/requests`, { query: undefined, json: body }, options);
+  }
+
+  /** The request's audit-trail events, oldest first. */
+  events(id: string, options?: RequestOptions): Promise<SignEventsData> {
+    return this.core.call<SignEventsData>("GET", `/v1/sign/requests/${encodeURIComponent(id)}/events`, { query: undefined, json: undefined }, options);
+  }
+
+  /** Read a signing request. */
+  get(id: string, options?: RequestOptions): Promise<SignRequest> {
+    return this.core.call<SignRequest>("GET", `/v1/sign/requests/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
+  }
+
+  /** List signing requests, newest first. */
+  list(query?: SignListQuery, options?: RequestOptions): Promise<SignListData> {
+    return this.core.call<SignListData>("GET", `/v1/sign/requests`, { query: query as unknown as Record<string, unknown> | undefined, json: undefined }, options);
+  }
+
+  /** Every item of list, page after page (follows next_cursor). */
+  listAll(query?: Omit<SignListQuery, "cursor">, options?: RequestOptions): AsyncIterable<SignRequestSummary> {
+    return this.core.paginate<SignRequestSummary>(`/v1/sign/requests`, query as unknown as Record<string, unknown> | undefined, options);
+  }
+
+  /** Send the signers whose turn it is their link again (validity reset to 7 days); free. */
+  remind(id: string, options?: RequestOptions): Promise<SignRequest> {
+    return this.core.call<SignRequest>("POST", `/v1/sign/requests/${encodeURIComponent(id)}/remind`, { query: undefined, json: undefined }, options);
+  }
+
+  /** Send a draft: the signers whose turn it is get their link (1 api_sign_requests). */
+  send(id: string, options?: RequestOptions): Promise<SignRequest> {
+    return this.core.call<SignRequest>("POST", `/v1/sign/requests/${encodeURIComponent(id)}/send`, { query: undefined, json: undefined }, options);
+  }
+
+  /** Redirect to a signed document (completed requests). */
+  signedDocumentUrl(id: string, n: string, options?: RequestOptions): Promise<string> {
+    return this.core.redirect(`/v1/sign/requests/${encodeURIComponent(id)}/documents/${encodeURIComponent(n)}/signed`, options);
+  }
+
+  /** A signer's link (for an embedded page or your own email), valid 7 days. */
+  signerLink(id: string, signerId: string, options?: RequestOptions): Promise<SignLink> {
+    return this.core.call<SignLink>("GET", `/v1/sign/requests/${encodeURIComponent(id)}/signers/${encodeURIComponent(signerId)}/link`, { query: undefined, json: undefined }, options);
+  }
+
+  /** Correct a signer's contact details before they sign (a new email or phone rotates the link). */
+  updateSigner(id: string, signerId: string, body: SignerPatch, options?: RequestOptions): Promise<SignRequest> {
+    return this.core.call<SignRequest>("PATCH", `/v1/sign/requests/${encodeURIComponent(id)}/signers/${encodeURIComponent(signerId)}`, { query: undefined, json: body }, options);
+  }
+
+  /** Void a request: refused once it is completed (409 invalid_state). */
+  void(id: string, body: SignVoid, options?: RequestOptions): Promise<SignRequest> {
+    return this.core.call<SignRequest>("POST", `/v1/sign/requests/${encodeURIComponent(id)}/void`, { query: undefined, json: body }, options);
+  }
+
+}
+
+/** . */
+export class SignTemplatesResource {
+  constructor(private readonly core: Core) {}
+
+  /** Bulk send: up to 500 rows, one request each, as one job (202). */
+  bulkSend(id: string, body: SignBulk, options?: RequestOptions): Promise<Job> {
+    return this.core.call<Job>("POST", `/v1/sign/templates/${encodeURIComponent(id)}/bulk`, { query: undefined, json: body }, options);
+  }
+
+  /** Store a template: documents, roles and placed fields. */
+  create(body: SignTemplateCreate, options?: RequestOptions): Promise<SignTemplate> {
+    return this.core.call<SignTemplate>("POST", `/v1/sign/templates`, { query: undefined, json: body }, options);
+  }
+
+  /** Make a request from a template: a person per role, merge data. */
+  createRequest(id: string, body: SignFromTemplate, options?: RequestOptions): Promise<SignRequest> {
+    return this.core.call<SignRequest>("POST", `/v1/sign/templates/${encodeURIComponent(id)}/requests`, { query: undefined, json: body }, options);
+  }
+
+  /** Delete a template (requests made from it are not affected). */
+  delete(id: string, options?: RequestOptions): Promise<Deleted> {
+    return this.core.call<Deleted>("DELETE", `/v1/sign/templates/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
+  }
+
+  /** Read a template. */
+  get(id: string, options?: RequestOptions): Promise<SignTemplate> {
+    return this.core.call<SignTemplate>("GET", `/v1/sign/templates/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
+  }
+
+  /** List templates, newest first. */
+  list(query?: SignTemplatesListQuery, options?: RequestOptions): Promise<SignTemplatesListData> {
+    return this.core.call<SignTemplatesListData>("GET", `/v1/sign/templates`, { query: query as unknown as Record<string, unknown> | undefined, json: undefined }, options);
+  }
+
+  /** Every item of list, page after page (follows next_cursor). */
+  listAll(query?: Omit<SignTemplatesListQuery, "cursor">, options?: RequestOptions): AsyncIterable<SignTemplate> {
+    return this.core.paginate<SignTemplate>(`/v1/sign/templates`, query as unknown as Record<string, unknown> | undefined, options);
+  }
+
+  /** Change a template's name, title, options or metadata. */
+  update(id: string, body: SignTemplatePatch, options?: RequestOptions): Promise<SignTemplate> {
+    return this.core.call<SignTemplate>("PATCH", `/v1/sign/templates/${encodeURIComponent(id)}`, { query: undefined, json: body }, options);
+  }
+
+}
+
 /** Stored render templates. */
 export class TemplatesResource {
   constructor(private readonly core: Core) {}
@@ -5399,6 +6152,10 @@ export class GeneratedClient {
   readonly requests: RequestsResource;
   /** Environment settings. */
   readonly settings: SettingsResource;
+  /** . */
+  readonly sign: SignResource;
+  /** . */
+  readonly signTemplates: SignTemplatesResource;
   /** Stored render templates. */
   readonly templates: TemplatesResource;
   /** Usage and balance. */
@@ -5420,6 +6177,8 @@ export class GeneratedClient {
     this.keys = new KeysResource(core);
     this.requests = new RequestsResource(core);
     this.settings = new SettingsResource(core);
+    this.sign = new SignResource(core);
+    this.signTemplates = new SignTemplatesResource(core);
     this.templates = new TemplatesResource(core);
     this.usage = new UsageResource(core);
     this.webhooks = new WebhooksResource(core);

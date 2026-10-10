@@ -927,6 +927,12 @@ class JobInput(TypedDict):
     file_id: NotRequired[str]
     file_ids: NotRequired[list[str]]
     pages: NotRequired[int]
+    rows: NotRequired[int]
+    """A sign bulk job's rows"""
+    send: NotRequired[bool]
+    """A sign bulk job sends each request"""
+    template_id: NotRequired[str]
+    """A sign bulk job's template"""
 
 class JobLinks(TypedDict):
     cancel: str
@@ -2417,6 +2423,10 @@ class Settings(TypedDict):
     retention_input_hours: int
     retention_output_hours: int
     """0 is zero retention"""
+    sign_auto_delete: bool
+    """Delete signed files after sign_retention_days; off (the default) keeps them while the request exists"""
+    sign_retention_days: int
+    """Days completed requests' signed files are kept when sign_auto_delete is on (default 2555, 7 years)"""
     updated_at: str
     verify_audit_retention_days: int
 
@@ -2435,11 +2445,591 @@ class SettingsPatch(TypedDict):
     retention_input_hours: NotRequired[int]
     retention_output_hours: NotRequired[int]
     """0 is zero retention"""
+    sign_auto_delete: NotRequired[bool]
+    """Delete completed requests' signed files after sign_retention_days"""
+    sign_retention_days: NotRequired[int]
+    """Days signed files are kept with sign_auto_delete"""
     verify_audit_retention_days: NotRequired[int]
 
 class SettingsPurgeQuery(TypedDict):
     confirm: Literal["live", "test"]
     """The calling environment, to confirm"""
+
+class SignAudit(TypedDict):
+    """The audit trail: the certificate's facts and every event with its hash"""
+    chain_error: NotRequired[str]
+    """The first event that does not verify"""
+    chain_valid: bool
+    """Every event verifies against its hash and the previous one"""
+    completed_at: NotRequired[Optional[str]]
+    created_at: str
+    documents: list[SignDocument]
+    environment: Literal["live", "test"]
+    events: list[SignEvent]
+    generated_at: str
+    head_hash: str
+    """The last event's hash"""
+    request_id: str
+    sent_at: NotRequired[Optional[str]]
+    signers: list[SignAuditSigner]
+    status: Literal["draft", "sent", "in_progress", "completed", "declined", "voided", "expired"]
+    """draft → sent → in_progress → completed; or declined (a signer declined), voided (by you), expired"""
+    title: NotRequired[str]
+
+class SignAuditSigner(TypedDict):
+    """A signer in the audit trail"""
+    auth: Literal["otp_email", "otp_sms", "aadhaar_esign", "none"]
+    decline_reason: NotRequired[str]
+    declined_at: Optional[str]
+    email: NotRequired[str]
+    ip: NotRequired[str]
+    name: str
+    order: int
+    phone: NotRequired[str]
+    role: NotRequired[str]
+    signature_kind: NotRequired[Literal["", "drawn", "typed", "uploaded"]]
+    signed_at: Optional[str]
+    signer_id: str
+    status: Literal["pending", "notified", "viewed", "signed", "declined"]
+    user_agent: NotRequired[str]
+    verified_at: Optional[str]
+    viewed_at: Optional[str]
+
+class SignBulk(TypedDict):
+    """Up to 500 rows, one request each, made as one job"""
+    callback_url: NotRequired[str]
+    """https URL for the job's webhook"""
+    rows: list[SignFromTemplate]
+    """1 to 500 (each row's send is ignored)"""
+    send: NotRequired[bool]
+    """Send each request (default true)"""
+
+class SignDecline(TypedDict):
+    reason: str
+
+class SignDocument(TypedDict):
+    """A document"""
+    file_id: str
+    """The PDF signed (a DOCX was converted)"""
+    filename: str
+    index: int
+    pages: int
+    sha256_after: NotRequired[str]
+    """SHA-256 of the signed copy (completed)"""
+    sha256_before: str
+    """SHA-256 of the document as sent"""
+    signed_file_id: NotRequired[str]
+    """The signed copy (completed)"""
+
+class SignEvent(TypedDict):
+    """An audit-trail event, hash-chained"""
+    at: str
+    """With microseconds (the hash covers them)"""
+    detail: dict[str, Any]
+    event_id: str
+    """sge_…"""
+    hash: str
+    """SHA-256 over prev_hash and the event's fields"""
+    prev_hash: str
+    """The previous event's hash (empty for the first)"""
+    seq: int
+    """From 1, without gaps"""
+    signer_id: NotRequired[str]
+    type: str
+    """request.sent, signer.opened, signer.verified, signer.signed, …"""
+
+class SignEventsData(TypedDict):
+    items: list[SignEvent]
+
+class SignField(TypedDict):
+    """A placed field"""
+    default: NotRequired[str]
+    document_index: int
+    field_id: str
+    """sgf_…"""
+    filled_at: Optional[str]
+    h: float
+    label: NotRequired[str]
+    page: int
+    required: bool
+    signer_id: str
+    signer_ref: str
+    type: Literal["signature", "initials", "date", "text", "checkbox", "stamp"]
+    value: Optional[str]
+    """What the signer filled (signature fields: drawn, typed or uploaded)"""
+    w: float
+    x: float
+    y: float
+
+class SignFieldInput(TypedDict):
+    """A place to fill"""
+    anchor: NotRequired[str]
+    """Place over every occurrence of this text in the document's text layer, e.g. {{sign_here}} (instead of page, x and y)"""
+    anchor_offset_x: NotRequired[float]
+    """Points right of the anchor"""
+    anchor_offset_y: NotRequired[float]
+    """Points below the anchor (negative: above)"""
+    default: NotRequired[str]
+    """A text or date's value unless the signer changes it; a checkbox's "true"/"false"; {{name}} takes a template's merge data"""
+    document_index: int
+    """The document's position in documents[], from 0"""
+    h: NotRequired[float]
+    label: NotRequired[str]
+    page: NotRequired[int]
+    """With x and y"""
+    required: NotRequired[bool]
+    """Default true for signature, initials and stamp"""
+    signer_ref: str
+    """The signer's ref (default its role, or its position from 1)"""
+    type: Literal["signature", "initials", "date", "text", "checkbox", "stamp"]
+    w: NotRequired[float]
+    x: NotRequired[float]
+    """Points from the page's left"""
+    y: NotRequired[float]
+    """Points from the page's top"""
+
+class SignFromTemplate(TypedDict):
+    """A request from a template: who fills each role, merge data"""
+    data: NotRequired[dict[str, str]]
+    """Replaces {{name}} in the title, message and field defaults"""
+    metadata: NotRequired[dict[str, str]]
+    """Your keys and values, returned in answers and webhooks"""
+    options: NotRequired[SignOptionsIn]
+    roles: dict[str, SignPerson]
+    """Role name → person"""
+    send: NotRequired[bool]
+    """Send at once (default: a draft)"""
+    title: NotRequired[str]
+
+class SignLink(TypedDict):
+    """A signer's link"""
+    embedded: bool
+    expires_at: str
+    signer_id: str
+    url: str
+
+class SignListData(TypedDict):
+    """A page; pass next_cursor as cursor for the next one (null at the end)."""
+    items: list[SignRequestSummary]
+    next_cursor: Optional[str]
+
+class SignListQuery(TypedDict):
+    status: NotRequired[Literal["draft", "sent", "in_progress", "completed", "declined", "voided", "expired"]]
+    template_id: NotRequired[str]
+    created_after: NotRequired[str]
+    created_before: NotRequired[str]
+    limit: NotRequired[int]
+    """Page size"""
+    cursor: NotRequired[str]
+    """next_cursor of the previous page."""
+
+class SignOTPResult(TypedDict):
+    attempts_left: int
+    verified: bool
+
+class SignOTPSent(TypedDict):
+    channel: Literal["email", "sms"]
+    code: NotRequired[str]
+    """Test environment only: the code (always 123456)"""
+    destination: str
+    """Masked"""
+    expires_at: str
+
+class SignOTPVerify(TypedDict):
+    code: str
+
+class SignOptions(TypedDict):
+    """Request options"""
+    attach_audit_certificate: NotRequired[bool]
+    """Append the audit certificate page to the sealed PDF"""
+    branding: NotRequired[SignOptionsBranding]
+    """What signers see of the sender"""
+    embedded: NotRequired[bool]
+    """Links for an iframe, allowed only on the environment's allowed_origins"""
+    expires_in_days: NotRequired[int]
+    """Default 30"""
+    message: NotRequired[str]
+    """Shown to signers and in their email"""
+    redirect_url: NotRequired[str]
+    """https URL the signer goes to after signing"""
+    reminders: NotRequired[SignOptionsReminders]
+    """Automatic reminders"""
+    require_view_all_pages: NotRequired[bool]
+    """Signers must view every page before signing"""
+    sequential: NotRequired[bool]
+    """Signers sign in order (order, else list order); otherwise all at once"""
+
+class SignOptionsBranding(TypedDict):
+    """What signers see of the sender"""
+    color: NotRequired[str]
+    logo_file_id: NotRequired[str]
+    """The stored logo (answers)"""
+    sender_name: NotRequired[str]
+
+class SignOptionsIn(TypedDict):
+    """Request options"""
+    attach_audit_certificate: NotRequired[bool]
+    """Append the audit certificate page to the sealed PDF"""
+    branding: NotRequired[SignOptionsInBranding]
+    """What signers see of the sender"""
+    embedded: NotRequired[bool]
+    """Links for an iframe, allowed only on the environment's allowed_origins"""
+    expires_in_days: NotRequired[int]
+    """Default 30"""
+    message: NotRequired[str]
+    """Shown to signers and in their email"""
+    redirect_url: NotRequired[str]
+    """https URL the signer goes to after signing"""
+    reminders: NotRequired[SignOptionsInReminders]
+    """Automatic reminders"""
+    require_view_all_pages: NotRequired[bool]
+    """Signers must view every page before signing"""
+    sequential: NotRequired[bool]
+    """Signers sign in order (order, else list order); otherwise all at once"""
+
+class SignOptionsInBranding(TypedDict):
+    """What signers see of the sender"""
+    color: NotRequired[str]
+    logo: NotRequired[FileRef]
+    logo_file_id: NotRequired[str]
+    """The stored logo (answers)"""
+    sender_name: NotRequired[str]
+
+class SignOptionsInReminders(TypedDict):
+    """Automatic reminders"""
+    after_days: int
+    """Days after sending"""
+    every_days: NotRequired[int]
+    """Then every this many days (0: one reminder)"""
+    max: NotRequired[int]
+    """At most this many (default 1, or 3 with every_days)"""
+
+class SignOptionsReminders(TypedDict):
+    """Automatic reminders"""
+    after_days: int
+    """Days after sending"""
+    every_days: NotRequired[int]
+    """Then every this many days (0: one reminder)"""
+    max: NotRequired[int]
+    """At most this many (default 1, or 3 with every_days)"""
+
+class SignPerson(TypedDict):
+    """The person filling a role"""
+    auth: NotRequired[Literal["otp_email", "otp_sms", "aadhaar_esign", "none"]]
+    email: NotRequired[str]
+    language: NotRequired[Literal["en", "hi"]]
+    name: str
+    phone: NotRequired[str]
+
+class SignRequest(TypedDict):
+    """A signing request"""
+    certificate_file_id: NotRequired[str]
+    """The audit certificate (completed)"""
+    completed_at: Optional[str]
+    created_at: str
+    declined_at: Optional[str]
+    documents: list[SignDocument]
+    environment: Literal["live", "test"]
+    expired_at: Optional[str]
+    expires_at: Optional[str]
+    fields: list[SignField]
+    metadata: dict[str, str]
+    """Your keys and values, returned in answers and webhooks"""
+    next_reminder_at: Optional[str]
+    options: SignOptions
+    reminders_sent: int
+    """Automatic reminders sent"""
+    request_id: str
+    """sgn_…"""
+    seal_job_id: NotRequired[str]
+    sealed_file_id: NotRequired[str]
+    """Every document and the audit certificate, sealed (completed)"""
+    sealing: bool
+    """Everyone has signed and the sealed PDF is being made"""
+    sent_at: Optional[str]
+    signers: list[SignSigner]
+    status: Literal["draft", "sent", "in_progress", "completed", "declined", "voided", "expired"]
+    """draft → sent → in_progress → completed; or declined (a signer declined), voided (by you), expired"""
+    template_id: NotRequired[str]
+    title: NotRequired[str]
+    updated_at: str
+    void_reason: NotRequired[str]
+    voided_at: Optional[str]
+
+class SignRequestCreate(TypedDict):
+    """A signing request"""
+    documents: list[FileRef]
+    """1 to 10 PDFs or DOCX files (converted to PDF), up to 25 MB and 200 pages each"""
+    fields: NotRequired[list[SignFieldInput]]
+    """Up to 200; a signer with no signature field gets one on the last page"""
+    metadata: NotRequired[dict[str, str]]
+    """Your keys and values, returned in answers and webhooks"""
+    options: NotRequired[SignOptionsIn]
+    send: NotRequired[bool]
+    """Send at once (default: a draft, sent with POST …/send)"""
+    signers: list[SignSignerInput]
+    """1 to 20"""
+    title: NotRequired[str]
+
+class SignRequestSummary(TypedDict):
+    """A request in a list"""
+    completed_at: Optional[str]
+    created_at: str
+    documents: int
+    expires_at: Optional[str]
+    metadata: dict[str, str]
+    """Your keys and values, returned in answers and webhooks"""
+    request_id: str
+    sent_at: Optional[str]
+    signed: int
+    signers: int
+    status: Literal["draft", "sent", "in_progress", "completed", "declined", "voided", "expired"]
+    """draft → sent → in_progress → completed; or declined (a signer declined), voided (by you), expired"""
+    template_id: NotRequired[str]
+    title: NotRequired[str]
+
+class SignRole(TypedDict):
+    """A template role: who will sign, given per request"""
+    auth: NotRequired[Literal["otp_email", "otp_sms", "aadhaar_esign", "none"]]
+    language: NotRequired[Literal["en", "hi"]]
+    order: NotRequired[int]
+    role: str
+
+class SignSession(TypedDict):
+    """The signer's view of the request"""
+    allowed_origins: NotRequired[list[str]]
+    """Embedded: the origins the page may be framed by"""
+    brand_color: NotRequired[str]
+    contact_hint: NotRequired[str]
+    """Where the code goes, masked"""
+    documents: list[SignSessionDocument]
+    embedded: NotRequired[bool]
+    environment: NotRequired[Literal["live", "test"]]
+    fields: list[SignField]
+    """This signer's fields"""
+    link_expires_at: NotRequired[str]
+    logo_file_id: NotRequired[str]
+    message: NotRequired[str]
+    pages_viewed: NotRequired[dict[str, list[int]]]
+    """Document index → pages seen"""
+    redirect_url: NotRequired[str]
+    request_id: str
+    request_status: Literal["draft", "sent", "in_progress", "completed", "declined", "voided", "expired", "sealing"]
+    """sealing: signed by everyone, the sealed PDF is being made"""
+    require_view_all_pages: NotRequired[bool]
+    sealed_file_id: NotRequired[str]
+    sender_name: NotRequired[str]
+    session_id: str
+    """Send it in X-Sign-Session on every later call (one session per signer: opening the link again ends the others)"""
+    signer: SignSigner
+    signers_signed: int
+    signers_total: int
+    test_completed: NotRequired[bool]
+    """test_sign completed the request"""
+    title: NotRequired[str]
+    verified: bool
+    """The signer proved who they are (or needs not)"""
+
+class SignSessionDocument(TypedDict):
+    filename: str
+    index: int
+    page_sizes: list[SignSessionDocumentsItemPageSize]
+    pages: int
+
+class SignSessionDocumentsItemPageSize(TypedDict):
+    """Page size in points"""
+    h: float
+    w: float
+
+class SignSigner(TypedDict):
+    """A signer"""
+    auth: Literal["otp_email", "otp_sms", "aadhaar_esign", "none"]
+    decline_reason: NotRequired[str]
+    declined_at: Optional[str]
+    email: NotRequired[str]
+    language: Literal["en", "hi"]
+    link_expires_at: NotRequired[Optional[str]]
+    """The link works until then (7 days; a reminder resets it)"""
+    name: str
+    notified_at: Optional[str]
+    order: int
+    phone: NotRequired[str]
+    ref: str
+    role: NotRequired[str]
+    signed_at: Optional[str]
+    signer_id: str
+    """sgs_…"""
+    signing_url: NotRequired[str]
+    """The signer's link: only in the answers of create with send, send, remind and template requests, for the signers whose turn it is"""
+    status: Literal["pending", "notified", "viewed", "signed", "declined"]
+    """pending: not yet reached; notified: sent the link; viewed: opened and verified; signed; declined"""
+    viewed_at: Optional[str]
+
+class SignSignerInput(TypedDict):
+    """A person who signs"""
+    auth: NotRequired[Literal["otp_email", "otp_sms", "aadhaar_esign", "none"]]
+    """How the signer proves who they are: a code by email or SMS, Aadhaar eSign at the ESP, or none (default: otp_email with an email, otp_sms with a phone, else none)"""
+    email: NotRequired[str]
+    language: NotRequired[Literal["en", "hi"]]
+    """The signer page's language"""
+    name: str
+    order: NotRequired[int]
+    phone: NotRequired[str]
+    """+E.164, or a 10-digit Indian mobile number"""
+    ref: NotRequired[str]
+    """How fields name this signer; default the role, or the position from 1"""
+    role: NotRequired[str]
+
+class SignSubmit(TypedDict):
+    """The signature"""
+    agree: bool
+    """Must be true: the signer agrees to sign electronically (422 consent_required otherwise)"""
+    fields: NotRequired[list[SignSubmitField]]
+    """Values of the signer's text, date and checkbox fields (a date defaults to today, IST)"""
+    signature: SignSubmitSignature
+
+class SignSubmitField(TypedDict):
+    field_id: str
+    value: str
+
+class SignSubmitSignature(TypedDict):
+    image_base64: NotRequired[str]
+    """drawn or uploaded: a PNG or JPEG, at most 1 MB, 20x10 to 4000x2000 pixels"""
+    kind: Literal["drawn", "typed", "uploaded"]
+    text: NotRequired[str]
+    """typed: the name as typed"""
+
+class SignTemplate(TypedDict):
+    """A template: roles, placed fields, documents"""
+    created_at: str
+    documents: list[SignDocument]
+    environment: Literal["live", "test"]
+    fields: list[SignTemplateField]
+    metadata: dict[str, str]
+    """Your keys and values, returned in answers and webhooks"""
+    name: str
+    options: SignOptions
+    roles: list[SignRole]
+    template_id: str
+    """sgt_…"""
+    title: NotRequired[str]
+    updated_at: str
+    uses: int
+    """Requests made from it"""
+
+class SignTemplateCreate(TypedDict):
+    """A template"""
+    documents: list[FileRef]
+    """1 to 10 PDFs or DOCX files"""
+    fields: NotRequired[list[SignTemplateCreateField]]
+    """Fields name a role"""
+    metadata: NotRequired[dict[str, str]]
+    """Your keys and values, returned in answers and webhooks"""
+    name: str
+    options: NotRequired[SignOptionsIn]
+    roles: list[SignRole]
+    """1 to 20"""
+    title: NotRequired[str]
+
+class SignTemplateCreateField(TypedDict):
+    """A place to fill"""
+    anchor: NotRequired[str]
+    """Place over every occurrence of this text in the document's text layer, e.g. {{sign_here}} (instead of page, x and y)"""
+    anchor_offset_x: NotRequired[float]
+    """Points right of the anchor"""
+    anchor_offset_y: NotRequired[float]
+    """Points below the anchor (negative: above)"""
+    default: NotRequired[str]
+    """A text or date's value unless the signer changes it; a checkbox's "true"/"false"; {{name}} takes a template's merge data"""
+    document_index: int
+    """The document's position in documents[], from 0"""
+    h: NotRequired[float]
+    label: NotRequired[str]
+    page: NotRequired[int]
+    """With x and y"""
+    required: NotRequired[bool]
+    """Default true for signature, initials and stamp"""
+    role: str
+    """The template role that fills it"""
+    type: Literal["signature", "initials", "date", "text", "checkbox", "stamp"]
+    w: NotRequired[float]
+    x: NotRequired[float]
+    """Points from the page's left"""
+    y: NotRequired[float]
+    """Points from the page's top"""
+
+class SignTemplateField(TypedDict):
+    """A place to fill"""
+    anchor: NotRequired[str]
+    """Place over every occurrence of this text in the document's text layer, e.g. {{sign_here}} (instead of page, x and y)"""
+    anchor_offset_x: NotRequired[float]
+    """Points right of the anchor"""
+    anchor_offset_y: NotRequired[float]
+    """Points below the anchor (negative: above)"""
+    box: SignTemplateFieldBox
+    """The placed box"""
+    default: NotRequired[str]
+    """A text or date's value unless the signer changes it; a checkbox's "true"/"false"; {{name}} takes a template's merge data"""
+    document_index: int
+    """The document's position in documents[], from 0"""
+    h: NotRequired[float]
+    label: NotRequired[str]
+    page: NotRequired[int]
+    """With x and y"""
+    required: NotRequired[bool]
+    """Default true for signature, initials and stamp"""
+    role: str
+    """The template role that fills it"""
+    type: Literal["signature", "initials", "date", "text", "checkbox", "stamp"]
+    w: NotRequired[float]
+    x: NotRequired[float]
+    """Points from the page's left"""
+    y: NotRequired[float]
+    """Points from the page's top"""
+
+class SignTemplateFieldBox(TypedDict):
+    """The placed box"""
+    h: float
+    page: int
+    w: float
+    x: float
+    y: float
+
+class SignTemplatePatch(TypedDict):
+    """Name, title, options or metadata (documents and fields are fixed: a different layout is a new template)"""
+    metadata: NotRequired[dict[str, str]]
+    """Your keys and values, returned in answers and webhooks"""
+    name: NotRequired[str]
+    options: NotRequired[SignOptionsIn]
+    title: NotRequired[str]
+
+class SignTemplatesListData(TypedDict):
+    """A page; pass next_cursor as cursor for the next one (null at the end)."""
+    items: list[SignTemplate]
+    next_cursor: Optional[str]
+
+class SignTemplatesListQuery(TypedDict):
+    limit: NotRequired[int]
+    """Page size"""
+    cursor: NotRequired[str]
+    """next_cursor of the previous page."""
+
+class SignViewed(TypedDict):
+    """Pages the signer has seen"""
+    document_index: NotRequired[int]
+    pages: list[int]
+
+class SignVoid(TypedDict):
+    reason: NotRequired[str]
+
+class SignerPatch(TypedDict):
+    """A contact correction before the signer signs; a new email or phone rotates the link"""
+    email: NotRequired[str]
+    language: NotRequired[Literal["en", "hi"]]
+    name: NotRequired[str]
+    notify: NotRequired[bool]
+    """Send the corrected signer their link now (default true when it is their turn)"""
+    phone: NotRequired[str]
 
 class Source(TypedDict):
     """Where the value was read: page and box (empty when the page does not show it)"""
@@ -5594,9 +6184,107 @@ class SettingsResource:
         """Delete every file, job, webhook and template of this environment and revoke its keys."""
         return self._core.call("DELETE", f"/v1/settings/data", query={"confirm": confirm}, json=None, idempotency_key=idempotency_key, request_id=request_id)
 
-    def update(self, *, alert_emails: Optional[list[str]] = None, allowed_origins: Optional[list[str]] = None, clear_monthly_credit_cap: Optional[bool] = None, default_webhook_ids: Optional[list[str]] = None, docai_labels: Optional[list[str]] = None, face_match_threshold: Optional[float] = None, monthly_credit_cap: Optional[str] = None, retention_input_hours: Optional[int] = None, retention_output_hours: Optional[int] = None, verify_audit_retention_days: Optional[int] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Settings:
+    def update(self, *, alert_emails: Optional[list[str]] = None, allowed_origins: Optional[list[str]] = None, clear_monthly_credit_cap: Optional[bool] = None, default_webhook_ids: Optional[list[str]] = None, docai_labels: Optional[list[str]] = None, face_match_threshold: Optional[float] = None, monthly_credit_cap: Optional[str] = None, retention_input_hours: Optional[int] = None, retention_output_hours: Optional[int] = None, sign_auto_delete: Optional[bool] = None, sign_retention_days: Optional[int] = None, verify_audit_retention_days: Optional[int] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Settings:
         """Change retention, spend cap, origins, default webhooks, alert emails, docai labels."""
-        return self._core.call("PATCH", f"/v1/settings", query=None, json=_drop_none({"alert_emails": alert_emails, "allowed_origins": allowed_origins, "clear_monthly_credit_cap": clear_monthly_credit_cap, "default_webhook_ids": default_webhook_ids, "docai_labels": docai_labels, "face_match_threshold": face_match_threshold, "monthly_credit_cap": monthly_credit_cap, "retention_input_hours": retention_input_hours, "retention_output_hours": retention_output_hours, "verify_audit_retention_days": verify_audit_retention_days}), idempotency_key=idempotency_key, request_id=request_id)
+        return self._core.call("PATCH", f"/v1/settings", query=None, json=_drop_none({"alert_emails": alert_emails, "allowed_origins": allowed_origins, "clear_monthly_credit_cap": clear_monthly_credit_cap, "default_webhook_ids": default_webhook_ids, "docai_labels": docai_labels, "face_match_threshold": face_match_threshold, "monthly_credit_cap": monthly_credit_cap, "retention_input_hours": retention_input_hours, "retention_output_hours": retention_output_hours, "sign_auto_delete": sign_auto_delete, "sign_retention_days": sign_retention_days, "verify_audit_retention_days": verify_audit_retention_days}), idempotency_key=idempotency_key, request_id=request_id)
+
+
+class SignResource:
+    """."""
+
+    def __init__(self, core: Core) -> None:
+        self._core = core
+
+    def audit(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignAudit:
+        """The audit trail: signers, methods, timestamps, IPs, document hashes and every event, with the hash chain verified."""
+        return self._core.call("GET", f"/v1/sign/requests/{_seg(id)}/audit", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def certificate_url(self, id: str, *, request_id: Optional[str] = None) -> str:
+        """Redirect to the audit certificate (completed requests)."""
+        return self._core.redirect(f"/v1/sign/requests/{_seg(id)}/certificate", request_id=request_id)
+
+    def create(self, *, documents: list[FileRef], signers: list[SignSignerInput], fields: Optional[list[SignFieldInput]] = None, metadata: Optional[dict[str, str]] = None, options: Optional[SignOptionsIn] = None, send: Optional[bool] = None, title: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignRequest:
+        """Create a signing request (a draft, or sent with send: true)."""
+        return self._core.call("POST", f"/v1/sign/requests", query=None, json=_drop_none({"documents": documents, "fields": fields, "metadata": metadata, "options": options, "send": send, "signers": signers, "title": title}), idempotency_key=idempotency_key, request_id=request_id)
+
+    def events(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignEventsData:
+        """The request's audit-trail events, oldest first."""
+        return self._core.call("GET", f"/v1/sign/requests/{_seg(id)}/events", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def get(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignRequest:
+        """Read a signing request."""
+        return self._core.call("GET", f"/v1/sign/requests/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list(self, *, created_after: Optional[str] = None, created_before: Optional[str] = None, cursor: Optional[str] = None, limit: Optional[int] = None, status: Optional[Literal["draft", "sent", "in_progress", "completed", "declined", "voided", "expired"]] = None, template_id: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignListData:
+        """List signing requests, newest first."""
+        return self._core.call("GET", f"/v1/sign/requests", query={"status": status, "template_id": template_id, "created_after": created_after, "created_before": created_before, "limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list_all(self, *, status: Optional[Literal["draft", "sent", "in_progress", "completed", "declined", "voided", "expired"]] = None, template_id: Optional[str] = None, created_after: Optional[str] = None, created_before: Optional[str] = None, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[SignRequestSummary]:
+        """Every item of list, page after page (follows next_cursor)."""
+        return self._core.paginate(f"/v1/sign/requests", {"status": status, "template_id": template_id, "created_after": created_after, "created_before": created_before, "limit": limit}, request_id=request_id)
+
+    def remind(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignRequest:
+        """Send the signers whose turn it is their link again (validity reset to 7 days); free."""
+        return self._core.call("POST", f"/v1/sign/requests/{_seg(id)}/remind", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def send(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignRequest:
+        """Send a draft: the signers whose turn it is get their link (1 api_sign_requests)."""
+        return self._core.call("POST", f"/v1/sign/requests/{_seg(id)}/send", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def signed_document_url(self, id: str, n: str, *, request_id: Optional[str] = None) -> str:
+        """Redirect to a signed document (completed requests)."""
+        return self._core.redirect(f"/v1/sign/requests/{_seg(id)}/documents/{_seg(n)}/signed", request_id=request_id)
+
+    def signer_link(self, id: str, signer_id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignLink:
+        """A signer's link (for an embedded page or your own email), valid 7 days."""
+        return self._core.call("GET", f"/v1/sign/requests/{_seg(id)}/signers/{_seg(signer_id)}/link", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def update_signer(self, id: str, signer_id: str, *, email: Optional[str] = None, language: Optional[Literal["en", "hi"]] = None, name: Optional[str] = None, notify: Optional[bool] = None, phone: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignRequest:
+        """Correct a signer's contact details before they sign (a new email or phone rotates the link)."""
+        return self._core.call("PATCH", f"/v1/sign/requests/{_seg(id)}/signers/{_seg(signer_id)}", query=None, json=_drop_none({"email": email, "language": language, "name": name, "notify": notify, "phone": phone}), idempotency_key=idempotency_key, request_id=request_id)
+
+    def void(self, id: str, *, reason: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignRequest:
+        """Void a request: refused once it is completed (409 invalid_state)."""
+        return self._core.call("POST", f"/v1/sign/requests/{_seg(id)}/void", query=None, json=_drop_none({"reason": reason}), idempotency_key=idempotency_key, request_id=request_id)
+
+
+class SignTemplatesResource:
+    """."""
+
+    def __init__(self, core: Core) -> None:
+        self._core = core
+
+    def bulk_send(self, id: str, *, rows: list[SignFromTemplate], callback_url: Optional[str] = None, send: Optional[bool] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Job:
+        """Bulk send: up to 500 rows, one request each, as one job (202)."""
+        return self._core.call("POST", f"/v1/sign/templates/{_seg(id)}/bulk", query=None, json=_drop_none({"callback_url": callback_url, "rows": rows, "send": send}), idempotency_key=idempotency_key, request_id=request_id)
+
+    def create(self, *, documents: list[FileRef], name: str, roles: list[SignRole], fields: Optional[list[SignTemplateCreateField]] = None, metadata: Optional[dict[str, str]] = None, options: Optional[SignOptionsIn] = None, title: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignTemplate:
+        """Store a template: documents, roles and placed fields."""
+        return self._core.call("POST", f"/v1/sign/templates", query=None, json=_drop_none({"documents": documents, "fields": fields, "metadata": metadata, "name": name, "options": options, "roles": roles, "title": title}), idempotency_key=idempotency_key, request_id=request_id)
+
+    def create_request(self, id: str, *, roles: dict[str, SignPerson], data: Optional[dict[str, str]] = None, metadata: Optional[dict[str, str]] = None, options: Optional[SignOptionsIn] = None, send: Optional[bool] = None, title: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignRequest:
+        """Make a request from a template: a person per role, merge data."""
+        return self._core.call("POST", f"/v1/sign/templates/{_seg(id)}/requests", query=None, json=_drop_none({"data": data, "metadata": metadata, "options": options, "roles": roles, "send": send, "title": title}), idempotency_key=idempotency_key, request_id=request_id)
+
+    def delete(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> Deleted:
+        """Delete a template (requests made from it are not affected)."""
+        return self._core.call("DELETE", f"/v1/sign/templates/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def get(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignTemplate:
+        """Read a template."""
+        return self._core.call("GET", f"/v1/sign/templates/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list(self, *, cursor: Optional[str] = None, limit: Optional[int] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignTemplatesListData:
+        """List templates, newest first."""
+        return self._core.call("GET", f"/v1/sign/templates", query={"limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list_all(self, *, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[SignTemplate]:
+        """Every item of list, page after page (follows next_cursor)."""
+        return self._core.paginate(f"/v1/sign/templates", {"limit": limit}, request_id=request_id)
+
+    def update(self, id: str, *, metadata: Optional[dict[str, str]] = None, name: Optional[str] = None, options: Optional[SignOptionsIn] = None, title: Optional[str] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> SignTemplate:
+        """Change a template's name, title, options or metadata."""
+        return self._core.call("PATCH", f"/v1/sign/templates/{_seg(id)}", query=None, json=_drop_none({"metadata": metadata, "name": name, "options": options, "title": title}), idempotency_key=idempotency_key, request_id=request_id)
 
 
 class TemplatesResource:
@@ -5765,6 +6453,10 @@ class GeneratedClient:
         """."""
         self.settings = SettingsResource(core)
         """Environment settings."""
+        self.sign = SignResource(core)
+        """."""
+        self.signTemplates = SignTemplatesResource(core)
+        """."""
         self.templates = TemplatesResource(core)
         """Stored render templates."""
         self.usage = UsageResource(core)

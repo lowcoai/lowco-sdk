@@ -3226,12 +3226,18 @@ class JobInput {
     this.fileId,
     this.fileIds,
     this.pages,
+    this.rows,
+    this.send,
+    this.templateId,
   });
 
   factory JobInput.fromJson(Map<String, dynamic> json) => JobInput(
         fileId: json['file_id'] as String?,
         fileIds: (json['file_ids'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
         pages: (json['pages'] as num?)?.toInt(),
+        rows: (json['rows'] as num?)?.toInt(),
+        send: json['send'] as bool?,
+        templateId: json['template_id'] as String?,
       );
 
   final String? fileId;
@@ -3240,11 +3246,23 @@ class JobInput {
 
   final int? pages;
 
+  /// A sign bulk job's rows
+  final int? rows;
+
+  /// A sign bulk job sends each request
+  final bool? send;
+
+  /// A sign bulk job's template
+  final String? templateId;
+
   /// The wire form; null fields are left out (file inputs are sent separately).
   Map<String, dynamic> toJson() => {
         if (fileId != null) 'file_id': fileId!,
         if (fileIds != null) 'file_ids': fileIds!,
         if (pages != null) 'pages': pages!,
+        if (rows != null) 'rows': rows!,
+        if (send != null) 'send': send!,
+        if (templateId != null) 'template_id': templateId!,
       };
 }
 
@@ -8851,6 +8869,8 @@ class Settings {
     this.monthlyCreditCap,
     this.retentionInputHours,
     this.retentionOutputHours,
+    this.signAutoDelete,
+    this.signRetentionDays,
     this.updatedAt,
     this.verifyAuditRetentionDays,
   });
@@ -8866,6 +8886,8 @@ class Settings {
         monthlyCreditCap: json['monthly_credit_cap'] as String?,
         retentionInputHours: (json['retention_input_hours'] as num?)?.toInt(),
         retentionOutputHours: (json['retention_output_hours'] as num?)?.toInt(),
+        signAutoDelete: json['sign_auto_delete'] as bool?,
+        signRetentionDays: (json['sign_retention_days'] as num?)?.toInt(),
         updatedAt: json['updated_at'] as String?,
         verifyAuditRetentionDays: (json['verify_audit_retention_days'] as num?)?.toInt(),
       );
@@ -8895,6 +8917,12 @@ class Settings {
   /// 0 is zero retention
   final int? retentionOutputHours;
 
+  /// Delete signed files after sign_retention_days; off (the default) keeps them while the request exists
+  final bool? signAutoDelete;
+
+  /// Days completed requests' signed files are kept when sign_auto_delete is on (default 2555, 7 years)
+  final int? signRetentionDays;
+
   final String? updatedAt;
 
   final int? verifyAuditRetentionDays;
@@ -8911,6 +8939,8 @@ class Settings {
         if (monthlyCreditCap != null) 'monthly_credit_cap': monthlyCreditCap!,
         if (retentionInputHours != null) 'retention_input_hours': retentionInputHours!,
         if (retentionOutputHours != null) 'retention_output_hours': retentionOutputHours!,
+        if (signAutoDelete != null) 'sign_auto_delete': signAutoDelete!,
+        if (signRetentionDays != null) 'sign_retention_days': signRetentionDays!,
         if (updatedAt != null) 'updated_at': updatedAt!,
         if (verifyAuditRetentionDays != null) 'verify_audit_retention_days': verifyAuditRetentionDays!,
       };
@@ -8927,6 +8957,8 @@ class SettingsPatch {
     this.monthlyCreditCap,
     this.retentionInputHours,
     this.retentionOutputHours,
+    this.signAutoDelete,
+    this.signRetentionDays,
     this.verifyAuditRetentionDays,
   });
 
@@ -8940,6 +8972,8 @@ class SettingsPatch {
         monthlyCreditCap: json['monthly_credit_cap'] as String?,
         retentionInputHours: (json['retention_input_hours'] as num?)?.toInt(),
         retentionOutputHours: (json['retention_output_hours'] as num?)?.toInt(),
+        signAutoDelete: json['sign_auto_delete'] as bool?,
+        signRetentionDays: (json['sign_retention_days'] as num?)?.toInt(),
         verifyAuditRetentionDays: (json['verify_audit_retention_days'] as num?)?.toInt(),
       );
 
@@ -8966,6 +9000,12 @@ class SettingsPatch {
   /// 0 is zero retention
   final int? retentionOutputHours;
 
+  /// Delete completed requests' signed files after sign_retention_days
+  final bool? signAutoDelete;
+
+  /// Days signed files are kept with sign_auto_delete
+  final int? signRetentionDays;
+
   final int? verifyAuditRetentionDays;
 
   /// The wire form; null fields are left out (file inputs are sent separately).
@@ -8979,6 +9019,8 @@ class SettingsPatch {
         if (monthlyCreditCap != null) 'monthly_credit_cap': monthlyCreditCap!,
         if (retentionInputHours != null) 'retention_input_hours': retentionInputHours!,
         if (retentionOutputHours != null) 'retention_output_hours': retentionOutputHours!,
+        if (signAutoDelete != null) 'sign_auto_delete': signAutoDelete!,
+        if (signRetentionDays != null) 'sign_retention_days': signRetentionDays!,
         if (verifyAuditRetentionDays != null) 'verify_audit_retention_days': verifyAuditRetentionDays!,
       };
 }
@@ -8998,6 +9040,2322 @@ class SettingsPurgeQuery {
   /// The wire form; null fields are left out (file inputs are sent separately).
   Map<String, dynamic> toJson() => {
         if (confirm != null) 'confirm': confirm!,
+      };
+}
+
+/// The audit trail: the certificate's facts and every event with its hash
+class SignAudit {
+  const SignAudit({
+    this.chainError,
+    this.chainValid,
+    this.completedAt,
+    this.createdAt,
+    this.documents,
+    this.environment,
+    this.events,
+    this.generatedAt,
+    this.headHash,
+    this.requestId,
+    this.sentAt,
+    this.signers,
+    this.status,
+    this.title,
+  });
+
+  factory SignAudit.fromJson(Map<String, dynamic> json) => SignAudit(
+        chainError: json['chain_error'] as String?,
+        chainValid: json['chain_valid'] as bool?,
+        completedAt: json['completed_at'] as String?,
+        createdAt: json['created_at'] as String?,
+        documents: (json['documents'] as List?)?.map((e) => (e == null ? null : SignDocument.fromJson(e as Map<String, dynamic>))!).toList().cast<SignDocument>(),
+        environment: json['environment'] as String?,
+        events: (json['events'] as List?)?.map((e) => (e == null ? null : SignEvent.fromJson(e as Map<String, dynamic>))!).toList().cast<SignEvent>(),
+        generatedAt: json['generated_at'] as String?,
+        headHash: json['head_hash'] as String?,
+        requestId: json['request_id'] as String?,
+        sentAt: json['sent_at'] as String?,
+        signers: (json['signers'] as List?)?.map((e) => (e == null ? null : SignAuditSigner.fromJson(e as Map<String, dynamic>))!).toList().cast<SignAuditSigner>(),
+        status: json['status'] as String?,
+        title: json['title'] as String?,
+      );
+
+  /// The first event that does not verify
+  final String? chainError;
+
+  /// Every event verifies against its hash and the previous one
+  final bool? chainValid;
+
+  final String? completedAt;
+
+  final String? createdAt;
+
+  final List<SignDocument>? documents;
+
+  final String? environment;
+
+  final List<SignEvent>? events;
+
+  final String? generatedAt;
+
+  /// The last event's hash
+  final String? headHash;
+
+  final String? requestId;
+
+  final String? sentAt;
+
+  final List<SignAuditSigner>? signers;
+
+  /// draft → sent → in_progress → completed; or declined (a signer declined), voided (by you), expired
+  final String? status;
+
+  final String? title;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (chainError != null) 'chain_error': chainError!,
+        if (chainValid != null) 'chain_valid': chainValid!,
+        if (completedAt != null) 'completed_at': completedAt!,
+        if (createdAt != null) 'created_at': createdAt!,
+        if (documents != null) 'documents': documents!.map((e) => e.toJson()).toList(),
+        if (environment != null) 'environment': environment!,
+        if (events != null) 'events': events!.map((e) => e.toJson()).toList(),
+        if (generatedAt != null) 'generated_at': generatedAt!,
+        if (headHash != null) 'head_hash': headHash!,
+        if (requestId != null) 'request_id': requestId!,
+        if (sentAt != null) 'sent_at': sentAt!,
+        if (signers != null) 'signers': signers!.map((e) => e.toJson()).toList(),
+        if (status != null) 'status': status!,
+        if (title != null) 'title': title!,
+      };
+}
+
+/// A signer in the audit trail
+class SignAuditSigner {
+  const SignAuditSigner({
+    this.auth,
+    this.declineReason,
+    this.declinedAt,
+    this.email,
+    this.ip,
+    this.name,
+    this.order,
+    this.phone,
+    this.role,
+    this.signatureKind,
+    this.signedAt,
+    this.signerId,
+    this.status,
+    this.userAgent,
+    this.verifiedAt,
+    this.viewedAt,
+  });
+
+  factory SignAuditSigner.fromJson(Map<String, dynamic> json) => SignAuditSigner(
+        auth: json['auth'] as String?,
+        declineReason: json['decline_reason'] as String?,
+        declinedAt: json['declined_at'] as String?,
+        email: json['email'] as String?,
+        ip: json['ip'] as String?,
+        name: json['name'] as String?,
+        order: (json['order'] as num?)?.toInt(),
+        phone: json['phone'] as String?,
+        role: json['role'] as String?,
+        signatureKind: json['signature_kind'] as String?,
+        signedAt: json['signed_at'] as String?,
+        signerId: json['signer_id'] as String?,
+        status: json['status'] as String?,
+        userAgent: json['user_agent'] as String?,
+        verifiedAt: json['verified_at'] as String?,
+        viewedAt: json['viewed_at'] as String?,
+      );
+
+  final String? auth;
+
+  final String? declineReason;
+
+  final String? declinedAt;
+
+  final String? email;
+
+  final String? ip;
+
+  final String? name;
+
+  final int? order;
+
+  final String? phone;
+
+  final String? role;
+
+  final String? signatureKind;
+
+  final String? signedAt;
+
+  final String? signerId;
+
+  final String? status;
+
+  final String? userAgent;
+
+  final String? verifiedAt;
+
+  final String? viewedAt;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (auth != null) 'auth': auth!,
+        if (declineReason != null) 'decline_reason': declineReason!,
+        if (declinedAt != null) 'declined_at': declinedAt!,
+        if (email != null) 'email': email!,
+        if (ip != null) 'ip': ip!,
+        if (name != null) 'name': name!,
+        if (order != null) 'order': order!,
+        if (phone != null) 'phone': phone!,
+        if (role != null) 'role': role!,
+        if (signatureKind != null) 'signature_kind': signatureKind!,
+        if (signedAt != null) 'signed_at': signedAt!,
+        if (signerId != null) 'signer_id': signerId!,
+        if (status != null) 'status': status!,
+        if (userAgent != null) 'user_agent': userAgent!,
+        if (verifiedAt != null) 'verified_at': verifiedAt!,
+        if (viewedAt != null) 'viewed_at': viewedAt!,
+      };
+}
+
+/// Up to 500 rows, one request each, made as one job
+class SignBulk {
+  const SignBulk({
+    this.callbackUrl,
+    this.rows,
+    this.send,
+  });
+
+  factory SignBulk.fromJson(Map<String, dynamic> json) => SignBulk(
+        callbackUrl: json['callback_url'] as String?,
+        rows: (json['rows'] as List?)?.map((e) => (e == null ? null : SignFromTemplate.fromJson(e as Map<String, dynamic>))!).toList().cast<SignFromTemplate>(),
+        send: json['send'] as bool?,
+      );
+
+  /// https URL for the job's webhook
+  final String? callbackUrl;
+
+  /// 1 to 500 (each row's send is ignored)
+  final List<SignFromTemplate>? rows;
+
+  /// Send each request (default true)
+  final bool? send;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (rows != null) 'rows': rows!.map((e) => e.toJson()).toList(),
+        if (send != null) 'send': send!,
+      };
+}
+
+class SignDecline {
+  const SignDecline({
+    this.reason,
+  });
+
+  factory SignDecline.fromJson(Map<String, dynamic> json) => SignDecline(
+        reason: json['reason'] as String?,
+      );
+
+  final String? reason;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (reason != null) 'reason': reason!,
+      };
+}
+
+/// A document
+class SignDocument {
+  const SignDocument({
+    this.fileId,
+    this.filename,
+    this.index,
+    this.pages,
+    this.sha256After,
+    this.sha256Before,
+    this.signedFileId,
+  });
+
+  factory SignDocument.fromJson(Map<String, dynamic> json) => SignDocument(
+        fileId: json['file_id'] as String?,
+        filename: json['filename'] as String?,
+        index: (json['index'] as num?)?.toInt(),
+        pages: (json['pages'] as num?)?.toInt(),
+        sha256After: json['sha256_after'] as String?,
+        sha256Before: json['sha256_before'] as String?,
+        signedFileId: json['signed_file_id'] as String?,
+      );
+
+  /// The PDF signed (a DOCX was converted)
+  final String? fileId;
+
+  final String? filename;
+
+  final int? index;
+
+  final int? pages;
+
+  /// SHA-256 of the signed copy (completed)
+  final String? sha256After;
+
+  /// SHA-256 of the document as sent
+  final String? sha256Before;
+
+  /// The signed copy (completed)
+  final String? signedFileId;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (fileId != null) 'file_id': fileId!,
+        if (filename != null) 'filename': filename!,
+        if (index != null) 'index': index!,
+        if (pages != null) 'pages': pages!,
+        if (sha256After != null) 'sha256_after': sha256After!,
+        if (sha256Before != null) 'sha256_before': sha256Before!,
+        if (signedFileId != null) 'signed_file_id': signedFileId!,
+      };
+}
+
+/// An audit-trail event, hash-chained
+class SignEvent {
+  const SignEvent({
+    this.at,
+    this.detail,
+    this.eventId,
+    this.hash,
+    this.prevHash,
+    this.seq,
+    this.signerId,
+    this.type,
+  });
+
+  factory SignEvent.fromJson(Map<String, dynamic> json) => SignEvent(
+        at: json['at'] as String?,
+        detail: (json['detail'] as Map?)?.map((k, e) => MapEntry(k as String, (e)!)).cast<String, Object>(),
+        eventId: json['event_id'] as String?,
+        hash: json['hash'] as String?,
+        prevHash: json['prev_hash'] as String?,
+        seq: (json['seq'] as num?)?.toInt(),
+        signerId: json['signer_id'] as String?,
+        type: json['type'] as String?,
+      );
+
+  /// With microseconds (the hash covers them)
+  final String? at;
+
+  final Map<String, Object>? detail;
+
+  /// sge_…
+  final String? eventId;
+
+  /// SHA-256 over prev_hash and the event's fields
+  final String? hash;
+
+  /// The previous event's hash (empty for the first)
+  final String? prevHash;
+
+  /// From 1, without gaps
+  final int? seq;
+
+  final String? signerId;
+
+  /// request.sent, signer.opened, signer.verified, signer.signed, …
+  final String? type;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (at != null) 'at': at!,
+        if (detail != null) 'detail': detail!,
+        if (eventId != null) 'event_id': eventId!,
+        if (hash != null) 'hash': hash!,
+        if (prevHash != null) 'prev_hash': prevHash!,
+        if (seq != null) 'seq': seq!,
+        if (signerId != null) 'signer_id': signerId!,
+        if (type != null) 'type': type!,
+      };
+}
+
+class SignEventsData {
+  const SignEventsData({
+    this.items,
+  });
+
+  factory SignEventsData.fromJson(Map<String, dynamic> json) => SignEventsData(
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : SignEvent.fromJson(e as Map<String, dynamic>))!).toList().cast<SignEvent>(),
+      );
+
+  final List<SignEvent>? items;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+      };
+}
+
+/// A placed field
+class SignField {
+  const SignField({
+    this.defaultValue,
+    this.documentIndex,
+    this.fieldId,
+    this.filledAt,
+    this.h,
+    this.label,
+    this.page,
+    this.required,
+    this.signerId,
+    this.signerRef,
+    this.type,
+    this.value,
+    this.w,
+    this.x,
+    this.y,
+  });
+
+  factory SignField.fromJson(Map<String, dynamic> json) => SignField(
+        defaultValue: json['default'] as String?,
+        documentIndex: (json['document_index'] as num?)?.toInt(),
+        fieldId: json['field_id'] as String?,
+        filledAt: json['filled_at'] as String?,
+        h: json['h'] as num?,
+        label: json['label'] as String?,
+        page: (json['page'] as num?)?.toInt(),
+        required: json['required'] as bool?,
+        signerId: json['signer_id'] as String?,
+        signerRef: json['signer_ref'] as String?,
+        type: json['type'] as String?,
+        value: json['value'] as String?,
+        w: json['w'] as num?,
+        x: json['x'] as num?,
+        y: json['y'] as num?,
+      );
+
+  final String? defaultValue;
+
+  final int? documentIndex;
+
+  /// sgf_…
+  final String? fieldId;
+
+  final String? filledAt;
+
+  final num? h;
+
+  final String? label;
+
+  final int? page;
+
+  final bool? required;
+
+  final String? signerId;
+
+  final String? signerRef;
+
+  final String? type;
+
+  /// What the signer filled (signature fields: drawn, typed or uploaded)
+  final String? value;
+
+  final num? w;
+
+  final num? x;
+
+  final num? y;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (defaultValue != null) 'default': defaultValue!,
+        if (documentIndex != null) 'document_index': documentIndex!,
+        if (fieldId != null) 'field_id': fieldId!,
+        if (filledAt != null) 'filled_at': filledAt!,
+        if (h != null) 'h': h!,
+        if (label != null) 'label': label!,
+        if (page != null) 'page': page!,
+        if (required != null) 'required': required!,
+        if (signerId != null) 'signer_id': signerId!,
+        if (signerRef != null) 'signer_ref': signerRef!,
+        if (type != null) 'type': type!,
+        if (value != null) 'value': value!,
+        if (w != null) 'w': w!,
+        if (x != null) 'x': x!,
+        if (y != null) 'y': y!,
+      };
+}
+
+/// A place to fill
+class SignFieldInput {
+  const SignFieldInput({
+    this.anchor,
+    this.anchorOffsetX,
+    this.anchorOffsetY,
+    this.defaultValue,
+    this.documentIndex,
+    this.h,
+    this.label,
+    this.page,
+    this.required,
+    this.signerRef,
+    this.type,
+    this.w,
+    this.x,
+    this.y,
+  });
+
+  factory SignFieldInput.fromJson(Map<String, dynamic> json) => SignFieldInput(
+        anchor: json['anchor'] as String?,
+        anchorOffsetX: json['anchor_offset_x'] as num?,
+        anchorOffsetY: json['anchor_offset_y'] as num?,
+        defaultValue: json['default'] as String?,
+        documentIndex: (json['document_index'] as num?)?.toInt(),
+        h: json['h'] as num?,
+        label: json['label'] as String?,
+        page: (json['page'] as num?)?.toInt(),
+        required: json['required'] as bool?,
+        signerRef: json['signer_ref'] as String?,
+        type: json['type'] as String?,
+        w: json['w'] as num?,
+        x: json['x'] as num?,
+        y: json['y'] as num?,
+      );
+
+  /// Place over every occurrence of this text in the document's text layer, e.g. {{sign_here}} (instead of page, x and y)
+  final String? anchor;
+
+  /// Points right of the anchor
+  final num? anchorOffsetX;
+
+  /// Points below the anchor (negative: above)
+  final num? anchorOffsetY;
+
+  /// A text or date's value unless the signer changes it; a checkbox's "true"/"false"; {{name}} takes a template's merge data
+  final String? defaultValue;
+
+  /// The document's position in documents\[], from 0
+  final int? documentIndex;
+
+  final num? h;
+
+  final String? label;
+
+  /// With x and y
+  final int? page;
+
+  /// Default true for signature, initials and stamp
+  final bool? required;
+
+  /// The signer's ref (default its role, or its position from 1)
+  final String? signerRef;
+
+  final String? type;
+
+  final num? w;
+
+  /// Points from the page's left
+  final num? x;
+
+  /// Points from the page's top
+  final num? y;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (anchor != null) 'anchor': anchor!,
+        if (anchorOffsetX != null) 'anchor_offset_x': anchorOffsetX!,
+        if (anchorOffsetY != null) 'anchor_offset_y': anchorOffsetY!,
+        if (defaultValue != null) 'default': defaultValue!,
+        if (documentIndex != null) 'document_index': documentIndex!,
+        if (h != null) 'h': h!,
+        if (label != null) 'label': label!,
+        if (page != null) 'page': page!,
+        if (required != null) 'required': required!,
+        if (signerRef != null) 'signer_ref': signerRef!,
+        if (type != null) 'type': type!,
+        if (w != null) 'w': w!,
+        if (x != null) 'x': x!,
+        if (y != null) 'y': y!,
+      };
+}
+
+/// A request from a template: who fills each role, merge data
+class SignFromTemplate {
+  const SignFromTemplate({
+    this.data,
+    this.metadata,
+    this.options,
+    this.roles,
+    this.send,
+    this.title,
+  });
+
+  factory SignFromTemplate.fromJson(Map<String, dynamic> json) => SignFromTemplate(
+        data: (json['data'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        metadata: (json['metadata'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        options: json['options'] == null ? null : SignOptionsIn.fromJson(json['options'] as Map<String, dynamic>),
+        roles: (json['roles'] as Map?)?.map((k, e) => MapEntry(k as String, (e == null ? null : SignPerson.fromJson(e as Map<String, dynamic>))!)).cast<String, SignPerson>(),
+        send: json['send'] as bool?,
+        title: json['title'] as String?,
+      );
+
+  /// Replaces {{name}} in the title, message and field defaults
+  final Map<String, String>? data;
+
+  /// Your keys and values, returned in answers and webhooks
+  final Map<String, String>? metadata;
+
+  final SignOptionsIn? options;
+
+  /// Role name → person
+  final Map<String, SignPerson>? roles;
+
+  /// Send at once (default: a draft)
+  final bool? send;
+
+  final String? title;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (data != null) 'data': data!,
+        if (metadata != null) 'metadata': metadata!,
+        if (options != null) 'options': options!.toJson(),
+        if (roles != null) 'roles': roles!.map((k, e) => MapEntry(k, e.toJson())),
+        if (send != null) 'send': send!,
+        if (title != null) 'title': title!,
+      };
+}
+
+/// A signer's link
+class SignLink {
+  const SignLink({
+    this.embedded,
+    this.expiresAt,
+    this.signerId,
+    this.url,
+  });
+
+  factory SignLink.fromJson(Map<String, dynamic> json) => SignLink(
+        embedded: json['embedded'] as bool?,
+        expiresAt: json['expires_at'] as String?,
+        signerId: json['signer_id'] as String?,
+        url: json['url'] as String?,
+      );
+
+  final bool? embedded;
+
+  final String? expiresAt;
+
+  final String? signerId;
+
+  final String? url;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (embedded != null) 'embedded': embedded!,
+        if (expiresAt != null) 'expires_at': expiresAt!,
+        if (signerId != null) 'signer_id': signerId!,
+        if (url != null) 'url': url!,
+      };
+}
+
+/// A page; pass next_cursor as cursor for the next one (null at the end).
+class SignListData {
+  const SignListData({
+    this.items,
+    this.nextCursor,
+  });
+
+  factory SignListData.fromJson(Map<String, dynamic> json) => SignListData(
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : SignRequestSummary.fromJson(e as Map<String, dynamic>))!).toList().cast<SignRequestSummary>(),
+        nextCursor: json['next_cursor'] as String?,
+      );
+
+  final List<SignRequestSummary>? items;
+
+  final String? nextCursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+        if (nextCursor != null) 'next_cursor': nextCursor!,
+      };
+}
+
+class SignListQuery {
+  const SignListQuery({
+    this.status,
+    this.templateId,
+    this.createdAfter,
+    this.createdBefore,
+    this.limit,
+    this.cursor,
+  });
+
+  factory SignListQuery.fromJson(Map<String, dynamic> json) => SignListQuery(
+        status: json['status'] as String?,
+        templateId: json['template_id'] as String?,
+        createdAfter: json['created_after'] as String?,
+        createdBefore: json['created_before'] as String?,
+        limit: (json['limit'] as num?)?.toInt(),
+        cursor: json['cursor'] as String?,
+      );
+
+  final String? status;
+
+  final String? templateId;
+
+  final String? createdAfter;
+
+  final String? createdBefore;
+
+  /// Page size
+  final int? limit;
+
+  /// next_cursor of the previous page.
+  final String? cursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (status != null) 'status': status!,
+        if (templateId != null) 'template_id': templateId!,
+        if (createdAfter != null) 'created_after': createdAfter!,
+        if (createdBefore != null) 'created_before': createdBefore!,
+        if (limit != null) 'limit': limit!,
+        if (cursor != null) 'cursor': cursor!,
+      };
+}
+
+class SignOTPResult {
+  const SignOTPResult({
+    this.attemptsLeft,
+    this.verified,
+  });
+
+  factory SignOTPResult.fromJson(Map<String, dynamic> json) => SignOTPResult(
+        attemptsLeft: (json['attempts_left'] as num?)?.toInt(),
+        verified: json['verified'] as bool?,
+      );
+
+  final int? attemptsLeft;
+
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (attemptsLeft != null) 'attempts_left': attemptsLeft!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+class SignOTPSent {
+  const SignOTPSent({
+    this.channel,
+    this.code,
+    this.destination,
+    this.expiresAt,
+  });
+
+  factory SignOTPSent.fromJson(Map<String, dynamic> json) => SignOTPSent(
+        channel: json['channel'] as String?,
+        code: json['code'] as String?,
+        destination: json['destination'] as String?,
+        expiresAt: json['expires_at'] as String?,
+      );
+
+  final String? channel;
+
+  /// Test environment only: the code (always 123456)
+  final String? code;
+
+  /// Masked
+  final String? destination;
+
+  final String? expiresAt;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (channel != null) 'channel': channel!,
+        if (code != null) 'code': code!,
+        if (destination != null) 'destination': destination!,
+        if (expiresAt != null) 'expires_at': expiresAt!,
+      };
+}
+
+class SignOTPVerify {
+  const SignOTPVerify({
+    this.code,
+  });
+
+  factory SignOTPVerify.fromJson(Map<String, dynamic> json) => SignOTPVerify(
+        code: json['code'] as String?,
+      );
+
+  final String? code;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (code != null) 'code': code!,
+      };
+}
+
+/// Request options
+class SignOptions {
+  const SignOptions({
+    this.attachAuditCertificate,
+    this.branding,
+    this.embedded,
+    this.expiresInDays,
+    this.message,
+    this.redirectUrl,
+    this.reminders,
+    this.requireViewAllPages,
+    this.sequential,
+  });
+
+  factory SignOptions.fromJson(Map<String, dynamic> json) => SignOptions(
+        attachAuditCertificate: json['attach_audit_certificate'] as bool?,
+        branding: json['branding'] == null ? null : SignOptionsBranding.fromJson(json['branding'] as Map<String, dynamic>),
+        embedded: json['embedded'] as bool?,
+        expiresInDays: (json['expires_in_days'] as num?)?.toInt(),
+        message: json['message'] as String?,
+        redirectUrl: json['redirect_url'] as String?,
+        reminders: json['reminders'] == null ? null : SignOptionsReminders.fromJson(json['reminders'] as Map<String, dynamic>),
+        requireViewAllPages: json['require_view_all_pages'] as bool?,
+        sequential: json['sequential'] as bool?,
+      );
+
+  /// Append the audit certificate page to the sealed PDF
+  final bool? attachAuditCertificate;
+
+  /// What signers see of the sender
+  final SignOptionsBranding? branding;
+
+  /// Links for an iframe, allowed only on the environment's allowed_origins
+  final bool? embedded;
+
+  /// Default 30
+  final int? expiresInDays;
+
+  /// Shown to signers and in their email
+  final String? message;
+
+  /// https URL the signer goes to after signing
+  final String? redirectUrl;
+
+  /// Automatic reminders
+  final SignOptionsReminders? reminders;
+
+  /// Signers must view every page before signing
+  final bool? requireViewAllPages;
+
+  /// Signers sign in order (order, else list order); otherwise all at once
+  final bool? sequential;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (attachAuditCertificate != null) 'attach_audit_certificate': attachAuditCertificate!,
+        if (branding != null) 'branding': branding!.toJson(),
+        if (embedded != null) 'embedded': embedded!,
+        if (expiresInDays != null) 'expires_in_days': expiresInDays!,
+        if (message != null) 'message': message!,
+        if (redirectUrl != null) 'redirect_url': redirectUrl!,
+        if (reminders != null) 'reminders': reminders!.toJson(),
+        if (requireViewAllPages != null) 'require_view_all_pages': requireViewAllPages!,
+        if (sequential != null) 'sequential': sequential!,
+      };
+}
+
+/// What signers see of the sender
+class SignOptionsBranding {
+  const SignOptionsBranding({
+    this.color,
+    this.logoFileId,
+    this.senderName,
+  });
+
+  factory SignOptionsBranding.fromJson(Map<String, dynamic> json) => SignOptionsBranding(
+        color: json['color'] as String?,
+        logoFileId: json['logo_file_id'] as String?,
+        senderName: json['sender_name'] as String?,
+      );
+
+  final String? color;
+
+  /// The stored logo (answers)
+  final String? logoFileId;
+
+  final String? senderName;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (color != null) 'color': color!,
+        if (logoFileId != null) 'logo_file_id': logoFileId!,
+        if (senderName != null) 'sender_name': senderName!,
+      };
+}
+
+/// Request options
+class SignOptionsIn {
+  const SignOptionsIn({
+    this.attachAuditCertificate,
+    this.branding,
+    this.embedded,
+    this.expiresInDays,
+    this.message,
+    this.redirectUrl,
+    this.reminders,
+    this.requireViewAllPages,
+    this.sequential,
+  });
+
+  factory SignOptionsIn.fromJson(Map<String, dynamic> json) => SignOptionsIn(
+        attachAuditCertificate: json['attach_audit_certificate'] as bool?,
+        branding: json['branding'] == null ? null : SignOptionsInBranding.fromJson(json['branding'] as Map<String, dynamic>),
+        embedded: json['embedded'] as bool?,
+        expiresInDays: (json['expires_in_days'] as num?)?.toInt(),
+        message: json['message'] as String?,
+        redirectUrl: json['redirect_url'] as String?,
+        reminders: json['reminders'] == null ? null : SignOptionsInReminders.fromJson(json['reminders'] as Map<String, dynamic>),
+        requireViewAllPages: json['require_view_all_pages'] as bool?,
+        sequential: json['sequential'] as bool?,
+      );
+
+  /// Append the audit certificate page to the sealed PDF
+  final bool? attachAuditCertificate;
+
+  /// What signers see of the sender
+  final SignOptionsInBranding? branding;
+
+  /// Links for an iframe, allowed only on the environment's allowed_origins
+  final bool? embedded;
+
+  /// Default 30
+  final int? expiresInDays;
+
+  /// Shown to signers and in their email
+  final String? message;
+
+  /// https URL the signer goes to after signing
+  final String? redirectUrl;
+
+  /// Automatic reminders
+  final SignOptionsInReminders? reminders;
+
+  /// Signers must view every page before signing
+  final bool? requireViewAllPages;
+
+  /// Signers sign in order (order, else list order); otherwise all at once
+  final bool? sequential;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (attachAuditCertificate != null) 'attach_audit_certificate': attachAuditCertificate!,
+        if (branding != null) 'branding': branding!.toJson(),
+        if (embedded != null) 'embedded': embedded!,
+        if (expiresInDays != null) 'expires_in_days': expiresInDays!,
+        if (message != null) 'message': message!,
+        if (redirectUrl != null) 'redirect_url': redirectUrl!,
+        if (reminders != null) 'reminders': reminders!.toJson(),
+        if (requireViewAllPages != null) 'require_view_all_pages': requireViewAllPages!,
+        if (sequential != null) 'sequential': sequential!,
+      };
+}
+
+/// What signers see of the sender
+class SignOptionsInBranding {
+  const SignOptionsInBranding({
+    this.color,
+    this.logo,
+    this.logoFileId,
+    this.senderName,
+  });
+
+  factory SignOptionsInBranding.fromJson(Map<String, dynamic> json) => SignOptionsInBranding(
+        color: json['color'] as String?,
+        logo: json['logo'] == null ? null : FileRef.fromJson(json['logo'] as Map<String, dynamic>),
+        logoFileId: json['logo_file_id'] as String?,
+        senderName: json['sender_name'] as String?,
+      );
+
+  final String? color;
+
+  final FileRef? logo;
+
+  /// The stored logo (answers)
+  final String? logoFileId;
+
+  final String? senderName;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (color != null) 'color': color!,
+        if (logo != null) 'logo': logo!.toJson(),
+        if (logoFileId != null) 'logo_file_id': logoFileId!,
+        if (senderName != null) 'sender_name': senderName!,
+      };
+}
+
+/// Automatic reminders
+class SignOptionsInReminders {
+  const SignOptionsInReminders({
+    this.afterDays,
+    this.everyDays,
+    this.max,
+  });
+
+  factory SignOptionsInReminders.fromJson(Map<String, dynamic> json) => SignOptionsInReminders(
+        afterDays: (json['after_days'] as num?)?.toInt(),
+        everyDays: (json['every_days'] as num?)?.toInt(),
+        max: (json['max'] as num?)?.toInt(),
+      );
+
+  /// Days after sending
+  final int? afterDays;
+
+  /// Then every this many days (0: one reminder)
+  final int? everyDays;
+
+  /// At most this many (default 1, or 3 with every_days)
+  final int? max;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (afterDays != null) 'after_days': afterDays!,
+        if (everyDays != null) 'every_days': everyDays!,
+        if (max != null) 'max': max!,
+      };
+}
+
+/// Automatic reminders
+class SignOptionsReminders {
+  const SignOptionsReminders({
+    this.afterDays,
+    this.everyDays,
+    this.max,
+  });
+
+  factory SignOptionsReminders.fromJson(Map<String, dynamic> json) => SignOptionsReminders(
+        afterDays: (json['after_days'] as num?)?.toInt(),
+        everyDays: (json['every_days'] as num?)?.toInt(),
+        max: (json['max'] as num?)?.toInt(),
+      );
+
+  /// Days after sending
+  final int? afterDays;
+
+  /// Then every this many days (0: one reminder)
+  final int? everyDays;
+
+  /// At most this many (default 1, or 3 with every_days)
+  final int? max;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (afterDays != null) 'after_days': afterDays!,
+        if (everyDays != null) 'every_days': everyDays!,
+        if (max != null) 'max': max!,
+      };
+}
+
+/// The person filling a role
+class SignPerson {
+  const SignPerson({
+    this.auth,
+    this.email,
+    this.language,
+    this.name,
+    this.phone,
+  });
+
+  factory SignPerson.fromJson(Map<String, dynamic> json) => SignPerson(
+        auth: json['auth'] as String?,
+        email: json['email'] as String?,
+        language: json['language'] as String?,
+        name: json['name'] as String?,
+        phone: json['phone'] as String?,
+      );
+
+  final String? auth;
+
+  final String? email;
+
+  final String? language;
+
+  final String? name;
+
+  final String? phone;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (auth != null) 'auth': auth!,
+        if (email != null) 'email': email!,
+        if (language != null) 'language': language!,
+        if (name != null) 'name': name!,
+        if (phone != null) 'phone': phone!,
+      };
+}
+
+/// A signing request
+class SignRequest {
+  const SignRequest({
+    this.certificateFileId,
+    this.completedAt,
+    this.createdAt,
+    this.declinedAt,
+    this.documents,
+    this.environment,
+    this.expiredAt,
+    this.expiresAt,
+    this.fields,
+    this.metadata,
+    this.nextReminderAt,
+    this.options,
+    this.remindersSent,
+    this.requestId,
+    this.sealJobId,
+    this.sealedFileId,
+    this.sealing,
+    this.sentAt,
+    this.signers,
+    this.status,
+    this.templateId,
+    this.title,
+    this.updatedAt,
+    this.voidReason,
+    this.voidedAt,
+  });
+
+  factory SignRequest.fromJson(Map<String, dynamic> json) => SignRequest(
+        certificateFileId: json['certificate_file_id'] as String?,
+        completedAt: json['completed_at'] as String?,
+        createdAt: json['created_at'] as String?,
+        declinedAt: json['declined_at'] as String?,
+        documents: (json['documents'] as List?)?.map((e) => (e == null ? null : SignDocument.fromJson(e as Map<String, dynamic>))!).toList().cast<SignDocument>(),
+        environment: json['environment'] as String?,
+        expiredAt: json['expired_at'] as String?,
+        expiresAt: json['expires_at'] as String?,
+        fields: (json['fields'] as List?)?.map((e) => (e == null ? null : SignField.fromJson(e as Map<String, dynamic>))!).toList().cast<SignField>(),
+        metadata: (json['metadata'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        nextReminderAt: json['next_reminder_at'] as String?,
+        options: json['options'] == null ? null : SignOptions.fromJson(json['options'] as Map<String, dynamic>),
+        remindersSent: (json['reminders_sent'] as num?)?.toInt(),
+        requestId: json['request_id'] as String?,
+        sealJobId: json['seal_job_id'] as String?,
+        sealedFileId: json['sealed_file_id'] as String?,
+        sealing: json['sealing'] as bool?,
+        sentAt: json['sent_at'] as String?,
+        signers: (json['signers'] as List?)?.map((e) => (e == null ? null : SignSigner.fromJson(e as Map<String, dynamic>))!).toList().cast<SignSigner>(),
+        status: json['status'] as String?,
+        templateId: json['template_id'] as String?,
+        title: json['title'] as String?,
+        updatedAt: json['updated_at'] as String?,
+        voidReason: json['void_reason'] as String?,
+        voidedAt: json['voided_at'] as String?,
+      );
+
+  /// The audit certificate (completed)
+  final String? certificateFileId;
+
+  final String? completedAt;
+
+  final String? createdAt;
+
+  final String? declinedAt;
+
+  final List<SignDocument>? documents;
+
+  final String? environment;
+
+  final String? expiredAt;
+
+  final String? expiresAt;
+
+  final List<SignField>? fields;
+
+  /// Your keys and values, returned in answers and webhooks
+  final Map<String, String>? metadata;
+
+  final String? nextReminderAt;
+
+  final SignOptions? options;
+
+  /// Automatic reminders sent
+  final int? remindersSent;
+
+  /// sgn_…
+  final String? requestId;
+
+  final String? sealJobId;
+
+  /// Every document and the audit certificate, sealed (completed)
+  final String? sealedFileId;
+
+  /// Everyone has signed and the sealed PDF is being made
+  final bool? sealing;
+
+  final String? sentAt;
+
+  final List<SignSigner>? signers;
+
+  /// draft → sent → in_progress → completed; or declined (a signer declined), voided (by you), expired
+  final String? status;
+
+  final String? templateId;
+
+  final String? title;
+
+  final String? updatedAt;
+
+  final String? voidReason;
+
+  final String? voidedAt;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (certificateFileId != null) 'certificate_file_id': certificateFileId!,
+        if (completedAt != null) 'completed_at': completedAt!,
+        if (createdAt != null) 'created_at': createdAt!,
+        if (declinedAt != null) 'declined_at': declinedAt!,
+        if (documents != null) 'documents': documents!.map((e) => e.toJson()).toList(),
+        if (environment != null) 'environment': environment!,
+        if (expiredAt != null) 'expired_at': expiredAt!,
+        if (expiresAt != null) 'expires_at': expiresAt!,
+        if (fields != null) 'fields': fields!.map((e) => e.toJson()).toList(),
+        if (metadata != null) 'metadata': metadata!,
+        if (nextReminderAt != null) 'next_reminder_at': nextReminderAt!,
+        if (options != null) 'options': options!.toJson(),
+        if (remindersSent != null) 'reminders_sent': remindersSent!,
+        if (requestId != null) 'request_id': requestId!,
+        if (sealJobId != null) 'seal_job_id': sealJobId!,
+        if (sealedFileId != null) 'sealed_file_id': sealedFileId!,
+        if (sealing != null) 'sealing': sealing!,
+        if (sentAt != null) 'sent_at': sentAt!,
+        if (signers != null) 'signers': signers!.map((e) => e.toJson()).toList(),
+        if (status != null) 'status': status!,
+        if (templateId != null) 'template_id': templateId!,
+        if (title != null) 'title': title!,
+        if (updatedAt != null) 'updated_at': updatedAt!,
+        if (voidReason != null) 'void_reason': voidReason!,
+        if (voidedAt != null) 'voided_at': voidedAt!,
+      };
+}
+
+/// A signing request
+class SignRequestCreate {
+  const SignRequestCreate({
+    this.documents,
+    this.fields,
+    this.metadata,
+    this.options,
+    this.send,
+    this.signers,
+    this.title,
+  });
+
+  factory SignRequestCreate.fromJson(Map<String, dynamic> json) => SignRequestCreate(
+        documents: (json['documents'] as List?)?.map((e) => (e == null ? null : FileRef.fromJson(e as Map<String, dynamic>))!).toList().cast<FileRef>(),
+        fields: (json['fields'] as List?)?.map((e) => (e == null ? null : SignFieldInput.fromJson(e as Map<String, dynamic>))!).toList().cast<SignFieldInput>(),
+        metadata: (json['metadata'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        options: json['options'] == null ? null : SignOptionsIn.fromJson(json['options'] as Map<String, dynamic>),
+        send: json['send'] as bool?,
+        signers: (json['signers'] as List?)?.map((e) => (e == null ? null : SignSignerInput.fromJson(e as Map<String, dynamic>))!).toList().cast<SignSignerInput>(),
+        title: json['title'] as String?,
+      );
+
+  /// 1 to 10 PDFs or DOCX files (converted to PDF), up to 25 MB and 200 pages each
+  final List<FileRef>? documents;
+
+  /// Up to 200; a signer with no signature field gets one on the last page
+  final List<SignFieldInput>? fields;
+
+  /// Your keys and values, returned in answers and webhooks
+  final Map<String, String>? metadata;
+
+  final SignOptionsIn? options;
+
+  /// Send at once (default: a draft, sent with POST …/send)
+  final bool? send;
+
+  /// 1 to 20
+  final List<SignSignerInput>? signers;
+
+  final String? title;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (documents != null) 'documents': documents!.map((e) => e.toJson()).toList(),
+        if (fields != null) 'fields': fields!.map((e) => e.toJson()).toList(),
+        if (metadata != null) 'metadata': metadata!,
+        if (options != null) 'options': options!.toJson(),
+        if (send != null) 'send': send!,
+        if (signers != null) 'signers': signers!.map((e) => e.toJson()).toList(),
+        if (title != null) 'title': title!,
+      };
+}
+
+/// A request in a list
+class SignRequestSummary {
+  const SignRequestSummary({
+    this.completedAt,
+    this.createdAt,
+    this.documents,
+    this.expiresAt,
+    this.metadata,
+    this.requestId,
+    this.sentAt,
+    this.signed,
+    this.signers,
+    this.status,
+    this.templateId,
+    this.title,
+  });
+
+  factory SignRequestSummary.fromJson(Map<String, dynamic> json) => SignRequestSummary(
+        completedAt: json['completed_at'] as String?,
+        createdAt: json['created_at'] as String?,
+        documents: (json['documents'] as num?)?.toInt(),
+        expiresAt: json['expires_at'] as String?,
+        metadata: (json['metadata'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        requestId: json['request_id'] as String?,
+        sentAt: json['sent_at'] as String?,
+        signed: (json['signed'] as num?)?.toInt(),
+        signers: (json['signers'] as num?)?.toInt(),
+        status: json['status'] as String?,
+        templateId: json['template_id'] as String?,
+        title: json['title'] as String?,
+      );
+
+  final String? completedAt;
+
+  final String? createdAt;
+
+  final int? documents;
+
+  final String? expiresAt;
+
+  /// Your keys and values, returned in answers and webhooks
+  final Map<String, String>? metadata;
+
+  final String? requestId;
+
+  final String? sentAt;
+
+  final int? signed;
+
+  final int? signers;
+
+  /// draft → sent → in_progress → completed; or declined (a signer declined), voided (by you), expired
+  final String? status;
+
+  final String? templateId;
+
+  final String? title;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (completedAt != null) 'completed_at': completedAt!,
+        if (createdAt != null) 'created_at': createdAt!,
+        if (documents != null) 'documents': documents!,
+        if (expiresAt != null) 'expires_at': expiresAt!,
+        if (metadata != null) 'metadata': metadata!,
+        if (requestId != null) 'request_id': requestId!,
+        if (sentAt != null) 'sent_at': sentAt!,
+        if (signed != null) 'signed': signed!,
+        if (signers != null) 'signers': signers!,
+        if (status != null) 'status': status!,
+        if (templateId != null) 'template_id': templateId!,
+        if (title != null) 'title': title!,
+      };
+}
+
+/// A template role: who will sign, given per request
+class SignRole {
+  const SignRole({
+    this.auth,
+    this.language,
+    this.order,
+    this.role,
+  });
+
+  factory SignRole.fromJson(Map<String, dynamic> json) => SignRole(
+        auth: json['auth'] as String?,
+        language: json['language'] as String?,
+        order: (json['order'] as num?)?.toInt(),
+        role: json['role'] as String?,
+      );
+
+  final String? auth;
+
+  final String? language;
+
+  final int? order;
+
+  final String? role;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (auth != null) 'auth': auth!,
+        if (language != null) 'language': language!,
+        if (order != null) 'order': order!,
+        if (role != null) 'role': role!,
+      };
+}
+
+/// The signer's view of the request
+class SignSession {
+  const SignSession({
+    this.allowedOrigins,
+    this.brandColor,
+    this.contactHint,
+    this.documents,
+    this.embedded,
+    this.environment,
+    this.fields,
+    this.linkExpiresAt,
+    this.logoFileId,
+    this.message,
+    this.pagesViewed,
+    this.redirectUrl,
+    this.requestId,
+    this.requestStatus,
+    this.requireViewAllPages,
+    this.sealedFileId,
+    this.senderName,
+    this.sessionId,
+    this.signer,
+    this.signersSigned,
+    this.signersTotal,
+    this.testCompleted,
+    this.title,
+    this.verified,
+  });
+
+  factory SignSession.fromJson(Map<String, dynamic> json) => SignSession(
+        allowedOrigins: (json['allowed_origins'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        brandColor: json['brand_color'] as String?,
+        contactHint: json['contact_hint'] as String?,
+        documents: (json['documents'] as List?)?.map((e) => (e == null ? null : SignSessionDocument.fromJson(e as Map<String, dynamic>))!).toList().cast<SignSessionDocument>(),
+        embedded: json['embedded'] as bool?,
+        environment: json['environment'] as String?,
+        fields: (json['fields'] as List?)?.map((e) => (e == null ? null : SignField.fromJson(e as Map<String, dynamic>))!).toList().cast<SignField>(),
+        linkExpiresAt: json['link_expires_at'] as String?,
+        logoFileId: json['logo_file_id'] as String?,
+        message: json['message'] as String?,
+        pagesViewed: (json['pages_viewed'] as Map?)?.map((k, e) => MapEntry(k as String, ((e as List?)?.map((e) => ((e as num?)?.toInt())!).toList().cast<int>())!)).cast<String, List<int>>(),
+        redirectUrl: json['redirect_url'] as String?,
+        requestId: json['request_id'] as String?,
+        requestStatus: json['request_status'] as String?,
+        requireViewAllPages: json['require_view_all_pages'] as bool?,
+        sealedFileId: json['sealed_file_id'] as String?,
+        senderName: json['sender_name'] as String?,
+        sessionId: json['session_id'] as String?,
+        signer: json['signer'] == null ? null : SignSigner.fromJson(json['signer'] as Map<String, dynamic>),
+        signersSigned: (json['signers_signed'] as num?)?.toInt(),
+        signersTotal: (json['signers_total'] as num?)?.toInt(),
+        testCompleted: json['test_completed'] as bool?,
+        title: json['title'] as String?,
+        verified: json['verified'] as bool?,
+      );
+
+  /// Embedded: the origins the page may be framed by
+  final List<String>? allowedOrigins;
+
+  final String? brandColor;
+
+  /// Where the code goes, masked
+  final String? contactHint;
+
+  final List<SignSessionDocument>? documents;
+
+  final bool? embedded;
+
+  final String? environment;
+
+  /// This signer's fields
+  final List<SignField>? fields;
+
+  final String? linkExpiresAt;
+
+  final String? logoFileId;
+
+  final String? message;
+
+  /// Document index → pages seen
+  final Map<String, List<int>>? pagesViewed;
+
+  final String? redirectUrl;
+
+  final String? requestId;
+
+  /// sealing: signed by everyone, the sealed PDF is being made
+  final String? requestStatus;
+
+  final bool? requireViewAllPages;
+
+  final String? sealedFileId;
+
+  final String? senderName;
+
+  /// Send it in X-Sign-Session on every later call (one session per signer: opening the link again ends the others)
+  final String? sessionId;
+
+  final SignSigner? signer;
+
+  final int? signersSigned;
+
+  final int? signersTotal;
+
+  /// test_sign completed the request
+  final bool? testCompleted;
+
+  final String? title;
+
+  /// The signer proved who they are (or needs not)
+  final bool? verified;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (allowedOrigins != null) 'allowed_origins': allowedOrigins!,
+        if (brandColor != null) 'brand_color': brandColor!,
+        if (contactHint != null) 'contact_hint': contactHint!,
+        if (documents != null) 'documents': documents!.map((e) => e.toJson()).toList(),
+        if (embedded != null) 'embedded': embedded!,
+        if (environment != null) 'environment': environment!,
+        if (fields != null) 'fields': fields!.map((e) => e.toJson()).toList(),
+        if (linkExpiresAt != null) 'link_expires_at': linkExpiresAt!,
+        if (logoFileId != null) 'logo_file_id': logoFileId!,
+        if (message != null) 'message': message!,
+        if (pagesViewed != null) 'pages_viewed': pagesViewed!,
+        if (redirectUrl != null) 'redirect_url': redirectUrl!,
+        if (requestId != null) 'request_id': requestId!,
+        if (requestStatus != null) 'request_status': requestStatus!,
+        if (requireViewAllPages != null) 'require_view_all_pages': requireViewAllPages!,
+        if (sealedFileId != null) 'sealed_file_id': sealedFileId!,
+        if (senderName != null) 'sender_name': senderName!,
+        if (sessionId != null) 'session_id': sessionId!,
+        if (signer != null) 'signer': signer!.toJson(),
+        if (signersSigned != null) 'signers_signed': signersSigned!,
+        if (signersTotal != null) 'signers_total': signersTotal!,
+        if (testCompleted != null) 'test_completed': testCompleted!,
+        if (title != null) 'title': title!,
+        if (verified != null) 'verified': verified!,
+      };
+}
+
+class SignSessionDocument {
+  const SignSessionDocument({
+    this.filename,
+    this.index,
+    this.pageSizes,
+    this.pages,
+  });
+
+  factory SignSessionDocument.fromJson(Map<String, dynamic> json) => SignSessionDocument(
+        filename: json['filename'] as String?,
+        index: (json['index'] as num?)?.toInt(),
+        pageSizes: (json['page_sizes'] as List?)?.map((e) => (e == null ? null : SignSessionDocumentsItemPageSize.fromJson(e as Map<String, dynamic>))!).toList().cast<SignSessionDocumentsItemPageSize>(),
+        pages: (json['pages'] as num?)?.toInt(),
+      );
+
+  final String? filename;
+
+  final int? index;
+
+  final List<SignSessionDocumentsItemPageSize>? pageSizes;
+
+  final int? pages;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (filename != null) 'filename': filename!,
+        if (index != null) 'index': index!,
+        if (pageSizes != null) 'page_sizes': pageSizes!.map((e) => e.toJson()).toList(),
+        if (pages != null) 'pages': pages!,
+      };
+}
+
+/// Page size in points
+class SignSessionDocumentsItemPageSize {
+  const SignSessionDocumentsItemPageSize({
+    this.h,
+    this.w,
+  });
+
+  factory SignSessionDocumentsItemPageSize.fromJson(Map<String, dynamic> json) => SignSessionDocumentsItemPageSize(
+        h: json['h'] as num?,
+        w: json['w'] as num?,
+      );
+
+  final num? h;
+
+  final num? w;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (h != null) 'h': h!,
+        if (w != null) 'w': w!,
+      };
+}
+
+/// A signer
+class SignSigner {
+  const SignSigner({
+    this.auth,
+    this.declineReason,
+    this.declinedAt,
+    this.email,
+    this.language,
+    this.linkExpiresAt,
+    this.name,
+    this.notifiedAt,
+    this.order,
+    this.phone,
+    this.ref,
+    this.role,
+    this.signedAt,
+    this.signerId,
+    this.signingUrl,
+    this.status,
+    this.viewedAt,
+  });
+
+  factory SignSigner.fromJson(Map<String, dynamic> json) => SignSigner(
+        auth: json['auth'] as String?,
+        declineReason: json['decline_reason'] as String?,
+        declinedAt: json['declined_at'] as String?,
+        email: json['email'] as String?,
+        language: json['language'] as String?,
+        linkExpiresAt: json['link_expires_at'] as String?,
+        name: json['name'] as String?,
+        notifiedAt: json['notified_at'] as String?,
+        order: (json['order'] as num?)?.toInt(),
+        phone: json['phone'] as String?,
+        ref: json['ref'] as String?,
+        role: json['role'] as String?,
+        signedAt: json['signed_at'] as String?,
+        signerId: json['signer_id'] as String?,
+        signingUrl: json['signing_url'] as String?,
+        status: json['status'] as String?,
+        viewedAt: json['viewed_at'] as String?,
+      );
+
+  final String? auth;
+
+  final String? declineReason;
+
+  final String? declinedAt;
+
+  final String? email;
+
+  final String? language;
+
+  /// The link works until then (7 days; a reminder resets it)
+  final String? linkExpiresAt;
+
+  final String? name;
+
+  final String? notifiedAt;
+
+  final int? order;
+
+  final String? phone;
+
+  final String? ref;
+
+  final String? role;
+
+  final String? signedAt;
+
+  /// sgs_…
+  final String? signerId;
+
+  /// The signer's link: only in the answers of create with send, send, remind and template requests, for the signers whose turn it is
+  final String? signingUrl;
+
+  /// pending: not yet reached; notified: sent the link; viewed: opened and verified; signed; declined
+  final String? status;
+
+  final String? viewedAt;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (auth != null) 'auth': auth!,
+        if (declineReason != null) 'decline_reason': declineReason!,
+        if (declinedAt != null) 'declined_at': declinedAt!,
+        if (email != null) 'email': email!,
+        if (language != null) 'language': language!,
+        if (linkExpiresAt != null) 'link_expires_at': linkExpiresAt!,
+        if (name != null) 'name': name!,
+        if (notifiedAt != null) 'notified_at': notifiedAt!,
+        if (order != null) 'order': order!,
+        if (phone != null) 'phone': phone!,
+        if (ref != null) 'ref': ref!,
+        if (role != null) 'role': role!,
+        if (signedAt != null) 'signed_at': signedAt!,
+        if (signerId != null) 'signer_id': signerId!,
+        if (signingUrl != null) 'signing_url': signingUrl!,
+        if (status != null) 'status': status!,
+        if (viewedAt != null) 'viewed_at': viewedAt!,
+      };
+}
+
+/// A person who signs
+class SignSignerInput {
+  const SignSignerInput({
+    this.auth,
+    this.email,
+    this.language,
+    this.name,
+    this.order,
+    this.phone,
+    this.ref,
+    this.role,
+  });
+
+  factory SignSignerInput.fromJson(Map<String, dynamic> json) => SignSignerInput(
+        auth: json['auth'] as String?,
+        email: json['email'] as String?,
+        language: json['language'] as String?,
+        name: json['name'] as String?,
+        order: (json['order'] as num?)?.toInt(),
+        phone: json['phone'] as String?,
+        ref: json['ref'] as String?,
+        role: json['role'] as String?,
+      );
+
+  /// How the signer proves who they are: a code by email or SMS, Aadhaar eSign at the ESP, or none (default: otp_email with an email, otp_sms with a phone, else none)
+  final String? auth;
+
+  final String? email;
+
+  /// The signer page's language
+  final String? language;
+
+  final String? name;
+
+  final int? order;
+
+  /// +E.164, or a 10-digit Indian mobile number
+  final String? phone;
+
+  /// How fields name this signer; default the role, or the position from 1
+  final String? ref;
+
+  final String? role;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (auth != null) 'auth': auth!,
+        if (email != null) 'email': email!,
+        if (language != null) 'language': language!,
+        if (name != null) 'name': name!,
+        if (order != null) 'order': order!,
+        if (phone != null) 'phone': phone!,
+        if (ref != null) 'ref': ref!,
+        if (role != null) 'role': role!,
+      };
+}
+
+/// The signature
+class SignSubmit {
+  const SignSubmit({
+    this.agree,
+    this.fields,
+    this.signature,
+  });
+
+  factory SignSubmit.fromJson(Map<String, dynamic> json) => SignSubmit(
+        agree: json['agree'] as bool?,
+        fields: (json['fields'] as List?)?.map((e) => (e == null ? null : SignSubmitField.fromJson(e as Map<String, dynamic>))!).toList().cast<SignSubmitField>(),
+        signature: json['signature'] == null ? null : SignSubmitSignature.fromJson(json['signature'] as Map<String, dynamic>),
+      );
+
+  /// Must be true: the signer agrees to sign electronically (422 consent_required otherwise)
+  final bool? agree;
+
+  /// Values of the signer's text, date and checkbox fields (a date defaults to today, IST)
+  final List<SignSubmitField>? fields;
+
+  final SignSubmitSignature? signature;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (agree != null) 'agree': agree!,
+        if (fields != null) 'fields': fields!.map((e) => e.toJson()).toList(),
+        if (signature != null) 'signature': signature!.toJson(),
+      };
+}
+
+class SignSubmitField {
+  const SignSubmitField({
+    this.fieldId,
+    this.value,
+  });
+
+  factory SignSubmitField.fromJson(Map<String, dynamic> json) => SignSubmitField(
+        fieldId: json['field_id'] as String?,
+        value: json['value'] as String?,
+      );
+
+  final String? fieldId;
+
+  final String? value;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (fieldId != null) 'field_id': fieldId!,
+        if (value != null) 'value': value!,
+      };
+}
+
+class SignSubmitSignature {
+  const SignSubmitSignature({
+    this.imageBase64,
+    this.kind,
+    this.text,
+  });
+
+  factory SignSubmitSignature.fromJson(Map<String, dynamic> json) => SignSubmitSignature(
+        imageBase64: json['image_base64'] as String?,
+        kind: json['kind'] as String?,
+        text: json['text'] as String?,
+      );
+
+  /// drawn or uploaded: a PNG or JPEG, at most 1 MB, 20x10 to 4000x2000 pixels
+  final String? imageBase64;
+
+  final String? kind;
+
+  /// typed: the name as typed
+  final String? text;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (imageBase64 != null) 'image_base64': imageBase64!,
+        if (kind != null) 'kind': kind!,
+        if (text != null) 'text': text!,
+      };
+}
+
+/// A template: roles, placed fields, documents
+class SignTemplate {
+  const SignTemplate({
+    this.createdAt,
+    this.documents,
+    this.environment,
+    this.fields,
+    this.metadata,
+    this.name,
+    this.options,
+    this.roles,
+    this.templateId,
+    this.title,
+    this.updatedAt,
+    this.uses,
+  });
+
+  factory SignTemplate.fromJson(Map<String, dynamic> json) => SignTemplate(
+        createdAt: json['created_at'] as String?,
+        documents: (json['documents'] as List?)?.map((e) => (e == null ? null : SignDocument.fromJson(e as Map<String, dynamic>))!).toList().cast<SignDocument>(),
+        environment: json['environment'] as String?,
+        fields: (json['fields'] as List?)?.map((e) => (e == null ? null : SignTemplateField.fromJson(e as Map<String, dynamic>))!).toList().cast<SignTemplateField>(),
+        metadata: (json['metadata'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        name: json['name'] as String?,
+        options: json['options'] == null ? null : SignOptions.fromJson(json['options'] as Map<String, dynamic>),
+        roles: (json['roles'] as List?)?.map((e) => (e == null ? null : SignRole.fromJson(e as Map<String, dynamic>))!).toList().cast<SignRole>(),
+        templateId: json['template_id'] as String?,
+        title: json['title'] as String?,
+        updatedAt: json['updated_at'] as String?,
+        uses: (json['uses'] as num?)?.toInt(),
+      );
+
+  final String? createdAt;
+
+  final List<SignDocument>? documents;
+
+  final String? environment;
+
+  final List<SignTemplateField>? fields;
+
+  /// Your keys and values, returned in answers and webhooks
+  final Map<String, String>? metadata;
+
+  final String? name;
+
+  final SignOptions? options;
+
+  final List<SignRole>? roles;
+
+  /// sgt_…
+  final String? templateId;
+
+  final String? title;
+
+  final String? updatedAt;
+
+  /// Requests made from it
+  final int? uses;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (createdAt != null) 'created_at': createdAt!,
+        if (documents != null) 'documents': documents!.map((e) => e.toJson()).toList(),
+        if (environment != null) 'environment': environment!,
+        if (fields != null) 'fields': fields!.map((e) => e.toJson()).toList(),
+        if (metadata != null) 'metadata': metadata!,
+        if (name != null) 'name': name!,
+        if (options != null) 'options': options!.toJson(),
+        if (roles != null) 'roles': roles!.map((e) => e.toJson()).toList(),
+        if (templateId != null) 'template_id': templateId!,
+        if (title != null) 'title': title!,
+        if (updatedAt != null) 'updated_at': updatedAt!,
+        if (uses != null) 'uses': uses!,
+      };
+}
+
+/// A template
+class SignTemplateCreate {
+  const SignTemplateCreate({
+    this.documents,
+    this.fields,
+    this.metadata,
+    this.name,
+    this.options,
+    this.roles,
+    this.title,
+  });
+
+  factory SignTemplateCreate.fromJson(Map<String, dynamic> json) => SignTemplateCreate(
+        documents: (json['documents'] as List?)?.map((e) => (e == null ? null : FileRef.fromJson(e as Map<String, dynamic>))!).toList().cast<FileRef>(),
+        fields: (json['fields'] as List?)?.map((e) => (e == null ? null : SignTemplateCreateField.fromJson(e as Map<String, dynamic>))!).toList().cast<SignTemplateCreateField>(),
+        metadata: (json['metadata'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        name: json['name'] as String?,
+        options: json['options'] == null ? null : SignOptionsIn.fromJson(json['options'] as Map<String, dynamic>),
+        roles: (json['roles'] as List?)?.map((e) => (e == null ? null : SignRole.fromJson(e as Map<String, dynamic>))!).toList().cast<SignRole>(),
+        title: json['title'] as String?,
+      );
+
+  /// 1 to 10 PDFs or DOCX files
+  final List<FileRef>? documents;
+
+  /// Fields name a role
+  final List<SignTemplateCreateField>? fields;
+
+  /// Your keys and values, returned in answers and webhooks
+  final Map<String, String>? metadata;
+
+  final String? name;
+
+  final SignOptionsIn? options;
+
+  /// 1 to 20
+  final List<SignRole>? roles;
+
+  final String? title;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (documents != null) 'documents': documents!.map((e) => e.toJson()).toList(),
+        if (fields != null) 'fields': fields!.map((e) => e.toJson()).toList(),
+        if (metadata != null) 'metadata': metadata!,
+        if (name != null) 'name': name!,
+        if (options != null) 'options': options!.toJson(),
+        if (roles != null) 'roles': roles!.map((e) => e.toJson()).toList(),
+        if (title != null) 'title': title!,
+      };
+}
+
+/// A place to fill
+class SignTemplateCreateField {
+  const SignTemplateCreateField({
+    this.anchor,
+    this.anchorOffsetX,
+    this.anchorOffsetY,
+    this.defaultValue,
+    this.documentIndex,
+    this.h,
+    this.label,
+    this.page,
+    this.required,
+    this.role,
+    this.type,
+    this.w,
+    this.x,
+    this.y,
+  });
+
+  factory SignTemplateCreateField.fromJson(Map<String, dynamic> json) => SignTemplateCreateField(
+        anchor: json['anchor'] as String?,
+        anchorOffsetX: json['anchor_offset_x'] as num?,
+        anchorOffsetY: json['anchor_offset_y'] as num?,
+        defaultValue: json['default'] as String?,
+        documentIndex: (json['document_index'] as num?)?.toInt(),
+        h: json['h'] as num?,
+        label: json['label'] as String?,
+        page: (json['page'] as num?)?.toInt(),
+        required: json['required'] as bool?,
+        role: json['role'] as String?,
+        type: json['type'] as String?,
+        w: json['w'] as num?,
+        x: json['x'] as num?,
+        y: json['y'] as num?,
+      );
+
+  /// Place over every occurrence of this text in the document's text layer, e.g. {{sign_here}} (instead of page, x and y)
+  final String? anchor;
+
+  /// Points right of the anchor
+  final num? anchorOffsetX;
+
+  /// Points below the anchor (negative: above)
+  final num? anchorOffsetY;
+
+  /// A text or date's value unless the signer changes it; a checkbox's "true"/"false"; {{name}} takes a template's merge data
+  final String? defaultValue;
+
+  /// The document's position in documents\[], from 0
+  final int? documentIndex;
+
+  final num? h;
+
+  final String? label;
+
+  /// With x and y
+  final int? page;
+
+  /// Default true for signature, initials and stamp
+  final bool? required;
+
+  /// The template role that fills it
+  final String? role;
+
+  final String? type;
+
+  final num? w;
+
+  /// Points from the page's left
+  final num? x;
+
+  /// Points from the page's top
+  final num? y;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (anchor != null) 'anchor': anchor!,
+        if (anchorOffsetX != null) 'anchor_offset_x': anchorOffsetX!,
+        if (anchorOffsetY != null) 'anchor_offset_y': anchorOffsetY!,
+        if (defaultValue != null) 'default': defaultValue!,
+        if (documentIndex != null) 'document_index': documentIndex!,
+        if (h != null) 'h': h!,
+        if (label != null) 'label': label!,
+        if (page != null) 'page': page!,
+        if (required != null) 'required': required!,
+        if (role != null) 'role': role!,
+        if (type != null) 'type': type!,
+        if (w != null) 'w': w!,
+        if (x != null) 'x': x!,
+        if (y != null) 'y': y!,
+      };
+}
+
+/// A place to fill
+class SignTemplateField {
+  const SignTemplateField({
+    this.anchor,
+    this.anchorOffsetX,
+    this.anchorOffsetY,
+    this.box,
+    this.defaultValue,
+    this.documentIndex,
+    this.h,
+    this.label,
+    this.page,
+    this.required,
+    this.role,
+    this.type,
+    this.w,
+    this.x,
+    this.y,
+  });
+
+  factory SignTemplateField.fromJson(Map<String, dynamic> json) => SignTemplateField(
+        anchor: json['anchor'] as String?,
+        anchorOffsetX: json['anchor_offset_x'] as num?,
+        anchorOffsetY: json['anchor_offset_y'] as num?,
+        box: json['box'] == null ? null : SignTemplateFieldBox.fromJson(json['box'] as Map<String, dynamic>),
+        defaultValue: json['default'] as String?,
+        documentIndex: (json['document_index'] as num?)?.toInt(),
+        h: json['h'] as num?,
+        label: json['label'] as String?,
+        page: (json['page'] as num?)?.toInt(),
+        required: json['required'] as bool?,
+        role: json['role'] as String?,
+        type: json['type'] as String?,
+        w: json['w'] as num?,
+        x: json['x'] as num?,
+        y: json['y'] as num?,
+      );
+
+  /// Place over every occurrence of this text in the document's text layer, e.g. {{sign_here}} (instead of page, x and y)
+  final String? anchor;
+
+  /// Points right of the anchor
+  final num? anchorOffsetX;
+
+  /// Points below the anchor (negative: above)
+  final num? anchorOffsetY;
+
+  /// The placed box
+  final SignTemplateFieldBox? box;
+
+  /// A text or date's value unless the signer changes it; a checkbox's "true"/"false"; {{name}} takes a template's merge data
+  final String? defaultValue;
+
+  /// The document's position in documents\[], from 0
+  final int? documentIndex;
+
+  final num? h;
+
+  final String? label;
+
+  /// With x and y
+  final int? page;
+
+  /// Default true for signature, initials and stamp
+  final bool? required;
+
+  /// The template role that fills it
+  final String? role;
+
+  final String? type;
+
+  final num? w;
+
+  /// Points from the page's left
+  final num? x;
+
+  /// Points from the page's top
+  final num? y;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (anchor != null) 'anchor': anchor!,
+        if (anchorOffsetX != null) 'anchor_offset_x': anchorOffsetX!,
+        if (anchorOffsetY != null) 'anchor_offset_y': anchorOffsetY!,
+        if (box != null) 'box': box!.toJson(),
+        if (defaultValue != null) 'default': defaultValue!,
+        if (documentIndex != null) 'document_index': documentIndex!,
+        if (h != null) 'h': h!,
+        if (label != null) 'label': label!,
+        if (page != null) 'page': page!,
+        if (required != null) 'required': required!,
+        if (role != null) 'role': role!,
+        if (type != null) 'type': type!,
+        if (w != null) 'w': w!,
+        if (x != null) 'x': x!,
+        if (y != null) 'y': y!,
+      };
+}
+
+/// The placed box
+class SignTemplateFieldBox {
+  const SignTemplateFieldBox({
+    this.h,
+    this.page,
+    this.w,
+    this.x,
+    this.y,
+  });
+
+  factory SignTemplateFieldBox.fromJson(Map<String, dynamic> json) => SignTemplateFieldBox(
+        h: json['h'] as num?,
+        page: (json['page'] as num?)?.toInt(),
+        w: json['w'] as num?,
+        x: json['x'] as num?,
+        y: json['y'] as num?,
+      );
+
+  final num? h;
+
+  final int? page;
+
+  final num? w;
+
+  final num? x;
+
+  final num? y;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (h != null) 'h': h!,
+        if (page != null) 'page': page!,
+        if (w != null) 'w': w!,
+        if (x != null) 'x': x!,
+        if (y != null) 'y': y!,
+      };
+}
+
+/// Name, title, options or metadata (documents and fields are fixed: a different layout is a new template)
+class SignTemplatePatch {
+  const SignTemplatePatch({
+    this.metadata,
+    this.name,
+    this.options,
+    this.title,
+  });
+
+  factory SignTemplatePatch.fromJson(Map<String, dynamic> json) => SignTemplatePatch(
+        metadata: (json['metadata'] as Map?)?.map((k, e) => MapEntry(k as String, (e as String?)!)).cast<String, String>(),
+        name: json['name'] as String?,
+        options: json['options'] == null ? null : SignOptionsIn.fromJson(json['options'] as Map<String, dynamic>),
+        title: json['title'] as String?,
+      );
+
+  /// Your keys and values, returned in answers and webhooks
+  final Map<String, String>? metadata;
+
+  final String? name;
+
+  final SignOptionsIn? options;
+
+  final String? title;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (metadata != null) 'metadata': metadata!,
+        if (name != null) 'name': name!,
+        if (options != null) 'options': options!.toJson(),
+        if (title != null) 'title': title!,
+      };
+}
+
+/// A page; pass next_cursor as cursor for the next one (null at the end).
+class SignTemplatesListData {
+  const SignTemplatesListData({
+    this.items,
+    this.nextCursor,
+  });
+
+  factory SignTemplatesListData.fromJson(Map<String, dynamic> json) => SignTemplatesListData(
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : SignTemplate.fromJson(e as Map<String, dynamic>))!).toList().cast<SignTemplate>(),
+        nextCursor: json['next_cursor'] as String?,
+      );
+
+  final List<SignTemplate>? items;
+
+  final String? nextCursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+        if (nextCursor != null) 'next_cursor': nextCursor!,
+      };
+}
+
+class SignTemplatesListQuery {
+  const SignTemplatesListQuery({
+    this.limit,
+    this.cursor,
+  });
+
+  factory SignTemplatesListQuery.fromJson(Map<String, dynamic> json) => SignTemplatesListQuery(
+        limit: (json['limit'] as num?)?.toInt(),
+        cursor: json['cursor'] as String?,
+      );
+
+  /// Page size
+  final int? limit;
+
+  /// next_cursor of the previous page.
+  final String? cursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (limit != null) 'limit': limit!,
+        if (cursor != null) 'cursor': cursor!,
+      };
+}
+
+/// Pages the signer has seen
+class SignViewed {
+  const SignViewed({
+    this.documentIndex,
+    this.pages,
+  });
+
+  factory SignViewed.fromJson(Map<String, dynamic> json) => SignViewed(
+        documentIndex: (json['document_index'] as num?)?.toInt(),
+        pages: (json['pages'] as List?)?.map((e) => ((e as num?)?.toInt())!).toList().cast<int>(),
+      );
+
+  final int? documentIndex;
+
+  final List<int>? pages;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (documentIndex != null) 'document_index': documentIndex!,
+        if (pages != null) 'pages': pages!,
+      };
+}
+
+class SignVoid {
+  const SignVoid({
+    this.reason,
+  });
+
+  factory SignVoid.fromJson(Map<String, dynamic> json) => SignVoid(
+        reason: json['reason'] as String?,
+      );
+
+  final String? reason;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (reason != null) 'reason': reason!,
+      };
+}
+
+/// A contact correction before the signer signs; a new email or phone rotates the link
+class SignerPatch {
+  const SignerPatch({
+    this.email,
+    this.language,
+    this.name,
+    this.notify,
+    this.phone,
+  });
+
+  factory SignerPatch.fromJson(Map<String, dynamic> json) => SignerPatch(
+        email: json['email'] as String?,
+        language: json['language'] as String?,
+        name: json['name'] as String?,
+        notify: json['notify'] as bool?,
+        phone: json['phone'] as String?,
+      );
+
+  final String? email;
+
+  final String? language;
+
+  final String? name;
+
+  /// Send the corrected signer their link now (default true when it is their turn)
+  final bool? notify;
+
+  final String? phone;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (email != null) 'email': email!,
+        if (language != null) 'language': language!,
+        if (name != null) 'name': name!,
+        if (notify != null) 'notify': notify!,
+        if (phone != null) 'phone': phone!,
       };
 }
 
@@ -16239,6 +18597,83 @@ class SettingsResource {
 
 }
 
+/// .
+class SignResource {
+  SignResource(this._core);
+  final Core _core;
+
+  /// The audit trail: signers, methods, timestamps, IPs, document hashes and every event, with the hash chain verified.
+  Future<SignAudit> audit(String id, [RequestOptions? options]) => _core.call('GET', '/v1/sign/requests/${Uri.encodeComponent(id)}/audit', query: null, body: null, decode: (j) => SignAudit.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Redirect to the audit certificate (completed requests).
+  Future<String> certificateUrl(String id, [RequestOptions? options]) => _core.redirect('/v1/sign/requests/${Uri.encodeComponent(id)}/certificate', options);
+
+  /// Create a signing request (a draft, or sent with send: true).
+  Future<SignRequest> create(SignRequestCreate body, [RequestOptions? options]) => _core.call('POST', '/v1/sign/requests', query: null, body: body.toJson(), decode: (j) => SignRequest.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// The request's audit-trail events, oldest first.
+  Future<SignEventsData> events(String id, [RequestOptions? options]) => _core.call('GET', '/v1/sign/requests/${Uri.encodeComponent(id)}/events', query: null, body: null, decode: (j) => SignEventsData.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Read a signing request.
+  Future<SignRequest> get(String id, [RequestOptions? options]) => _core.call('GET', '/v1/sign/requests/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => SignRequest.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// List signing requests, newest first.
+  Future<SignListData> list(SignListQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/sign/requests', query: query?.toJson(), body: null, decode: (j) => SignListData.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Every item of list, page after page (follows next_cursor).
+  Stream<SignRequestSummary> listAll(SignListQuery? query, [RequestOptions? options]) => _core.paginate('/v1/sign/requests', query?.toJson(), (j) => SignRequestSummary.fromJson(j as Map<String, dynamic>), options);
+
+  /// Send the signers whose turn it is their link again (validity reset to 7 days); free.
+  Future<SignRequest> remind(String id, [RequestOptions? options]) => _core.call('POST', '/v1/sign/requests/${Uri.encodeComponent(id)}/remind', query: null, body: null, decode: (j) => SignRequest.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Send a draft: the signers whose turn it is get their link (1 api_sign_requests).
+  Future<SignRequest> send(String id, [RequestOptions? options]) => _core.call('POST', '/v1/sign/requests/${Uri.encodeComponent(id)}/send', query: null, body: null, decode: (j) => SignRequest.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Redirect to a signed document (completed requests).
+  Future<String> signedDocumentUrl(String id, String n, [RequestOptions? options]) => _core.redirect('/v1/sign/requests/${Uri.encodeComponent(id)}/documents/${Uri.encodeComponent(n)}/signed', options);
+
+  /// A signer's link (for an embedded page or your own email), valid 7 days.
+  Future<SignLink> signerLink(String id, String signerId, [RequestOptions? options]) => _core.call('GET', '/v1/sign/requests/${Uri.encodeComponent(id)}/signers/${Uri.encodeComponent(signerId)}/link', query: null, body: null, decode: (j) => SignLink.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Correct a signer's contact details before they sign (a new email or phone rotates the link).
+  Future<SignRequest> updateSigner(String id, String signerId, SignerPatch body, [RequestOptions? options]) => _core.call('PATCH', '/v1/sign/requests/${Uri.encodeComponent(id)}/signers/${Uri.encodeComponent(signerId)}', query: null, body: body.toJson(), decode: (j) => SignRequest.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Void a request: refused once it is completed (409 invalid_state).
+  Future<SignRequest> voidValue(String id, SignVoid body, [RequestOptions? options]) => _core.call('POST', '/v1/sign/requests/${Uri.encodeComponent(id)}/void', query: null, body: body.toJson(), decode: (j) => SignRequest.fromJson(j as Map<String, dynamic>), options: options);
+
+}
+
+/// .
+class SignTemplatesResource {
+  SignTemplatesResource(this._core);
+  final Core _core;
+
+  /// Bulk send: up to 500 rows, one request each, as one job (202).
+  Future<Job> bulkSend(String id, SignBulk body, [RequestOptions? options]) => _core.call('POST', '/v1/sign/templates/${Uri.encodeComponent(id)}/bulk', query: null, body: body.toJson(), decode: (j) => Job.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Store a template: documents, roles and placed fields.
+  Future<SignTemplate> create(SignTemplateCreate body, [RequestOptions? options]) => _core.call('POST', '/v1/sign/templates', query: null, body: body.toJson(), decode: (j) => SignTemplate.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Make a request from a template: a person per role, merge data.
+  Future<SignRequest> createRequest(String id, SignFromTemplate body, [RequestOptions? options]) => _core.call('POST', '/v1/sign/templates/${Uri.encodeComponent(id)}/requests', query: null, body: body.toJson(), decode: (j) => SignRequest.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Delete a template (requests made from it are not affected).
+  Future<Deleted> delete(String id, [RequestOptions? options]) => _core.call('DELETE', '/v1/sign/templates/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => Deleted.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Read a template.
+  Future<SignTemplate> get(String id, [RequestOptions? options]) => _core.call('GET', '/v1/sign/templates/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => SignTemplate.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// List templates, newest first.
+  Future<SignTemplatesListData> list(SignTemplatesListQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/sign/templates', query: query?.toJson(), body: null, decode: (j) => SignTemplatesListData.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Every item of list, page after page (follows next_cursor).
+  Stream<SignTemplate> listAll(SignTemplatesListQuery? query, [RequestOptions? options]) => _core.paginate('/v1/sign/templates', query?.toJson(), (j) => SignTemplate.fromJson(j as Map<String, dynamic>), options);
+
+  /// Change a template's name, title, options or metadata.
+  Future<SignTemplate> update(String id, SignTemplatePatch body, [RequestOptions? options]) => _core.call('PATCH', '/v1/sign/templates/${Uri.encodeComponent(id)}', query: null, body: body.toJson(), decode: (j) => SignTemplate.fromJson(j as Map<String, dynamic>), options: options);
+
+}
+
 /// Stored render templates.
 class TemplatesResource {
   TemplatesResource(this._core);
@@ -16354,6 +18789,8 @@ class GeneratedClient {
         keys = KeysResource(core),
         requests = RequestsResource(core),
         settings = SettingsResource(core),
+        sign = SignResource(core),
+        signTemplates = SignTemplatesResource(core),
         templates = TemplatesResource(core),
         usage = UsageResource(core),
         webhooks = WebhooksResource(core);
@@ -16396,6 +18833,12 @@ class GeneratedClient {
 
   /// Environment settings.
   final SettingsResource settings;
+
+  /// .
+  final SignResource sign;
+
+  /// .
+  final SignTemplatesResource signTemplates;
 
   /// Stored render templates.
   final TemplatesResource templates;
