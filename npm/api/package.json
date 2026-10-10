@@ -1,0 +1,63 @@
+{
+  "name": "@lowcoai/api",
+  "version": "1.1.0",
+  "description": "Official Node/TypeScript client for the Lowco API: PDF, render, OCR, Document AI, QR and barcodes, with jobs, file inputs, webhooks and typed errors.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lowcoai/lowco-sdk.git",
+    "directory": "npm/api"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean --target node18",
+    "typecheck": "tsc --noEmit",
+    "pretest": "npm run build",
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  },
+  "keywords": [
+    "lowco",
+    "pdf",
+    "ocr",
+    "document-ai",
+    "invoice",
+    "gst",
+    "qr",
+    "upi",
+    "sdk"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
