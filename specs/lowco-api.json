@@ -23071,7 +23071,7 @@
         "tags": [
           "messages"
         ],
-        "x-lowco-scope": "api.messages.read"
+        "x-lowco-scope": "api.messages.messages.read"
       },
       "post": {
         "operationId": "messages_send",
@@ -23313,7 +23313,7 @@
         "tags": [
           "messages"
         ],
-        "x-lowco-scope": "api.messages.send"
+        "x-lowco-scope": "api.messages.messages.send"
       }
     },
     "/v1/messages/batch": {
@@ -23511,7 +23511,7 @@
         "tags": [
           "messages"
         ],
-        "x-lowco-scope": "api.messages.send"
+        "x-lowco-scope": "api.messages.messages.send"
       }
     },
     "/v1/messages/receipts/{provider}": {
@@ -26300,7 +26300,7 @@
         "tags": [
           "messages"
         ],
-        "x-lowco-scope": "api.messages.read"
+        "x-lowco-scope": "api.messages.messages.read"
       }
     },
     "/v1/messages/{id}/cancel": {
@@ -26440,7 +26440,7 @@
         "tags": [
           "messages"
         ],
-        "x-lowco-scope": "api.messages.send"
+        "x-lowco-scope": "api.messages.messages.send"
       }
     },
     "/v1/ocr/handwriting": {
@@ -27216,7 +27216,7 @@
         "tags": [
           "messages"
         ],
-        "x-lowco-scope": "api.otp.send"
+        "x-lowco-scope": "api.otp.codes.send"
       }
     },
     "/v1/otp/send": {
@@ -27401,7 +27401,7 @@
         "tags": [
           "messages"
         ],
-        "x-lowco-scope": "api.otp.send"
+        "x-lowco-scope": "api.otp.codes.send"
       }
     },
     "/v1/otp/verify": {
@@ -27566,7 +27566,7 @@
         "tags": [
           "messages"
         ],
-        "x-lowco-scope": "api.otp.verify"
+        "x-lowco-scope": "api.otp.codes.verify"
       }
     },
     "/v1/overview": {
