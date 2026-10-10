@@ -8831,6 +8831,10 @@
           "verified": {
             "description": "The signer proved who they are (or needs not)",
             "type": "boolean"
+          },
+          "your_turn": {
+            "description": "False while earlier signers of a sequential request have not signed",
+            "type": "boolean"
           }
         },
         "required": [
@@ -32870,7 +32874,8 @@
                         "signers_signed": 0,
                         "signers_total": 2,
                         "title": "Offer letter — Asha Rao",
-                        "verified": false
+                        "verified": false,
+                        "your_turn": false
                       },
                       "status": 1
                     }
@@ -33097,7 +33102,8 @@
                         "signers_signed": 0,
                         "signers_total": 2,
                         "title": "Offer letter — Asha Rao",
-                        "verified": true
+                        "verified": true,
+                        "your_turn": false
                       },
                       "status": 1
                     }
@@ -33967,7 +33973,8 @@
                         "signers_signed": 0,
                         "signers_total": 2,
                         "title": "Offer letter — Asha Rao",
-                        "verified": false
+                        "verified": false,
+                        "your_turn": false
                       },
                       "status": 1
                     }
@@ -34206,7 +34213,8 @@
                         "signers_signed": 1,
                         "signers_total": 2,
                         "title": "Offer letter — Asha Rao",
-                        "verified": true
+                        "verified": true,
+                        "your_turn": false
                       },
                       "status": 1
                     }
@@ -34454,7 +34462,8 @@
                         "signers_signed": 0,
                         "signers_total": 2,
                         "title": "Offer letter — Asha Rao",
-                        "verified": true
+                        "verified": true,
+                        "your_turn": false
                       },
                       "status": 1
                     }

@@ -3072,6 +3072,8 @@ export interface SignSession {
   title?: string;
   /** The signer proved who they are (or needs not) */
   verified: boolean;
+  /** False while earlier signers of a sequential request have not signed */
+  your_turn?: boolean;
 }
 
 export interface SignSessionDocument {

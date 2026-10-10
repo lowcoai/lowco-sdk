@@ -3295,6 +3295,8 @@ type SignSession struct {
 	Title         *string `json:"title,omitempty"`
 	// The signer proved who they are (or needs not)
 	Verified bool `json:"verified"`
+	// False while earlier signers of a sequential request have not signed
+	YourTurn *bool `json:"your_turn,omitempty"`
 }
 
 // SignSessionDocument is a Lowco API object.

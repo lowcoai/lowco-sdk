@@ -2829,6 +2829,8 @@ class SignSession(TypedDict):
     title: NotRequired[str]
     verified: bool
     """The signer proved who they are (or needs not)"""
+    your_turn: NotRequired[bool]
+    """False while earlier signers of a sequential request have not signed"""
 
 class SignSessionDocument(TypedDict):
     filename: str

@@ -10432,6 +10432,7 @@ class SignSession {
     this.testCompleted,
     this.title,
     this.verified,
+    this.yourTurn,
   });
 
   factory SignSession.fromJson(Map<String, dynamic> json) => SignSession(
@@ -10459,6 +10460,7 @@ class SignSession {
         testCompleted: json['test_completed'] as bool?,
         title: json['title'] as String?,
         verified: json['verified'] as bool?,
+        yourTurn: json['your_turn'] as bool?,
       );
 
   /// Embedded: the origins the page may be framed by
@@ -10517,6 +10519,9 @@ class SignSession {
   /// The signer proved who they are (or needs not)
   final bool? verified;
 
+  /// False while earlier signers of a sequential request have not signed
+  final bool? yourTurn;
+
   /// The wire form; null fields are left out (file inputs are sent separately).
   Map<String, dynamic> toJson() => {
         if (allowedOrigins != null) 'allowed_origins': allowedOrigins!,
@@ -10543,6 +10548,7 @@ class SignSession {
         if (testCompleted != null) 'test_completed': testCompleted!,
         if (title != null) 'title': title!,
         if (verified != null) 'verified': verified!,
+        if (yourTurn != null) 'your_turn': yourTurn!,
       };
 }
 
