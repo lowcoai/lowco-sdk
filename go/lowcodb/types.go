@@ -30,6 +30,10 @@ type Base struct {
 	ConnectionID string   `json:"connectionId,omitempty"`
 	BaseType     BaseType `json:"baseType,omitempty"`
 	Schema       string   `json:"schema,omitempty"`
+	// Gateway is where the base's data is served; the manager attaches it to every
+	// base it lists or returns, so a caller holding a Base knows its gateway without a
+	// second call.
+	Gateway *GatewayInfo `json:"gateway,omitempty"`
 }
 
 type Table struct {
