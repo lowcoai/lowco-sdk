@@ -58,7 +58,7 @@ return { lead };`,
 // Console/test run — full result with logs and errors:
 const run = await client.executeFunction(fn.id!, { email: "a@b.co", score: 10 });
 
-// Data-plane invocation (what the gateway proxies /v1/fn/{key} to):
+// Invoke through the base's gateway (/gateway/<hash>/v1/fn/{key}):
 const out = await client.invokeFunction(base.schema!, fn.functionKey!, { email: "a@b.co" });
 ```
 
