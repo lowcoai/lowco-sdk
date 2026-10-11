@@ -1,6 +1,6 @@
 {
   "name": "@lowcoai/lowcodb",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Official Node/TypeScript client for the lowcodb manager service.",
   "license": "MIT",
   "repository": {
@@ -35,7 +35,8 @@
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --clean --target node18",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test": "npm run build && node --test test/"
   },
   "devDependencies": {
     "tsup": "^8.0.0",

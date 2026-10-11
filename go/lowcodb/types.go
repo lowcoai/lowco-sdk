@@ -218,3 +218,19 @@ type ListParams struct {
 	Filter string
 	Sort   string
 }
+
+// TransactionOperation is one write in ExecuteTransaction.
+type TransactionOperation struct {
+	// Type is create, update or delete.
+	Type  string `json:"type"`
+	Table string `json:"table"`
+	// ID identifies the row for update and delete.
+	ID string `json:"id,omitempty"`
+	// Record carries the fields for create and update.
+	Record Record `json:"record,omitempty"`
+}
+
+// TransactionResult is what a transaction answers: one entry per operation.
+type TransactionResult struct {
+	Results []map[string]any `json:"results"`
+}

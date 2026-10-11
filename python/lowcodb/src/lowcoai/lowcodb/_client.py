@@ -7,7 +7,13 @@ from typing import Any
 import httpx
 from typing_extensions import Self
 
+from ._errors import LowcodbError
 from ._base import (
+    DEFAULT_GATEWAY_CACHE_TTL,
+    function_route,
+    table_route,
+    transactions_route,
+    view_route,
     DEFAULT_TIMEOUT,
     BaseClient,
     check_status,
@@ -50,7 +56,7 @@ from .types import (
     ViewRefreshResponse,
 )
 
-__all__ = ["AsyncLowcodbClient", "LowcodbClient"]
+__all__ = ["AsyncGatewayClient", "AsyncLowcodbClient", "GatewayClient", "LowcodbClient"]
 
 
 class LowcodbClient(BaseClient):
@@ -71,6 +77,9 @@ class LowcodbClient(BaseClient):
         default_headers: Mapping[str, str] | None = None,
         timeout: float | None = DEFAULT_TIMEOUT,
         http_client: httpx.Client | None = None,
+        gateways: Mapping[str, str] | None = None,
+        gateway_origin: str = "public",
+        gateway_cache_ttl: float = DEFAULT_GATEWAY_CACHE_TTL,
     ) -> None:
         """
         Args:
@@ -84,6 +93,12 @@ class LowcodbClient(BaseClient):
             timeout: Per-request timeout in seconds (default 30). ``None`` disables it.
             http_client: Custom ``httpx.Client`` (proxies, retries, mocks). It is
                 not closed by :meth:`close`.
+            gateways: Pinned gateways by schema — the context path
+                (``"/gateway/<hash>"``, joined to ``base_url``) or a full origin + path.
+                A pinned schema is never looked up.
+            gateway_origin: ``"public"`` (``https://api.lowco.ai/gateway/<hash>``) or
+                ``"internal"`` (the gateway's in-cluster Service).
+            gateway_cache_ttl: Seconds a resolved gateway is reused (600).
         """
         super().__init__(
             token,
@@ -91,6 +106,9 @@ class LowcodbClient(BaseClient):
             base_url=base_url,
             api_base_path=api_base_path,
             default_headers=default_headers,
+            gateways=gateways,
+            gateway_origin=gateway_origin,
+            gateway_cache_ttl=gateway_cache_ttl,
         )
         self._timeout = timeout
         self._owns_http = http_client is None
@@ -243,22 +261,20 @@ class LowcodbClient(BaseClient):
     # --- Records -----------------------------------------------------------
 
     def create_record(self, schema: str, table_name: str, record: LowcodbRecord) -> LowcodbRecord:
-        return self._request(
-            "POST", self._data(schema, "tables", table_name, "records"), body=record
+        return self._data_request(schema, "POST", table_route(table_name), body=record
         )
 
     def get_record(self, schema: str, table_name: str, id: str) -> LowcodbRecord:
-        return self._request("GET", self._data(schema, "tables", table_name, "records", id))
+        return self._data_request(schema, "GET", table_route(table_name, id))
 
     def update_record(
         self, schema: str, table_name: str, id: str, record: LowcodbRecord
     ) -> LowcodbRecord:
-        return self._request(
-            "PUT", self._data(schema, "tables", table_name, "records", id), body=record
+        return self._data_request(schema, "PUT", table_route(table_name, id), body=record
         )
 
     def delete_record(self, schema: str, table_name: str, id: str) -> DeleteCountResponse:
-        return self._request("DELETE", self._data(schema, "tables", table_name, "records", id))
+        return self._data_request(schema, "DELETE", table_route(table_name, id))
 
     def list_records(
         self,
@@ -270,9 +286,7 @@ class LowcodbClient(BaseClient):
         filter: str | None = None,
         sort: str | None = None,
     ) -> list[LowcodbRecord]:
-        return self._request(
-            "GET",
-            self._data(schema, "tables", table_name, "records"),
+        return self._data_request(schema, "GET", table_route(table_name),
             query=list_query(page_no, size, filter, sort),
         )
 
@@ -286,37 +300,32 @@ class LowcodbClient(BaseClient):
         filter: str | None = None,
         sort: str | None = None,
     ) -> CountResponse:
-        return self._request(
-            "GET",
-            self._data(schema, "tables", table_name, "records", "count"),
+        return self._data_request(schema, "GET", table_route(table_name, "count"),
             query=list_query(page_no, size, filter, sort),
         )
 
     def create_bulk_records(
         self, schema: str, table_name: str, records: list[LowcodbRecord]
     ) -> None:
-        self._request_void(
-            "POST", self._data(schema, "tables", table_name, "records", "bulk"), body=records
+        self._data_request_void(schema, "POST", table_route(table_name, "bulk"), body=records
         )
 
     def update_bulk_records(
         self, schema: str, table_name: str, records: list[LowcodbRecord]
     ) -> RecordsBulkResult:
-        return self._request(
-            "PUT", self._data(schema, "tables", table_name, "records", "bulk"), body=records
+        return self._data_request(schema, "PUT", table_route(table_name, "bulk"), body=records
         )
 
     def delete_bulk_records(self, schema: str, table_name: str, body: Any) -> None:
         """Bulk delete. The manager treats ``body`` as the deletion criterion
         (typically a list of ids or a filter clause)."""
-        self._request_void(
-            "DELETE", self._data(schema, "tables", table_name, "records", "bulk"), body=body
+        self._data_request_void(schema, "DELETE", table_route(table_name, "bulk"), body=body
         )
 
     # --- View data ---------------------------------------------------------
 
     def get_view_record(self, schema: str, view_name: str, id: str) -> LowcodbRecord:
-        return self._request("GET", self._data(schema, "views", view_name, "records", id))
+        return self._data_request(schema, "GET", view_route(view_name, id))
 
     def list_view_records(
         self,
@@ -328,9 +337,7 @@ class LowcodbClient(BaseClient):
         filter: str | None = None,
         sort: str | None = None,
     ) -> list[LowcodbRecord]:
-        return self._request(
-            "GET",
-            self._data(schema, "views", view_name, "records"),
+        return self._data_request(schema, "GET", view_route(view_name),
             query=list_query(page_no, size, filter, sort),
         )
 
@@ -344,9 +351,7 @@ class LowcodbClient(BaseClient):
         filter: str | None = None,
         sort: str | None = None,
     ) -> CountResponse:
-        return self._request(
-            "GET",
-            self._data(schema, "views", view_name, "records", "count"),
+        return self._data_request(schema, "GET", view_route(view_name, "count"),
             query=list_query(page_no, size, filter, sort),
         )
 
@@ -453,8 +458,8 @@ class LowcodbClient(BaseClient):
     ) -> TransactionResult:
         """Runs ordered create/update/delete record operations inside one
         database transaction — all succeed or none apply. Internal bases only."""
-        return self._request(
-            "POST", self._api("data", schema, "transactions"), body={"operations": operations}
+        return self._data_request(
+            schema, "POST", transactions_route(), body={"operations": operations}
         )
 
     # --- Events ------------------------------------------------------------
@@ -510,10 +515,9 @@ class LowcodbClient(BaseClient):
         *,
         method: FunctionHTTPMethod = "POST",
     ) -> Any:
-        """Data-plane invocation of an active function by schema + key (the same
-        route the base's gateway proxies ``/v1/fn/{key}`` to). Returns the
-        function's return value."""
-        return self._request(method, self._api("fn", schema, function_key), body=body)
+        """Invokes an active function by schema + key through the base's gateway
+        (``/v1/fn/{key}``). Returns the function's return value."""
+        return self._data_request(schema, method, function_route(function_key), body=body)
 
     # --- Query -------------------------------------------------------------
 
@@ -556,6 +560,62 @@ class LowcodbClient(BaseClient):
         return self._request(
             "POST", self._api("views", id, "refresh"), body={"concurrent": concurrent}
         )
+
+    # --- Gateway (where a base's data is served) ---------------------------
+
+    def get_gateway(self, schema: str) -> GatewayInfo:
+        """Where a base's data is served, by schema."""
+        return self._request("GET", self._api("bases", "gateway-by-schema", schema))
+
+    def get_gateway_by_base_id(self, base_id: str) -> GatewayInfo:
+        """Where a base's data is served, by base id."""
+        return self._request("GET", self._api("bases", base_id, "gateway"))
+
+    def gateway(self, path_or_url: str) -> "GatewayClient":
+        """A client bound to one gateway (``"/gateway/<hash>"`` on ``base_url``, or a
+        full origin + path), for callers that hold the gateway rather than the base."""
+        return GatewayClient(self, self._absolute_gateway(path_or_url))
+
+    def _gateway_base(self, schema: str) -> tuple[str, bool]:
+        key = schema.strip()
+        if not key:
+            raise ValueError("lowcodb: schema is required")
+        pinned = self._pinned_gateway(key)
+        if pinned:
+            return pinned, True
+        cached = self._cached_gateway(key)
+        if cached:
+            return cached, False
+        base = self._pick_gateway_base(key, self.get_gateway(key))
+        self._remember_gateway(key, base)
+        return base, False
+
+    def _data_request(
+        self,
+        schema: str,
+        method: str,
+        route: str,
+        *,
+        query: dict[str, str] | None = None,
+        body: Any = None,
+    ) -> Any:
+        """One data-plane call for ``schema`` through its gateway. A 404 from a gateway
+        that was looked up is retried once after a fresh lookup: the access hash may
+        have been regenerated since it was cached."""
+        base, pinned = self._gateway_base(schema)
+        try:
+            return self._request(method, base + route, query=query, body=body)
+        except LowcodbError as err:
+            if pinned or err.status_code != 404:
+                raise
+            self._forget_gateway(schema)
+            fresh, _ = self._gateway_base(schema)
+            if fresh == base:
+                raise
+            return self._request(method, fresh + route, query=query, body=body)
+
+    def _data_request_void(self, schema: str, method: str, route: str, *, body: Any = None) -> None:
+        self._data_request(schema, method, route, body=body)
 
     # --- internals ---------------------------------------------------------
 
@@ -612,6 +672,9 @@ class AsyncLowcodbClient(BaseClient):
         default_headers: Mapping[str, str] | None = None,
         timeout: float | None = DEFAULT_TIMEOUT,
         http_client: httpx.AsyncClient | None = None,
+        gateways: Mapping[str, str] | None = None,
+        gateway_origin: str = "public",
+        gateway_cache_ttl: float = DEFAULT_GATEWAY_CACHE_TTL,
     ) -> None:
         """
         Args:
@@ -632,6 +695,9 @@ class AsyncLowcodbClient(BaseClient):
             base_url=base_url,
             api_base_path=api_base_path,
             default_headers=default_headers,
+            gateways=gateways,
+            gateway_origin=gateway_origin,
+            gateway_cache_ttl=gateway_cache_ttl,
         )
         self._timeout = timeout
         self._owns_http = http_client is None
@@ -790,23 +856,20 @@ class AsyncLowcodbClient(BaseClient):
     async def create_record(
         self, schema: str, table_name: str, record: LowcodbRecord
     ) -> LowcodbRecord:
-        return await self._request(
-            "POST", self._data(schema, "tables", table_name, "records"), body=record
+        return await self._data_request(schema, "POST", table_route(table_name), body=record
         )
 
     async def get_record(self, schema: str, table_name: str, id: str) -> LowcodbRecord:
-        return await self._request("GET", self._data(schema, "tables", table_name, "records", id))
+        return await self._data_request(schema, "GET", table_route(table_name, id))
 
     async def update_record(
         self, schema: str, table_name: str, id: str, record: LowcodbRecord
     ) -> LowcodbRecord:
-        return await self._request(
-            "PUT", self._data(schema, "tables", table_name, "records", id), body=record
+        return await self._data_request(schema, "PUT", table_route(table_name, id), body=record
         )
 
     async def delete_record(self, schema: str, table_name: str, id: str) -> DeleteCountResponse:
-        return await self._request(
-            "DELETE", self._data(schema, "tables", table_name, "records", id)
+        return await self._data_request(schema, "DELETE", table_route(table_name, id)
         )
 
     async def list_records(
@@ -819,9 +882,7 @@ class AsyncLowcodbClient(BaseClient):
         filter: str | None = None,
         sort: str | None = None,
     ) -> list[LowcodbRecord]:
-        return await self._request(
-            "GET",
-            self._data(schema, "tables", table_name, "records"),
+        return await self._data_request(schema, "GET", table_route(table_name),
             query=list_query(page_no, size, filter, sort),
         )
 
@@ -835,37 +896,32 @@ class AsyncLowcodbClient(BaseClient):
         filter: str | None = None,
         sort: str | None = None,
     ) -> CountResponse:
-        return await self._request(
-            "GET",
-            self._data(schema, "tables", table_name, "records", "count"),
+        return await self._data_request(schema, "GET", table_route(table_name, "count"),
             query=list_query(page_no, size, filter, sort),
         )
 
     async def create_bulk_records(
         self, schema: str, table_name: str, records: list[LowcodbRecord]
     ) -> None:
-        await self._request_void(
-            "POST", self._data(schema, "tables", table_name, "records", "bulk"), body=records
+        await self._data_request_void(schema, "POST", table_route(table_name, "bulk"), body=records
         )
 
     async def update_bulk_records(
         self, schema: str, table_name: str, records: list[LowcodbRecord]
     ) -> RecordsBulkResult:
-        return await self._request(
-            "PUT", self._data(schema, "tables", table_name, "records", "bulk"), body=records
+        return await self._data_request(schema, "PUT", table_route(table_name, "bulk"), body=records
         )
 
     async def delete_bulk_records(self, schema: str, table_name: str, body: Any) -> None:
         """Bulk delete. The manager treats ``body`` as the deletion criterion
         (typically a list of ids or a filter clause)."""
-        await self._request_void(
-            "DELETE", self._data(schema, "tables", table_name, "records", "bulk"), body=body
+        await self._data_request_void(schema, "DELETE", table_route(table_name, "bulk"), body=body
         )
 
     # --- View data ---------------------------------------------------------
 
     async def get_view_record(self, schema: str, view_name: str, id: str) -> LowcodbRecord:
-        return await self._request("GET", self._data(schema, "views", view_name, "records", id))
+        return await self._data_request(schema, "GET", view_route(view_name, id))
 
     async def list_view_records(
         self,
@@ -877,9 +933,7 @@ class AsyncLowcodbClient(BaseClient):
         filter: str | None = None,
         sort: str | None = None,
     ) -> list[LowcodbRecord]:
-        return await self._request(
-            "GET",
-            self._data(schema, "views", view_name, "records"),
+        return await self._data_request(schema, "GET", view_route(view_name),
             query=list_query(page_no, size, filter, sort),
         )
 
@@ -893,9 +947,7 @@ class AsyncLowcodbClient(BaseClient):
         filter: str | None = None,
         sort: str | None = None,
     ) -> CountResponse:
-        return await self._request(
-            "GET",
-            self._data(schema, "views", view_name, "records", "count"),
+        return await self._data_request(schema, "GET", view_route(view_name, "count"),
             query=list_query(page_no, size, filter, sort),
         )
 
@@ -1002,8 +1054,8 @@ class AsyncLowcodbClient(BaseClient):
     ) -> TransactionResult:
         """Runs ordered create/update/delete record operations inside one
         database transaction — all succeed or none apply. Internal bases only."""
-        return await self._request(
-            "POST", self._api("data", schema, "transactions"), body={"operations": operations}
+        return await self._data_request(
+            schema, "POST", transactions_route(), body={"operations": operations}
         )
 
     # --- Events ------------------------------------------------------------
@@ -1059,10 +1111,9 @@ class AsyncLowcodbClient(BaseClient):
         *,
         method: FunctionHTTPMethod = "POST",
     ) -> Any:
-        """Data-plane invocation of an active function by schema + key (the same
-        route the base's gateway proxies ``/v1/fn/{key}`` to). Returns the
-        function's return value."""
-        return await self._request(method, self._api("fn", schema, function_key), body=body)
+        """Invokes an active function by schema + key through the base's gateway
+        (``/v1/fn/{key}``). Returns the function's return value."""
+        return await self._data_request(schema, method, function_route(function_key), body=body)
 
     # --- Query -------------------------------------------------------------
 
@@ -1108,6 +1159,59 @@ class AsyncLowcodbClient(BaseClient):
             "POST", self._api("views", id, "refresh"), body={"concurrent": concurrent}
         )
 
+    # --- Gateway (where a base's data is served) ---------------------------
+
+    async def get_gateway(self, schema: str) -> GatewayInfo:
+        """Where a base's data is served, by schema."""
+        return await self._request("GET", self._api("bases", "gateway-by-schema", schema))
+
+    async def get_gateway_by_base_id(self, base_id: str) -> GatewayInfo:
+        """Where a base's data is served, by base id."""
+        return await self._request("GET", self._api("bases", base_id, "gateway"))
+
+    def gateway(self, path_or_url: str) -> "AsyncGatewayClient":
+        """A client bound to one gateway (``"/gateway/<hash>"`` on ``base_url``, or a
+        full origin + path), for callers that hold the gateway rather than the base."""
+        return AsyncGatewayClient(self, self._absolute_gateway(path_or_url))
+
+    async def _gateway_base(self, schema: str) -> tuple[str, bool]:
+        key = schema.strip()
+        if not key:
+            raise ValueError("lowcodb: schema is required")
+        pinned = self._pinned_gateway(key)
+        if pinned:
+            return pinned, True
+        cached = self._cached_gateway(key)
+        if cached:
+            return cached, False
+        base = self._pick_gateway_base(key, await self.get_gateway(key))
+        self._remember_gateway(key, base)
+        return base, False
+
+    async def _data_request(
+        self,
+        schema: str,
+        method: str,
+        route: str,
+        *,
+        query: dict[str, str] | None = None,
+        body: Any = None,
+    ) -> Any:
+        base, pinned = await self._gateway_base(schema)
+        try:
+            return await self._request(method, base + route, query=query, body=body)
+        except LowcodbError as err:
+            if pinned or err.status_code != 404:
+                raise
+            self._forget_gateway(schema)
+            fresh, _ = await self._gateway_base(schema)
+            if fresh == base:
+                raise
+            return await self._request(method, fresh + route, query=query, body=body)
+
+    async def _data_request_void(self, schema: str, method: str, route: str, *, body: Any = None) -> None:
+        await self._data_request(schema, method, route, body=body)
+
     # --- internals ---------------------------------------------------------
 
     async def _send(
@@ -1143,3 +1247,111 @@ class AsyncLowcodbClient(BaseClient):
         resp = await self._send(method, path, None, None)
         check_status(resp.status_code, resp.text)
         return resp.content
+
+
+class GatewayClient:
+    """One base gateway, addressed directly (``client.gateway("/gateway/<hash>")``):
+    the record, view, function and transaction methods without the schema argument."""
+
+    def __init__(self, client: LowcodbClient, url: str) -> None:
+        self._client = client
+        #: Absolute prefix: origin + ``/gateway/<hash>``.
+        self.url = url
+
+    def _req(self, method: str, route: str, *, query: dict[str, str] | None = None, body: Any = None) -> Any:
+        return self._client._request(method, self.url + route, query=query, body=body)
+
+    def create_record(self, table_name: str, record: LowcodbRecord) -> LowcodbRecord:
+        return self._req("POST", table_route(table_name), body=record)
+
+    def get_record(self, table_name: str, id: str) -> LowcodbRecord:
+        return self._req("GET", table_route(table_name, id))
+
+    def update_record(self, table_name: str, id: str, record: LowcodbRecord) -> LowcodbRecord:
+        return self._req("PUT", table_route(table_name, id), body=record)
+
+    def delete_record(self, table_name: str, id: str) -> DeleteCountResponse:
+        return self._req("DELETE", table_route(table_name, id))
+
+    def list_records(self, table_name: str, *, page_no: int | None = None, size: int | None = None, filter: str | None = None, sort: str | None = None) -> list[LowcodbRecord]:
+        return self._req("GET", table_route(table_name), query=list_query(page_no, size, filter, sort))
+
+    def count_records(self, table_name: str, *, page_no: int | None = None, size: int | None = None, filter: str | None = None, sort: str | None = None) -> CountResponse:
+        return self._req("GET", table_route(table_name, "count"), query=list_query(page_no, size, filter, sort))
+
+    def create_bulk_records(self, table_name: str, records: list[LowcodbRecord]) -> None:
+        self._req("POST", table_route(table_name, "bulk"), body=records)
+
+    def update_bulk_records(self, table_name: str, records: list[LowcodbRecord]) -> RecordsBulkResult:
+        return self._req("PUT", table_route(table_name, "bulk"), body=records)
+
+    def delete_bulk_records(self, table_name: str, body: Any) -> None:
+        self._req("DELETE", table_route(table_name, "bulk"), body=body)
+
+    def get_view_record(self, view_name: str, id: str) -> LowcodbRecord:
+        return self._req("GET", view_route(view_name, id))
+
+    def list_view_records(self, view_name: str, *, page_no: int | None = None, size: int | None = None, filter: str | None = None, sort: str | None = None) -> list[LowcodbRecord]:
+        return self._req("GET", view_route(view_name), query=list_query(page_no, size, filter, sort))
+
+    def count_view_records(self, view_name: str, *, page_no: int | None = None, size: int | None = None, filter: str | None = None, sort: str | None = None) -> CountResponse:
+        return self._req("GET", view_route(view_name, "count"), query=list_query(page_no, size, filter, sort))
+
+    def invoke_function(self, function_key: str, body: Any = None, *, method: FunctionHTTPMethod = "POST") -> Any:
+        return self._req(method, function_route(function_key), body=body)
+
+    def execute_transaction(self, operations: list[TransactionOperation]) -> TransactionResult:
+        return self._req("POST", transactions_route(), body={"operations": operations})
+
+
+class AsyncGatewayClient:
+    """Asyncio twin of :class:`GatewayClient`."""
+
+    def __init__(self, client: AsyncLowcodbClient, url: str) -> None:
+        self._client = client
+        self.url = url
+
+    async def _req(self, method: str, route: str, *, query: dict[str, str] | None = None, body: Any = None) -> Any:
+        return await self._client._request(method, self.url + route, query=query, body=body)
+
+    async def create_record(self, table_name: str, record: LowcodbRecord) -> LowcodbRecord:
+        return await self._req("POST", table_route(table_name), body=record)
+
+    async def get_record(self, table_name: str, id: str) -> LowcodbRecord:
+        return await self._req("GET", table_route(table_name, id))
+
+    async def update_record(self, table_name: str, id: str, record: LowcodbRecord) -> LowcodbRecord:
+        return await self._req("PUT", table_route(table_name, id), body=record)
+
+    async def delete_record(self, table_name: str, id: str) -> DeleteCountResponse:
+        return await self._req("DELETE", table_route(table_name, id))
+
+    async def list_records(self, table_name: str, *, page_no: int | None = None, size: int | None = None, filter: str | None = None, sort: str | None = None) -> list[LowcodbRecord]:
+        return await self._req("GET", table_route(table_name), query=list_query(page_no, size, filter, sort))
+
+    async def count_records(self, table_name: str, *, page_no: int | None = None, size: int | None = None, filter: str | None = None, sort: str | None = None) -> CountResponse:
+        return await self._req("GET", table_route(table_name, "count"), query=list_query(page_no, size, filter, sort))
+
+    async def create_bulk_records(self, table_name: str, records: list[LowcodbRecord]) -> None:
+        await self._req("POST", table_route(table_name, "bulk"), body=records)
+
+    async def update_bulk_records(self, table_name: str, records: list[LowcodbRecord]) -> RecordsBulkResult:
+        return await self._req("PUT", table_route(table_name, "bulk"), body=records)
+
+    async def delete_bulk_records(self, table_name: str, body: Any) -> None:
+        await self._req("DELETE", table_route(table_name, "bulk"), body=body)
+
+    async def get_view_record(self, view_name: str, id: str) -> LowcodbRecord:
+        return await self._req("GET", view_route(view_name, id))
+
+    async def list_view_records(self, view_name: str, *, page_no: int | None = None, size: int | None = None, filter: str | None = None, sort: str | None = None) -> list[LowcodbRecord]:
+        return await self._req("GET", view_route(view_name), query=list_query(page_no, size, filter, sort))
+
+    async def count_view_records(self, view_name: str, *, page_no: int | None = None, size: int | None = None, filter: str | None = None, sort: str | None = None) -> CountResponse:
+        return await self._req("GET", view_route(view_name, "count"), query=list_query(page_no, size, filter, sort))
+
+    async def invoke_function(self, function_key: str, body: Any = None, *, method: FunctionHTTPMethod = "POST") -> Any:
+        return await self._req(method, function_route(function_key), body=body)
+
+    async def execute_transaction(self, operations: list[TransactionOperation]) -> TransactionResult:
+        return await self._req("POST", transactions_route(), body={"operations": operations})

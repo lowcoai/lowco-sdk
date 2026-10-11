@@ -37,6 +37,25 @@ class Recorder {
       );
 }
 
+const gatewayUrl = 'https://api.lowco.ai/gateway/h1';
+
+/// Answers the manager's gateway discovery for any schema; everything else via [respond].
+http.Response Function(http.Request) gatewayAware(http.Response Function(http.Request) respond,
+        {String hash = 'h1'}) =>
+    (req) {
+      if (req.url.path.contains('/bases/gateway-by-schema/')) {
+        return envelope({
+          'gatewayId': 'gw-1',
+          'hash': hash,
+          'contextPath': '/gateway/$hash',
+          'url': 'https://api.lowco.ai/gateway/$hash',
+          'internalUrl': 'http://gateway-svc-gw-1.prod.svc:80/gateway/$hash',
+          'gatewayType': 'dedicated',
+        });
+      }
+      return respond(req);
+    };
+
 http.Response envelope(Object? data, [int status = 200]) =>
     http.Response(jsonEncode({'success': true, 'data': data}), status,
         headers: {'content-type': 'application/json'});
@@ -91,17 +110,20 @@ void main() {
     expect((await Recorder((_) => envelope(null)).client().getBase('b1')).id, isNull);
     expect(await Recorder((_) => envelope(null)).client().listBases(), isEmpty);
     expect(
-        await Recorder((_) => http.Response('', 204)).client().getRecord('s', 't', 'r'), isEmpty);
+        await Recorder(gatewayAware((_) => http.Response('', 204)))
+            .client()
+            .getRecord('s', 't', 'r'),
+        isEmpty);
   });
 
   test('list params become query parameters', () async {
-    final rec = Recorder((_) => envelope([
+    final rec = Recorder(gatewayAware((_) => envelope([
           {'id': 'r1', 'name': 'Ada'}
-        ]));
+        ])));
     final rows = await rec.client().listRecords('app_crm', 'leads',
         const ListParams(pageNo: 2, size: 50, filter: "status='open'", sort: '-createdAt'));
     expect(rows.single['name'], 'Ada');
-    expect(rec.last.url.path, '/v1/lowcodb/data/app_crm/tables/leads/records');
+    expect(rec.last.url.path, '/gateway/h1/v1/leads');
     expect(rec.last.url.queryParameters, {
       'pageNo': '2',
       'size': '50',
@@ -111,10 +133,11 @@ void main() {
   });
 
   test('path segments are escaped', () async {
-    final rec = Recorder((_) => envelope({}));
+    final rec = Recorder(gatewayAware((_) => envelope({})));
     await rec.client().getRecord('my schema', 'a/b', 'id?1');
-    expect(rec.last.url.toString(),
-        'https://api.lowco.ai/v1/lowcodb/data/my%20schema/tables/a%2Fb/records/id%3F1');
+    expect(rec.requests.first.url.toString(),
+        'https://api.lowco.ai/v1/lowcodb/bases/gateway-by-schema/my%20schema');
+    expect(rec.last.url.toString(), 'https://api.lowco.ai/gateway/h1/v1/a%2Fb/id%3F1');
   });
 
   test('baseUrl and apiBasePath overrides', () async {
@@ -137,7 +160,7 @@ void main() {
   });
 
   test('deleteBulkRecords sends a body', () async {
-    final rec = Recorder();
+    final rec = Recorder(gatewayAware((_) => envelope(null)));
     await rec.client().deleteBulkRecords('app_crm', 'leads', ['r1', 'r2']);
     expect(rec.last.method, 'DELETE');
     expect(rec.lastJson, ['r1', 'r2']);
@@ -162,17 +185,17 @@ void main() {
   });
 
   test('transaction and event bodies', () async {
-    final rec = Recorder((_) => envelope({
+    final rec = Recorder(gatewayAware((_) => envelope({
           'results': [
             {'id': 'r1'}
           ]
-        }));
+        })));
     final client = rec.client();
     final res = await client.executeTransaction('app_crm', [
       const TransactionOperation(type: 'create', table: 'leads', record: {'a': 1}),
     ]);
     expect(res.results!.single['id'], 'r1');
-    expect(rec.last.url.path, '/v1/lowcodb/data/app_crm/transactions');
+    expect(rec.last.url.path, '/gateway/h1/v1/transactions');
     expect(rec.lastJson, {
       'operations': [
         {
@@ -191,7 +214,7 @@ void main() {
   });
 
   test('functions execute and invoke', () async {
-    final rec = Recorder((_) => envelope({'ok': true}));
+    final rec = Recorder(gatewayAware((_) => envelope({'ok': true})));
     final client = rec.client();
     await client.executeFunction('f1');
     expect(rec.lastJson, <String, dynamic>{});
@@ -200,7 +223,7 @@ void main() {
     expect(await client.invokeFunction('app_crm', 'score-lead', method: 'GET'), {'ok': true});
     expect(rec.last.method, 'GET');
     expect(rec.last.body, isEmpty);
-    expect(rec.last.url.path, '/v1/lowcodb/fn/app_crm/score-lead');
+    expect(rec.last.url.path, '/gateway/h1/v1/fn/score-lead');
 
     await client.invokeFunction('app_crm', 'score-lead', body: {'leadId': 'l1'});
     expect(rec.last.method, 'POST');
@@ -294,5 +317,120 @@ void main() {
       );
       await expectLater(client.listBases(), throwsA(isA<TimeoutException>()));
     });
+  });
+
+  // --- gateway routing -------------------------------------------------------
+
+  test('data calls resolve the gateway once and cache it', () async {
+    final rec = Recorder(gatewayAware(
+        (req) => envelope(req.method == 'GET' && !req.url.path.endsWith('/r1') ? [] : {})));
+    final client = rec.client();
+    await client.listRecords('app_crm', 'leads');
+    await client.countViewRecords('app_crm', 'hot leads');
+    await client.createBulkRecords('app_crm', 'leads', [
+      {'a': 1}
+    ]);
+    final discoveries = rec.requests.where((r) => r.url.path.contains('gateway-by-schema'));
+    expect(discoveries.length, 1);
+    final data = rec.requests
+        .where((r) => r.url.path.contains('/gateway/'))
+        .map((r) => '${r.method} ${r.url.path}');
+    expect(data, [
+      'GET /gateway/h1/v1/leads',
+      'GET /gateway/h1/v1/views/hot%20leads/count',
+      'POST /gateway/h1/v1/leads/bulk'
+    ]);
+  });
+
+  test('pinned gateways skip discovery; api keys travel as X-Api-Key', () async {
+    final rec = Recorder((_) => envelope({}));
+    final client = LowcodbClient(
+      token: 'lc_secret',
+      orgId: 'org_1',
+      gateways: {'app_crm': '/gateway/pinned', 'other': 'http://gw.internal:8080/gateway/x'},
+      httpClient: MockClient((req) async {
+        rec.requests.add(req);
+        return envelope({});
+      }),
+    );
+    await client.getRecord('app_crm', 'leads', 'r1');
+    await client.getRecord('other', 'leads', 'r1');
+    expect(rec.requests.map((r) => r.url.toString()), [
+      'https://api.lowco.ai/gateway/pinned/v1/leads/r1',
+      'http://gw.internal:8080/gateway/x/v1/leads/r1'
+    ]);
+    expect(rec.last.headers[headerApiKey], 'lc_secret');
+    expect(rec.last.headers.containsKey('Authorization'), isFalse);
+  });
+
+  test('internal origin uses the in-cluster url', () async {
+    final rec = Recorder(gatewayAware((_) => envelope({})));
+    final client = LowcodbClient(
+      token: 'tok',
+      gatewayOrigin: GatewayOrigin.internal,
+      httpClient: MockClient((req) async {
+        rec.requests.add(req);
+        return gatewayAware((_) => envelope({}))(req);
+      }),
+    );
+    await client.getRecord('app_crm', 'leads', 'r1');
+    expect(rec.last.url.toString(), 'http://gateway-svc-gw-1.prod.svc/gateway/h1/v1/leads/r1');
+  });
+
+  test('a stale gateway is re-resolved once', () async {
+    final hashes = ['old', 'new'];
+    final rec = Recorder((req) {
+      if (req.url.path.contains('gateway-by-schema')) {
+        final h = hashes.removeAt(0);
+        return envelope({
+          'gatewayId': 'gw',
+          'hash': h,
+          'contextPath': '/gateway/$h',
+          'url': 'https://api.lowco.ai/gateway/$h'
+        });
+      }
+      if (req.url.path.contains('/gateway/old/')) return http.Response('route not found', 404);
+      return envelope({'id': 'r1'});
+    });
+    final row = await rec.client().getRecord('app_crm', 'leads', 'r1');
+    expect(row['id'], 'r1');
+    expect(rec.requests.where((r) => r.url.path.contains('/gateway/')).map((r) => r.url.path),
+        ['/gateway/old/v1/leads/r1', '/gateway/new/v1/leads/r1']);
+  });
+
+  test('402 QUOTA_EXCEEDED is typed', () async {
+    final rec = Recorder(gatewayAware((_) => jsonResponse({
+          'code': 'QUOTA_EXCEEDED',
+          'message': 'plan cap reached',
+          'meter': 'app_crm_leads_create',
+          'consumed': 100,
+          'included': 100,
+          'hard_cap': 100,
+          'period_end': '2026-11-01T00:00:00Z',
+          'app_key': 'crm',
+          'upgrade': {
+            'app_key': 'crm',
+            'plans': ['pro']
+          },
+        }, 402)));
+    await expectLater(
+      rec.client().createRecord('app_crm', 'leads', {}),
+      throwsA(isA<QuotaExceededException>()
+          .having((e) => e.statusCode, 'status', 402)
+          .having((e) => e.meter, 'meter', 'app_crm_leads_create')
+          .having((e) => e.hardCap, 'hardCap', 100)
+          .having((e) => e.upgradeAppKey, 'upgradeAppKey', 'crm')
+          .having((e) => e.upgradePlans, 'plans', ['pro'])),
+    );
+  });
+
+  test('GatewayClient addresses a gateway directly', () async {
+    final rec = Recorder((_) => envelope({'results': []}));
+    final gw = rec.client().gateway('/gateway/direct');
+    expect(gw.url, 'https://api.lowco.ai/gateway/direct');
+    await gw.executeTransaction(const []);
+    await gw.invokeFunction('score-lead', body: {'id': 1});
+    expect(rec.requests.map((r) => r.url.path),
+        ['/gateway/direct/v1/transactions', '/gateway/direct/v1/fn/score-lead']);
   });
 }

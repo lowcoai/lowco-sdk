@@ -17,6 +17,58 @@ const String defaultApiBasePath = '/v1/lowcodb';
 /// Header carrying the organization id.
 const String headerOrgId = 'X-Org-Id';
 
+/// Header carrying an `lc_` API key; user tokens travel as `Authorization: Bearer`.
+const String headerApiKey = 'X-Api-Key';
+
+/// Whether [token] is a Lowco API key rather than a user token.
+bool isApiKey(String token) => token.trim().startsWith('lc_');
+
+/// How long a resolved gateway is reused before it is looked up again.
+const Duration defaultGatewayCacheTtl = Duration(minutes: 10);
+
+/// Which address of a base's gateway data calls are sent to.
+enum GatewayOrigin {
+  /// `https://api.lowco.ai/gateway/<hash>`.
+  public,
+
+  /// The gateway's in-cluster Service, for callers inside the platform.
+  internal,
+}
+
+/// Where a base's data is served: its API gateway (`GET /bases/{id}/gateway`).
+class GatewayInfo {
+  const GatewayInfo({
+    required this.gatewayId,
+    this.hash,
+    this.contextPath,
+    this.url,
+    this.internalUrl,
+    this.gatewayType,
+    this.routes,
+    this.sync,
+  });
+
+  factory GatewayInfo.fromJson(Map<String, dynamic> json) => GatewayInfo(
+        gatewayId: json['gatewayId'] as String? ?? '',
+        hash: json['hash'] as String?,
+        contextPath: json['contextPath'] as String?,
+        url: json['url'] as String?,
+        internalUrl: json['internalUrl'] as String?,
+        gatewayType: json['gatewayType'] as String?,
+        routes: (json['routes'] as Map?)?.cast<String, dynamic>(),
+        sync: (json['sync'] as Map?)?.cast<String, dynamic>(),
+      );
+
+  final String gatewayId;
+  final String? hash;
+  final String? contextPath;
+  final String? url;
+  final String? internalUrl;
+  final String? gatewayType;
+  final Map<String, dynamic>? routes;
+  final Map<String, dynamic>? sync;
+}
+
 /// Pagination / filtering accepted by every list endpoint.
 class ListParams {
   const ListParams({this.pageNo, this.size, this.filter, this.sort});
@@ -50,6 +102,11 @@ class LowcodbClient {
   /// * [timeout] — per-request timeout (default 30 s); `null` disables it.
   /// * [httpClient] — custom `http.Client` (e.g. a `MockClient` in tests or a
   ///   platform client in Flutter). It is not closed by [close].
+  /// * [gateways] — pinned gateways by schema: the context path
+  ///   (`/gateway/<hash>`, joined to [baseUrl]) or a full origin + path. A pinned
+  ///   schema is never looked up.
+  /// * [gatewayOrigin] — public (default) or the gateway's in-cluster address.
+  /// * [gatewayCacheTtl] — how long a resolved gateway is reused.
   LowcodbClient({
     required String token,
     String? orgId,
@@ -58,17 +115,26 @@ class LowcodbClient {
     Map<String, String>? defaultHeaders,
     Duration? timeout = const Duration(seconds: 30),
     http.Client? httpClient,
+    Map<String, String>? gateways,
+    GatewayOrigin gatewayOrigin = GatewayOrigin.public,
+    Duration gatewayCacheTtl = defaultGatewayCacheTtl,
   })  : _baseUrl = baseUrl.replaceAll(RegExp(r'/+$'), ''),
         _apiBasePath = _trimSlashes(apiBasePath),
         _timeout = timeout,
         _ownsHttp = httpClient == null,
-        _http = httpClient ?? http.Client() {
+        _http = httpClient ?? http.Client(),
+        _gateways = {for (final e in (gateways ?? const {}).entries) e.key.trim(): e.value.trim()},
+        _gatewayOrigin = gatewayOrigin,
+        _gatewayCacheTtl = gatewayCacheTtl {
     if (token.trim().isEmpty) {
       throw ArgumentError.value(token, 'token', 'LowcodbClient: token is required');
     }
-    _headers
-      ..addAll(defaultHeaders ?? const {})
-      ..['Authorization'] = 'Bearer $token';
+    _headers.addAll(defaultHeaders ?? const {});
+    if (isApiKey(token)) {
+      _headers[headerApiKey] = token.trim();
+    } else {
+      _headers['Authorization'] = 'Bearer $token';
+    }
     if (orgId != null && orgId.isNotEmpty) _headers[headerOrgId] = orgId;
   }
 
@@ -78,6 +144,83 @@ class LowcodbClient {
   final bool _ownsHttp;
   final http.Client _http;
   final Map<String, String> _headers = {};
+  final Map<String, String> _gateways;
+  final GatewayOrigin _gatewayOrigin;
+  final Duration _gatewayCacheTtl;
+  final Map<String, _CachedGateway> _gatewayCache = {};
+
+  // --- Gateway (where a base's data is served) -------------------------------
+  //
+  // Records, view rows, DB functions and transactions are served by the base's API
+  // gateway; the manager's data routes are cluster-internal. The schema argument of
+  // the data methods names the base, whose gateway is resolved (and cached) here.
+
+  /// Where a base's data is served, by schema.
+  Future<GatewayInfo> getGateway(String schema) async => _one(
+      await _request('GET', _api(['bases', 'gateway-by-schema', schema])), GatewayInfo.fromJson);
+
+  /// Where a base's data is served, by base id.
+  Future<GatewayInfo> getGatewayByBaseId(String baseId) async =>
+      _one(await _request('GET', _api(['bases', baseId, 'gateway'])), GatewayInfo.fromJson);
+
+  /// A client bound to one gateway (`/gateway/<hash>` on [baseUrl], or a full
+  /// origin + path), for callers that hold the gateway rather than the base.
+  GatewayClient gateway(String pathOrUrl) => GatewayClient._(this, _absoluteGateway(pathOrUrl));
+
+  String _absoluteGateway(String pathOrUrl) {
+    final p = pathOrUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    if (p.startsWith('http://') || p.startsWith('https://')) return p;
+    return '$_baseUrl/${p.replaceAll(RegExp(r'^/+'), '')}';
+  }
+
+  String _pickGatewayBase(String schema, GatewayInfo info) {
+    final internal = info.internalUrl?.trim() ?? '';
+    if (_gatewayOrigin == GatewayOrigin.internal && internal.isNotEmpty) {
+      return internal.replaceAll(RegExp(r'/+$'), '');
+    }
+    final url = info.url?.trim() ?? '';
+    if (url.isNotEmpty) return url.replaceAll(RegExp(r'/+$'), '');
+    final contextPath = info.contextPath?.trim() ?? '';
+    if (contextPath.isNotEmpty) return _absoluteGateway(contextPath);
+    throw LowcodbException(
+        statusCode: 404, message: 'lowcodb: base $schema has no usable gateway yet');
+  }
+
+  /// Absolute prefix (origin + context path) of [schema]'s gateway, and whether it
+  /// was pinned (never looked up).
+  Future<(String, bool)> _gatewayBase(String schema) async {
+    final key = schema.trim();
+    if (key.isEmpty) throw ArgumentError.value(schema, 'schema', 'lowcodb: schema is required');
+    final pinned = _gateways[key];
+    if (pinned != null && pinned.isNotEmpty) return (_absoluteGateway(pinned), true);
+    final cached = _gatewayCache[key];
+    if (cached != null && cached.expires.isAfter(DateTime.now())) return (cached.base, false);
+    final base = _pickGatewayBase(key, await getGateway(key));
+    _gatewayCache[key] = _CachedGateway(base, DateTime.now().add(_gatewayCacheTtl));
+    return (base, false);
+  }
+
+  void _forgetGateway(String schema) => _gatewayCache.remove(schema.trim());
+
+  /// One data-plane call for [schema] through its gateway. A 404 from a gateway that
+  /// was looked up is retried once after a fresh lookup: the base's access hash may
+  /// have been regenerated since it was cached.
+  Future<Object?> _dataRequest(String schema, String method, String route,
+      {Map<String, String>? query, Object? body}) async {
+    final (base, pinned) = await _gatewayBase(schema);
+    try {
+      return await _request(method, base + route, query: query, body: body);
+    } on LowcodbException catch (e) {
+      if (pinned || e.statusCode != 404) rethrow;
+      _forgetGateway(schema);
+      final (fresh, _) = await _gatewayBase(schema);
+      if (fresh == base) rethrow;
+      return _request(method, fresh + route, query: query, body: body);
+    }
+  }
+
+  Future<void> _dataRequestVoid(String schema, String method, String route, {Object? body}) =>
+      _dataRequest(schema, method, route, body: body);
 
   /// Sets the `X-Org-Id` header for later requests; `null` removes it.
   void setOrgId(String? orgId) {
@@ -199,61 +342,55 @@ class LowcodbClient {
   // --- Records -------------------------------------------------------------
 
   Future<LowcodbRecord> createRecord(String schema, String tableName, LowcodbRecord record) async =>
-      _record(
-          await _request('POST', _data(schema, 'tables', tableName, ['records']), body: record));
+      _record(await _dataRequest(schema, 'POST', tableRoute(tableName), body: record));
 
   Future<LowcodbRecord> getRecord(String schema, String tableName, String id) async =>
-      _record(await _request('GET', _data(schema, 'tables', tableName, ['records', id])));
+      _record(await _dataRequest(schema, 'GET', tableRoute(tableName, [id])));
 
   Future<LowcodbRecord> updateRecord(
           String schema, String tableName, String id, LowcodbRecord record) async =>
-      _record(
-          await _request('PUT', _data(schema, 'tables', tableName, ['records', id]), body: record));
+      _record(await _dataRequest(schema, 'PUT', tableRoute(tableName, [id]), body: record));
 
   Future<DeleteCountResponse> deleteRecord(String schema, String tableName, String id) async =>
-      _one(await _request('DELETE', _data(schema, 'tables', tableName, ['records', id])),
+      _one(await _dataRequest(schema, 'DELETE', tableRoute(tableName, [id])),
           DeleteCountResponse.fromJson);
 
   Future<List<LowcodbRecord>> listRecords(String schema, String tableName,
           [ListParams? params]) async =>
-      _records(await _request('GET', _data(schema, 'tables', tableName, ['records']),
-          query: params?.toQuery()));
+      _records(await _dataRequest(schema, 'GET', tableRoute(tableName), query: params?.toQuery()));
 
   Future<CountResponse> countRecords(String schema, String tableName, [ListParams? params]) async =>
       _one(
-          await _request('GET', _data(schema, 'tables', tableName, ['records', 'count']),
+          await _dataRequest(schema, 'GET', tableRoute(tableName, ['count']),
               query: params?.toQuery()),
           CountResponse.fromJson);
 
   Future<void> createBulkRecords(String schema, String tableName, List<LowcodbRecord> records) =>
-      _requestVoid('POST', _data(schema, 'tables', tableName, ['records', 'bulk']), body: records);
+      _dataRequestVoid(schema, 'POST', tableRoute(tableName, ['bulk']), body: records);
 
   Future<RecordsBulkResult> updateBulkRecords(
           String schema, String tableName, List<LowcodbRecord> records) async =>
-      _one(
-          await _request('PUT', _data(schema, 'tables', tableName, ['records', 'bulk']),
-              body: records),
+      _one(await _dataRequest(schema, 'PUT', tableRoute(tableName, ['bulk']), body: records),
           RecordsBulkResult.fromJson);
 
   /// Bulk delete. The manager treats [body] as the deletion criterion
   /// (typically a list of ids or a filter clause).
   Future<void> deleteBulkRecords(String schema, String tableName, Object? body) =>
-      _requestVoid('DELETE', _data(schema, 'tables', tableName, ['records', 'bulk']), body: body);
+      _dataRequestVoid(schema, 'DELETE', tableRoute(tableName, ['bulk']), body: body);
 
   // --- View data -----------------------------------------------------------
 
   Future<LowcodbRecord> getViewRecord(String schema, String viewName, String id) async =>
-      _record(await _request('GET', _data(schema, 'views', viewName, ['records', id])));
+      _record(await _dataRequest(schema, 'GET', viewRoute(viewName, [id])));
 
   Future<List<LowcodbRecord>> listViewRecords(String schema, String viewName,
           [ListParams? params]) async =>
-      _records(await _request('GET', _data(schema, 'views', viewName, ['records']),
-          query: params?.toQuery()));
+      _records(await _dataRequest(schema, 'GET', viewRoute(viewName), query: params?.toQuery()));
 
   Future<CountResponse> countViewRecords(String schema, String viewName,
           [ListParams? params]) async =>
       _one(
-          await _request('GET', _data(schema, 'views', viewName, ['records', 'count']),
+          await _dataRequest(schema, 'GET', viewRoute(viewName, ['count']),
               query: params?.toQuery()),
           CountResponse.fromJson);
 
@@ -324,8 +461,7 @@ class LowcodbClient {
   Future<TransactionResult> executeTransaction(
           String schema, List<TransactionOperation> operations) async =>
       _one(
-          await _request('POST', _api(['data', schema, 'transactions']),
-              body: {'operations': operations}),
+          await _dataRequest(schema, 'POST', transactionsRoute(), body: {'operations': operations}),
           TransactionResult.fromJson);
 
   // --- Events --------------------------------------------------------------
@@ -367,7 +503,7 @@ class LowcodbClient {
   /// function's return value. [method] must be allowed by the function.
   Future<Object?> invokeFunction(String schema, String functionKey,
           {Object? body, String method = 'POST'}) =>
-      _request(method, _api(['fn', schema, functionKey]), body: body);
+      _dataRequest(schema, method, functionRoute(functionKey), body: body);
 
   // --- Query ---------------------------------------------------------------
 
@@ -406,18 +542,11 @@ class LowcodbClient {
   String _api(List<String> parts) =>
       '/${[_apiBasePath, ...parts.map((p) => Uri.encodeComponent(_trimSlashes(p)))].join('/')}';
 
-  String _data(String schema, String objectType, String objectName, List<String> parts) => '/${[
-        _apiBasePath,
-        'data',
-        Uri.encodeComponent(schema),
-        objectType,
-        Uri.encodeComponent(objectName),
-        ...parts.map(Uri.encodeComponent),
-      ].join('/')}';
-
   Future<http.Response> _send(String method, String path,
       {Map<String, String>? query, Object? body}) async {
-    var url = Uri.parse('$_baseUrl$path');
+    // Data calls carry an absolute gateway URL; management calls a path on the base.
+    var url = Uri.parse(
+        path.startsWith('http://') || path.startsWith('https://') ? path : '$_baseUrl$path');
     if (query != null && query.isNotEmpty) url = url.replace(queryParameters: query);
 
     final abort = Completer<void>();
@@ -500,3 +629,92 @@ List<T> _many<T>(Object? data, T Function(Map<String, dynamic>) fromJson) =>
 Map<String, dynamic> _record(Object? data) => readMap(data) ?? <String, dynamic>{};
 
 List<Map<String, dynamic>> _records(Object? data) => readMapList(data) ?? [];
+
+// --- Gateway routes ----------------------------------------------------------
+
+String _seg(String p) => Uri.encodeComponent(_trimSlashes(p));
+
+/// `/v1/<table>[/...]` on a base gateway.
+String tableRoute(String table, [List<String> parts = const []]) =>
+    '/${['v1', _seg(table), ...parts.map(_seg)].join('/')}';
+
+/// `/v1/views/<view>[/...]` on a base gateway.
+String viewRoute(String view, [List<String> parts = const []]) =>
+    '/${['v1', 'views', _seg(view), ...parts.map(_seg)].join('/')}';
+
+/// `/v1/fn/<key>` on a base gateway.
+String functionRoute(String key) => '/${['v1', 'fn', _seg(key)].join('/')}';
+
+/// `/v1/transactions` on a base gateway.
+String transactionsRoute() => '/v1/transactions';
+
+class _CachedGateway {
+  _CachedGateway(this.base, this.expires);
+  final String base;
+  final DateTime expires;
+}
+
+/// One base gateway addressed directly (`client.gateway('/gateway/<hash>')`): the
+/// record, view, function and transaction methods without the schema argument.
+class GatewayClient {
+  GatewayClient._(this._client, this.url);
+
+  final LowcodbClient _client;
+
+  /// Absolute prefix: origin + `/gateway/<hash>`.
+  final String url;
+
+  Future<Object?> _req(String method, String route, {Map<String, String>? query, Object? body}) =>
+      _client._request(method, url + route, query: query, body: body);
+
+  Future<LowcodbRecord> createRecord(String tableName, LowcodbRecord record) async =>
+      _record(await _req('POST', tableRoute(tableName), body: record));
+
+  Future<LowcodbRecord> getRecord(String tableName, String id) async =>
+      _record(await _req('GET', tableRoute(tableName, [id])));
+
+  Future<LowcodbRecord> updateRecord(String tableName, String id, LowcodbRecord record) async =>
+      _record(await _req('PUT', tableRoute(tableName, [id]), body: record));
+
+  Future<DeleteCountResponse> deleteRecord(String tableName, String id) async =>
+      _one(await _req('DELETE', tableRoute(tableName, [id])), DeleteCountResponse.fromJson);
+
+  Future<List<LowcodbRecord>> listRecords(String tableName, [ListParams? params]) async =>
+      _records(await _req('GET', tableRoute(tableName), query: params?.toQuery()));
+
+  Future<CountResponse> countRecords(String tableName, [ListParams? params]) async => _one(
+      await _req('GET', tableRoute(tableName, ['count']), query: params?.toQuery()),
+      CountResponse.fromJson);
+
+  Future<void> createBulkRecords(String tableName, List<LowcodbRecord> records) async {
+    await _req('POST', tableRoute(tableName, ['bulk']), body: records);
+  }
+
+  Future<RecordsBulkResult> updateBulkRecords(
+          String tableName, List<LowcodbRecord> records) async =>
+      _one(await _req('PUT', tableRoute(tableName, ['bulk']), body: records),
+          RecordsBulkResult.fromJson);
+
+  Future<void> deleteBulkRecords(String tableName, Object? body) async {
+    await _req('DELETE', tableRoute(tableName, ['bulk']), body: body);
+  }
+
+  Future<LowcodbRecord> getViewRecord(String viewName, String id) async =>
+      _record(await _req('GET', viewRoute(viewName, [id])));
+
+  Future<List<LowcodbRecord>> listViewRecords(String viewName, [ListParams? params]) async =>
+      _records(await _req('GET', viewRoute(viewName), query: params?.toQuery()));
+
+  Future<CountResponse> countViewRecords(String viewName, [ListParams? params]) async => _one(
+      await _req('GET', viewRoute(viewName, ['count']), query: params?.toQuery()),
+      CountResponse.fromJson);
+
+  /// Invokes an active DB function by key; [method] defaults to POST.
+  Future<Object?> invokeFunction(String functionKey, {Object? body, String method = 'POST'}) =>
+      _req(method, functionRoute(functionKey), body: body);
+
+  /// Applies ordered record writes in one database transaction. Internal bases only.
+  Future<TransactionResult> executeTransaction(List<TransactionOperation> operations) async => _one(
+      await _req('POST', transactionsRoute(), body: {'operations': operations}),
+      TransactionResult.fromJson);
+}

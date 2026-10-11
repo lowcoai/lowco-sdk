@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lowcoai-lowcodb"
-version = "0.1.0"
+version = "0.2.0"
 description = "Official Python client for the lowcodb manager service."
 readme = "README.md"
 license = "MIT"

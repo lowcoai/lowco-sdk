@@ -27,6 +27,22 @@ final open = await client.listRecords(
 client.close();
 ```
 
+## Data goes through the base's gateway
+
+Records, view rows, DB functions and transactions are served by the base's API gateway
+(`https://api.lowco.ai/gateway/<hash>/v1/...`); the manager's data routes are
+cluster-internal. The methods above keep their `(schema, table)` arguments — the client
+resolves the schema's gateway once (`getGateway`) and caches it. Options:
+
+```dart
+LowcodbClient(token: token, gateways: {'app_crm': '/gateway/WOsqwRyURn'}); // pin
+LowcodbClient(token: token, gatewayOrigin: GatewayOrigin.internal);        // in-cluster address
+final g = client.gateway('/gateway/WOsqwRyURn');                           // schema-less GatewayClient
+```
+
+An `lc_` API key is sent as `X-Api-Key`, a user token as `Authorization: Bearer`. A plan
+cap answers 402 → `QuotaExceededException`.
+
 ## Options
 
 | Parameter        | Description                                                                          |

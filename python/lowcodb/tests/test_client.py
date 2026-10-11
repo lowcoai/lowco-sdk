@@ -43,6 +43,36 @@ def make_client(rec: Recorder, **kwargs: Any) -> LowcodbClient:
     )
 
 
+GATEWAY = "https://api.lowco.ai/gateway/h1"
+
+
+def gateway_aware(respond: Callable[[httpx.Request], httpx.Response]) -> Callable[[httpx.Request], httpx.Response]:
+    """Answers the manager's gateway discovery for any schema, everything else via respond."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "/bases/gateway-by-schema/" in request.url.path:
+            schema = request.url.path.rsplit("/", 1)[-1]
+            return envelope(
+                {
+                    "gatewayId": "gw-1",
+                    "hash": "h1",
+                    "contextPath": "/gateway/h1",
+                    "url": GATEWAY,
+                    "internalUrl": "http://gateway-svc-gw-1.prod.svc:80/gateway/h1",
+                    "gatewayType": "dedicated",
+                    "schema": schema,
+                }
+            )
+        return respond(request)
+
+    return handler
+
+
+def data_requests(rec: Recorder) -> list[httpx.Request]:
+    """The recorded requests that went to a gateway (discovery calls left out)."""
+    return [r for r in rec.requests if "/gateway/" in r.url.path]
+
+
 def test_token_is_required() -> None:
     with pytest.raises(ValueError):
         LowcodbClient("  ")
@@ -94,13 +124,13 @@ def test_null_data_and_empty_body_return_none() -> None:
 
 
 def test_list_params_are_sent_as_query() -> None:
-    rec = Recorder(lambda _r: envelope([]))
+    rec = Recorder(gateway_aware(lambda _r: envelope([])))
     client = make_client(rec)
     client.list_records(
         "app_crm", "leads", page_no=2, size=50, filter="status='open'", sort="-createdAt"
     )
     url = rec.last.url
-    assert url.path == "/v1/lowcodb/data/app_crm/tables/leads/records"
+    assert url.path == "/gateway/h1/v1/leads"
     assert dict(url.params) == {
         "pageNo": "2",
         "size": "50",
@@ -110,10 +140,11 @@ def test_list_params_are_sent_as_query() -> None:
 
 
 def test_path_segments_are_escaped() -> None:
-    rec = Recorder(lambda _r: envelope({}))
+    rec = Recorder(gateway_aware(lambda _r: envelope({})))
     client = make_client(rec)
     client.get_record("my schema", "a/b", "id?1")
-    assert rec.last.url.raw_path == b"/v1/lowcodb/data/my%20schema/tables/a%2Fb/records/id%3F1"
+    assert rec.requests[0].url.raw_path == b"/v1/lowcodb/bases/gateway-by-schema/my%20schema"
+    assert rec.last.url.raw_path == b"/gateway/h1/v1/a%2Fb/id%3F1"
 
 
 def test_base_url_and_api_base_path_overrides() -> None:
@@ -139,7 +170,7 @@ def test_delete_ignores_non_json_success_body() -> None:
 
 
 def test_delete_bulk_records_sends_body() -> None:
-    rec = Recorder()
+    rec = Recorder(gateway_aware(lambda _r: envelope(None)))
     client = make_client(rec)
     client.delete_bulk_records("app_crm", "leads", ["r1", "r2"])
     assert rec.last.method == "DELETE"
@@ -160,12 +191,12 @@ def test_validate_field_is_not_enveloped() -> None:
 
 
 def test_transaction_and_event_bodies() -> None:
-    rec = Recorder(lambda _r: envelope({"results": []}))
+    rec = Recorder(gateway_aware(lambda _r: envelope({"results": []})))
     client = make_client(rec)
     client.execute_transaction(
         "app_crm", [{"type": "create", "table": "leads", "record": {"a": 1}}]
     )
-    assert rec.last.url.path == "/v1/lowcodb/data/app_crm/transactions"
+    assert rec.last.url.path == "/gateway/h1/v1/transactions"
     assert rec.last_json() == {
         "operations": [{"type": "create", "table": "leads", "record": {"a": 1}}]
     }
@@ -180,7 +211,7 @@ def test_transaction_and_event_bodies() -> None:
 
 
 def test_functions_execute_and_invoke() -> None:
-    rec = Recorder(lambda _r: envelope({"ok": True}))
+    rec = Recorder(gateway_aware(lambda _r: envelope({"ok": True})))
     client = make_client(rec)
     client.execute_function("f1")
     assert rec.last_json() == {}
@@ -189,7 +220,7 @@ def test_functions_execute_and_invoke() -> None:
     assert client.invoke_function("app_crm", "score-lead", method="GET") == {"ok": True}
     assert rec.last.method == "GET"
     assert rec.last.content == b""
-    assert rec.last.url.path == "/v1/lowcodb/fn/app_crm/score-lead"
+    assert rec.last.url.path == "/gateway/h1/v1/fn/score-lead"
 
     client.invoke_function("app_crm", "score-lead", {"leadId": "l1"})
     assert rec.last.method == "POST"
@@ -280,3 +311,111 @@ def test_owned_http_client_closes_but_injected_does_not() -> None:
     owned = LowcodbClient("t")
     owned.close()
     assert owned._http.is_closed
+
+
+# --- gateway routing ---------------------------------------------------------
+
+
+def test_data_calls_resolve_the_gateway_once_and_cache_it() -> None:
+    rec = Recorder(gateway_aware(lambda _r: envelope([])))
+    client = make_client(rec)
+    client.list_records("app_crm", "leads")
+    client.count_view_records("app_crm", "hot leads")
+    client.create_bulk_records("app_crm", "leads", [{"a": 1}])
+    discoveries = [r for r in rec.requests if "gateway-by-schema" in r.url.path]
+    assert len(discoveries) == 1
+    paths = [f"{r.method} {r.url.raw_path.decode()}" for r in data_requests(rec)]
+    assert paths == [
+        "GET /gateway/h1/v1/leads",
+        "GET /gateway/h1/v1/views/hot%20leads/count",
+        "POST /gateway/h1/v1/leads/bulk",
+    ]
+
+
+def test_pinned_gateway_skips_discovery_and_accepts_full_urls() -> None:
+    rec = Recorder(lambda _r: envelope({}))
+    client = make_client(
+        rec, gateways={"app_crm": "/gateway/pinned", "other": "http://gw.internal:8080/gateway/x"}
+    )
+    client.get_record("app_crm", "leads", "r1")
+    client.get_record("other", "leads", "r1")
+    assert [str(r.url) for r in rec.requests] == [
+        "https://api.lowco.ai/gateway/pinned/v1/leads/r1",
+        "http://gw.internal:8080/gateway/x/v1/leads/r1",
+    ]
+
+
+def test_internal_origin_uses_the_in_cluster_url() -> None:
+    rec = Recorder(gateway_aware(lambda _r: envelope({})))
+    client = make_client(rec, gateway_origin="internal")
+    client.get_record("app_crm", "leads", "r1")
+    assert str(rec.last.url) == "http://gateway-svc-gw-1.prod.svc/gateway/h1/v1/leads/r1"
+
+
+def test_api_key_travels_as_x_api_key() -> None:
+    rec = Recorder(gateway_aware(lambda _r: envelope({})))
+    client = LowcodbClient(
+        "lc_secret", org_id="org_1", http_client=httpx.Client(transport=httpx.MockTransport(rec))
+    )
+    client.get_record("app_crm", "leads", "r1")
+    assert rec.last.headers["X-Api-Key"] == "lc_secret"
+    assert "Authorization" not in rec.last.headers
+
+
+def test_stale_gateway_is_re_resolved_once() -> None:
+    hashes = iter(["old", "new"])
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if "gateway-by-schema" in request.url.path:
+            h = next(hashes)
+            return envelope({"gatewayId": "gw", "hash": h, "contextPath": f"/gateway/{h}", "url": f"https://api.lowco.ai/gateway/{h}"})
+        if "/gateway/old/" in request.url.path:
+            return httpx.Response(404, text="route not found")
+        return envelope({"id": "r1"})
+
+    rec = Recorder(respond)
+    client = make_client(rec)
+    assert client.get_record("app_crm", "leads", "r1") == {"id": "r1"}
+    assert [r.url.path for r in data_requests(rec)] == [
+        "/gateway/old/v1/leads/r1",
+        "/gateway/new/v1/leads/r1",
+    ]
+
+
+def test_quota_exceeded_is_typed() -> None:
+    body = {
+        "code": "QUOTA_EXCEEDED",
+        "message": "plan cap reached",
+        "meter": "app_crm_leads_create",
+        "consumed": 100,
+        "included": 100,
+        "hard_cap": 100,
+        "period_end": "2026-11-01T00:00:00Z",
+        "app_key": "crm",
+        "upgrade": {"app_key": "crm", "plans": ["pro"]},
+    }
+    rec = Recorder(gateway_aware(lambda _r: httpx.Response(402, json=body)))
+    client = make_client(rec)
+    from lowcoai.lowcodb import QuotaExceededError, is_quota_exceeded
+
+    with pytest.raises(QuotaExceededError) as info:
+        client.create_record("app_crm", "leads", {})
+    err = info.value
+    assert is_quota_exceeded(err) and isinstance(err, LowcodbError)
+    assert err.status_code == 402 and err.code == "QUOTA_EXCEEDED"
+    assert err.meter == "app_crm_leads_create" and err.consumed == 100 and err.hard_cap == 100
+    assert err.period_end == "2026-11-01T00:00:00Z" and err.upgrade_app_key == "crm"
+    assert err.upgrade_plans == ["pro"]
+
+
+def test_gateway_client_addresses_a_gateway_directly() -> None:
+    rec = Recorder(lambda _r: envelope({"results": []}))
+    client = make_client(rec)
+    gw = client.gateway("/gateway/direct")
+    assert gw.url == "https://api.lowco.ai/gateway/direct"
+    gw.execute_transaction([{"type": "create", "table": "leads", "record": {}}])
+    gw.invoke_function("score-lead", {"id": 1})
+    assert [r.url.path for r in rec.requests] == [
+        "/gateway/direct/v1/transactions",
+        "/gateway/direct/v1/fn/score-lead",
+    ]

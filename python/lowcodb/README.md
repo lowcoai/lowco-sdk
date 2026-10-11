@@ -30,6 +30,22 @@ async with AsyncLowcodbClient("<token-or-api-key>", org_id="org_123") as client:
 
 `AsyncLowcodbClient` has the same methods as `LowcodbClient`; each one is a coroutine. Close it with `await client.aclose()` if you don't use `async with`.
 
+## Data goes through the base's gateway
+
+Records, view rows, DB functions and transactions are served by the base's API gateway
+(`https://api.lowco.ai/gateway/<hash>/v1/...`); the manager's data routes are
+cluster-internal. The methods above keep their `(schema, table)` arguments — the client
+resolves the schema's gateway once (`get_gateway`) and caches it. Options:
+
+```python
+LowcodbClient(token, gateways={"app_crm": "/gateway/WOsqwRyURn"})   # pin: never looked up
+LowcodbClient(token, gateway_origin="internal")                       # in-cluster address
+g = client.gateway("/gateway/WOsqwRyURn")                             # schema-less GatewayClient
+```
+
+An `lc_` API key is sent as `X-Api-Key`, a user token as `Authorization: Bearer`. A plan
+cap answers 402 → `QuotaExceededError` (`is_quota_exceeded(err)`).
+
 ## Options
 
 | Argument          | Description                                                                          |
