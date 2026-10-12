@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	api "github.com/lowcoai/lowco-sdk/go/api"
+	api "github.com/lowcoai/lowco-sdk/go/api/v2"
 )
 
 func TestOperationByPath(t *testing.T) {
@@ -18,7 +18,7 @@ func TestOperationByPath(t *testing.T) {
 	ctx := context.Background()
 
 	// files[] as multipart, options as the options part.
-	ans, err := c.Operation(ctx, "/v1/pdf/merge", api.OperationInput{
+	ans, err := c.Operation(ctx, "/v1/lowco-api/pdf/merge", api.OperationInput{
 		Files:  []api.FileInput{api.FileBytes([]byte("%PDF-a"), api.WithFilename("a.pdf")), api.FileBytes([]byte("%PDF-b"), api.WithFilename("b.pdf"))},
 		Params: map[string]any{"bookmarks": true},
 	})
@@ -38,7 +38,7 @@ func TestOperationByPath(t *testing.T) {
 	}
 
 	// A remote file by reference, async, then Result waits for the job.
-	ans, err = c.Operation(ctx, "/v1/docai/invoice", api.OperationInput{File: api.FileID("file_1")}, api.WithMode("async"))
+	ans, err = c.Operation(ctx, "/v1/lowco-api/docai/invoice", api.OperationInput{File: api.FileID("file_1")}, api.WithMode("async"))
 	if err != nil || ans.Job == nil || ans.Job.JobID != "job_inv" {
 		t.Fatalf("async = %+v, %v", ans, err)
 	}
@@ -51,15 +51,15 @@ func TestOperationByPath(t *testing.T) {
 	}
 
 	// No file input: options only; errors are the typed *Error.
-	if _, err := c.Operation(ctx, "/v1/qr/generate", api.OperationInput{Params: map[string]any{"content": "hi"}}); err != nil {
+	if _, err := c.Operation(ctx, "/v1/lowco-api/qr/generate", api.OperationInput{Params: map[string]any{"content": "hi"}}); err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.Operation(ctx, "/v1/pdf/rotate", api.OperationInput{File: api.FileID("file_1"), Params: map[string]any{"angle": 45}})
+	_, err = c.Operation(ctx, "/v1/lowco-api/pdf/rotate", api.OperationInput{File: api.FileID("file_1"), Params: map[string]any{"angle": 45}})
 	var ae *api.Error
 	if !errors.As(err, &ae) || ae.Reason != api.ReasonInvalidParam || ae.Param != "angle" {
 		t.Fatalf("rotate err = %v", err)
 	}
-	if _, err := c.Operation(ctx, "/v1/pdf/merge", api.OperationInput{File: api.FileID("a"), Files: []api.FileInput{api.FileID("b")}}); err == nil {
+	if _, err := c.Operation(ctx, "/v1/lowco-api/pdf/merge", api.OperationInput{File: api.FileID("a"), Files: []api.FileInput{api.FileID("b")}}); err == nil {
 		t.Fatal("File and Files together were accepted")
 	}
 }
@@ -69,7 +69,7 @@ func TestRequestByPath(t *testing.T) {
 	c, _ := api.NewClient(api.Config{APIKey: "lc_test_sdk", BaseURL: m.srv.URL})
 	ctx := context.Background()
 
-	raw, err := c.Request(ctx, http.MethodGet, "/v1/jobs", url.Values{"status": {"failed"}}, nil)
+	raw, err := c.Request(ctx, http.MethodGet, "/v1/lowco-api/jobs", url.Values{"status": {"failed"}}, nil)
 	if err != nil || !strings.Contains(string(raw), `"next_cursor":"c2"`) {
 		t.Fatalf("list = %s, %v", raw, err)
 	}
@@ -77,11 +77,11 @@ func TestRequestByPath(t *testing.T) {
 		t.Fatalf("query = %v", q)
 	}
 	// GETs are retried on 429 like the typed resources.
-	raw, err = c.Request(ctx, http.MethodGet, "/v1/settings", nil, nil)
+	raw, err = c.Request(ctx, http.MethodGet, "/v1/lowco-api/settings", nil, nil)
 	if err != nil || !strings.Contains(string(raw), `"test"`) {
 		t.Fatalf("settings = %s, %v", raw, err)
 	}
-	body, ctype, err := c.RequestRaw(ctx, http.MethodGet, "/v1/usage", url.Values{"format": {"csv"}}, "text/csv")
+	body, ctype, err := c.RequestRaw(ctx, http.MethodGet, "/v1/lowco-api/usage", url.Values{"format": {"csv"}}, "text/csv")
 	if err != nil || ctype != "text/csv" || !strings.HasPrefix(string(body), "day,credits") {
 		t.Fatalf("csv = %q %q %v", body, ctype, err)
 	}

@@ -6,7 +6,7 @@ import type { ErrorDetail, ErrorReason, Job } from "./generated.js";
 export const DEFAULT_BASE_URL = "https://api.lowco.ai";
 
 /** This SDK's version; its major and minor follow the API document it was generated from. */
-export const SDK_VERSION = "1.1.0";
+export const SDK_VERSION = "2.0.0";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_WAIT_MS = 300_000;
@@ -329,7 +329,7 @@ export class Core {
     return this.data<T>(await this.send(method, this.url(path, input.query), init, options));
   }
 
-  /** POST /v1/files and the like: one multipart file. */
+  /** POST /v1/lowco-api/files and the like: one multipart file. */
   async upload<T>(path: string, file: FileInput, options?: RequestOptions): Promise<T> {
     const f = normalise(file);
     if (!isLocal(f)) throw new LowcoApiError("upload takes a local file (path, bytes or stream)", { status: 0, reason: "invalid_param", param: "file" });
@@ -380,7 +380,7 @@ export class Core {
     if (local > 0 && local < all.length) {
       const up = async (ref: FileRef): Promise<FileRef> => {
         if (!isLocal(ref)) return ref;
-        const stored = await this.upload<{ file_id: string }>("/v1/files", ref, { signal: options?.signal });
+        const stored = await this.upload<{ file_id: string }>("/v1/lowco-api/files", ref, { signal: options?.signal });
         return { kind: "id", fileId: stored.file_id, password: ref.password };
       };
       for (const n of named) n.ref = await up(n.ref);
@@ -451,7 +451,7 @@ export class Core {
     const maxInterval = options?.maxIntervalMs ?? 10_000;
     const deadline = Date.now() + timeout;
     for (;;) {
-      const raw = await this.send("GET", this.url(`/v1/jobs/${encodeURIComponent(jobId)}`), {}, { signal: options?.signal });
+      const raw = await this.send("GET", this.url(`/v1/lowco-api/jobs/${encodeURIComponent(jobId)}`), {}, { signal: options?.signal });
       const job = this.data<Job>(raw);
       if (TERMINAL.has(job.status)) {
         if (job.status === "succeeded") return job;

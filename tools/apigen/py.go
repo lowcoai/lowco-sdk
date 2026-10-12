@@ -9,7 +9,7 @@ var pyKeywords = map[string]bool{"from": true, "in": true, "is": true, "not": tr
 
 // pyCallOptions are the keyword-only arguments every generated method may
 // take; a path parameter with one of these names would be a duplicate
-// argument (GET /v1/requests/{request_id}), so it gets a trailing underscore.
+// argument (GET /v1/lowco-api/requests/{request_id}), so it gets a trailing underscore.
 var pyCallOptions = map[string]bool{"request_id": true, "idempotency_key": true, "mode": true, "accept": true, "timeout": true}
 
 // pyPathName is a path parameter's Python name.
@@ -150,7 +150,7 @@ func emitPython(m *Model) []byte {
 	b.WriteString("\n\n")
 
 	for _, svc := range m.services() {
-		fmt.Fprintf(&b, "class %sOperations:\n    \"\"\"/v1/%s operations.\"\"\"\n\n    def __init__(self, core: Core) -> None:\n        self._core = core\n\n", pascal(svc), svc)
+		fmt.Fprintf(&b, "class %sOperations:\n    \"\"\"/v1/lowco-api/%s operations.\"\"\"\n\n    def __init__(self, core: Core) -> None:\n        self._core = core\n\n", pascal(svc), svc)
 		for _, o := range m.Ops {
 			if o.Service != svc {
 				continue
@@ -304,7 +304,7 @@ func emitPython(m *Model) []byte {
 	b.WriteString("def _drop_none(d: Dict[str, Any]) -> Dict[str, Any]:\n    return {k: v for k, v in d.items() if v is not None}\n\n\n")
 	b.WriteString("class GeneratedClient:\n    \"\"\"Every operation and resource of the Lowco API.\"\"\"\n\n    def __init__(self, core: Core) -> None:\n        self._core = core\n")
 	for _, svc := range m.services() {
-		fmt.Fprintf(&b, "        self.%s = %sOperations(core)\n        \"\"\"/v1/%s operations.\"\"\"\n", pyName(svc), pascal(svc), svc)
+		fmt.Fprintf(&b, "        self.%s = %sOperations(core)\n        \"\"\"/v1/lowco-api/%s operations.\"\"\"\n", pyName(svc), pascal(svc), svc)
 	}
 	for _, g := range m.groups() {
 		fmt.Fprintf(&b, "        self.%s = %sResource(core)\n        \"\"\"%s.\"\"\"\n", pyName(g), pascal(g), groupDoc(g))

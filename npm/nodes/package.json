@@ -1,0 +1,56 @@
+{
+  "name": "@lowcoai/nodes",
+  "version": "0.1.0",
+  "description": "Write Lowco workflow nodes in code: define nodes, test them locally, push the library.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lowcoai/lowco-sdk.git",
+    "directory": "npm/nodes"
+  },
+  "type": "module",
+  "main": "./index.mjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.mjs"
+    },
+    "./testing": {
+      "types": "./testing.d.ts",
+      "import": "./testing.mjs"
+    }
+  },
+  "bin": {
+    "lowco-nodes": "./bin/lowco-nodes.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "index.d.ts",
+    "runtime.mjs",
+    "testing.mjs",
+    "testing.d.ts",
+    "lib",
+    "bin",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "sync": "node scripts/sync.mjs",
+    "check": "node scripts/sync.mjs --check",
+    "test": "node scripts/sync.mjs --check && node --test test/*.test.mjs examples/acme-crm/test/*.test.mjs"
+  },
+  "keywords": [
+    "lowco",
+    "workflow",
+    "nodes",
+    "sdk",
+    "low-code",
+    "automation"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

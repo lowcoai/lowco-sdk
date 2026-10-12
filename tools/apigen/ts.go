@@ -134,7 +134,7 @@ func emitTS(m *Model) []byte {
 
 	for _, svc := range m.services() {
 		cls := pascal(svc) + "Operations"
-		fmt.Fprintf(&b, "/** /v1/%s operations. */\nexport class %s {\n  constructor(private readonly core: Core) {}\n\n", svc, cls)
+		fmt.Fprintf(&b, "/** /v1/lowco-api/%s operations. */\nexport class %s {\n  constructor(private readonly core: Core) {}\n\n", svc, cls)
 		for _, o := range m.Ops {
 			if o.Service != svc {
 				continue
@@ -226,7 +226,7 @@ func emitTS(m *Model) []byte {
 
 	b.WriteString("/** Every operation and resource of the Lowco API. */\nexport class GeneratedClient {\n")
 	for _, svc := range m.services() {
-		fmt.Fprintf(&b, "  /** /v1/%s operations. */\n  readonly %s: %sOperations;\n", svc, camel(svc), pascal(svc))
+		fmt.Fprintf(&b, "  /** /v1/lowco-api/%s operations. */\n  readonly %s: %sOperations;\n", svc, camel(svc), pascal(svc))
 	}
 	for _, g := range m.groups() {
 		fmt.Fprintf(&b, "  /** %s. */\n  readonly %s: %sResource;\n", groupDoc(g), camel(g), pascal(g))

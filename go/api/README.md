@@ -3,7 +3,7 @@
 Official Go client for the **Lowco API**: PDF, render, OCR, Document AI, QR codes and barcodes, with jobs, file inputs, webhooks and typed errors. Generated from the API's OpenAPI document (`zz_generated.go`) with hand-written helpers. Standard library only.
 
 ```bash
-go get github.com/lowcoai/lowco-sdk/go/api
+go get github.com/lowcoai/lowco-sdk/go/api/v2
 ```
 
 ## Quick start
@@ -54,11 +54,11 @@ ev, err := api.ConstructEvent(rawBody, r.Header.Get(api.SignatureHeader), secret
 Tools that build calls from the API document (`lowco api` in lowco-cli) use the two untyped entry points, which share the typed services' file handling, retries, errors and job waiting:
 
 ```go
-ans, err := client.Operation(ctx, "/v1/pdf/merge", api.OperationInput{
+ans, err := client.Operation(ctx, "/v1/lowco-api/pdf/merge", api.OperationInput{
 	Files:  []api.FileInput{api.FilePath("a.pdf"), api.FilePath("b.pdf")},
 	Params: map[string]any{"bookmarks": true},
 })
-raw, err := client.Request(ctx, http.MethodGet, "/v1/jobs", url.Values{"status": {"failed"}}, nil)
+raw, err := client.Request(ctx, http.MethodGet, "/v1/lowco-api/jobs", url.Values{"status": {"failed"}}, nil)
 ```
 
 `ans.Data` is the result as `json.RawMessage`; `ans.Result(ctx)` waits for a job. Applications should prefer the typed services.

@@ -14,7 +14,7 @@ const DefaultBaseURL = "https://api.lowco.ai"
 
 // SDKVersion is this SDK's version; its major and minor follow the API
 // document it was generated from.
-const SDKVersion = "1.1.0"
+const SDKVersion = "2.0.0"
 
 // ErrMissingAPIKey is returned by NewClient when no key is configured.
 var ErrMissingAPIKey = errors.New("lowco api: an API key is required (lc_live_… or lc_test_…): set Config.APIKey or LOWCO_API_KEY")

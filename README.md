@@ -13,7 +13,7 @@ lowco-sdk/
 │   ├── integrations/   ← github.com/lowcoai/lowco-sdk/go/integrations
 │   ├── flux/           ← github.com/lowcoai/lowco-sdk/go/flux
 │   ├── docs/           ← github.com/lowcoai/lowco-sdk/go/docs
-│   └── api/            ← github.com/lowcoai/lowco-sdk/go/api   (generated from specs/lowco-api.json)
+│   └── api/            ← github.com/lowcoai/lowco-sdk/go/api/v2   (generated from specs/lowco-api.json)
 ├── npm/
 │   ├── lowcodb/        ← @lowcoai/lowcodb
 │   ├── agentx/         ← @lowcoai/agentx
@@ -23,6 +23,7 @@ lowco-sdk/
 │   ├── auth/           ← @lowcoai/auth      (React)
 │   ├── engage/         ← @lowcoai/engage    (browser)
 │   ├── docs/           ← @lowcoai/docs
+│   ├── nodes/          ← @lowcoai/nodes     (write workflow nodes in code; CLI lowco-nodes)
 │   └── api/            ← @lowcoai/api
 ├── python/
 │   ├── lowcodb/        ← lowcoai-lowcodb       (import lowcoai.lowcodb)
@@ -69,10 +70,11 @@ The Dart API clients are pure Dart (`package:http` / `web_socket_channel`), so t
 | `workflow`     | workflow-orchestrator                     | `github.com/lowcoai/lowco-sdk/go/workflow`     | `@lowcoai/workflow`     | `lowcoai-workflow`     | `lowcoai_workflow`     | [docs/workflow.md](docs/workflow.md)         |
 | `integrations` | integrations-manager                      | `github.com/lowcoai/lowco-sdk/go/integrations` | `@lowcoai/integrations` | `lowcoai-integrations` | `lowcoai_integrations` | [docs/integrations.md](docs/integrations.md) |
 | `docs`         | document manager                          | `github.com/lowcoai/lowco-sdk/go/docs`         | `@lowcoai/docs`         | `lowcoai-docs`         | `lowcoai_docs`         | [docs/docs.md](docs/docs.md)                 |
-| `api`          | Lowco API (PDF, render, OCR, Document AI, codes) | `github.com/lowcoai/lowco-sdk/go/api`   | `@lowcoai/api`          | `lowcoai-api`          | `lowcoai_api`          | [docs/api.md](docs/api.md)                   |
+| `api`          | Lowco API (PDF, render, OCR, Document AI, codes) | `github.com/lowcoai/lowco-sdk/go/api/v2` | `@lowcoai/api`          | `lowcoai-api`          | `lowcoai_api`          | [docs/api.md](docs/api.md)                   |
 | `flux`         | flux realtime WebSocket                   | `github.com/lowcoai/lowco-sdk/go/flux`         | `@lowcoai/flux`         | `lowcoai-flux`         | `lowcoai_flux`         | [npm/flux/README.md](npm/flux/README.md)     |
 | `auth`         | lowco OAuth (Authorization Code + PKCE)   | —                                                       | `@lowcoai/auth`         | `lowcoai-auth`         | `lowcoai_auth`         | [npm/auth/README.md](npm/auth/README.md)     |
 | `engage`       | engage event tracking                     | —                                                       | `@lowcoai/engage`       | `lowcoai-engage`       | `lowcoai_engage`       | [npm/engage/README.md](npm/engage/README.md) |
+| `nodes`        | workflow node libraries (code nodes)      | —                                                       | `@lowcoai/nodes`        | —                      | —                      | [npm/nodes/README.md](npm/nodes/README.md)   |
 
 Every package has its own README with the full surface (`python/<product>/README.md`, `flutter/<product>/README.md`).
 
@@ -396,7 +398,7 @@ Each package is self-contained; run its checks from its own folder.
 | Ecosystem | Checks |
 | --------- | ------ |
 | Go        | `go vet ./... && go test ./...` |
-| npm       | `npm install && npm run typecheck && npm run build` |
+| npm       | `npm install && npm run typecheck && npm run build` (`npm/nodes`: `npm test`, which also checks its copies of the workflow engine's SDK) |
 | Python    | `pip install -e ".[dev]"`, then `pytest`, `ruff check .`, `ruff format --check .`, `mypy src tests` |
 | Dart      | `dart pub get && dart format --set-exit-if-changed . && dart analyze && dart test` |
 | Flutter   | `flutter pub get && dart format --set-exit-if-changed . && flutter analyze && flutter test` (`flutter/auth`, `flutter/engage`) |
@@ -413,7 +415,7 @@ Each package is self-contained; run its checks from its own folder.
 - Method names mirror the controller verbs in the corresponding service so the SDKs and server stay in lockstep (snake_case in Python, lowerCamelCase in Dart).
 - Wire payloads keep the server's field names in every language: TypedDicts with camelCase keys in Python, model classes with `fromJson` / `toJson` (nulls omitted) in Dart.
 
-NPM packages — `@lowcoai/lowcodb`, `@lowcoai/agentx`, `@lowcoai/workflow`, `@lowcoai/integrations`, `@lowcoai/docs`, `@lowcoai/flux`, `@lowcoai/auth`, `@lowcoai/engage`.
+NPM packages — `@lowcoai/lowcodb`, `@lowcoai/agentx`, `@lowcoai/workflow`, `@lowcoai/integrations`, `@lowcoai/docs`, `@lowcoai/flux`, `@lowcoai/auth`, `@lowcoai/engage`, `@lowcoai/nodes`.
 
 PyPI packages — `lowcoai-lowcodb`, `lowcoai-agentx`, `lowcoai-workflow`, `lowcoai-integrations`, `lowcoai-docs`, `lowcoai-flux`, `lowcoai-auth`, `lowcoai-engage`.
 

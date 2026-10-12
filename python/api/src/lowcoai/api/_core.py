@@ -18,7 +18,7 @@ from ._errors import LowcoApiError, LowcoJobError, LowcoTimeoutError
 from ._files import FileRef, Files
 
 DEFAULT_BASE_URL = "https://api.lowco.ai"
-SDK_VERSION = "1.1.0"
+SDK_VERSION = "2.0.0"
 _TERMINAL = {"succeeded", "failed", "cancelled"}
 
 T = TypeVar("T")
@@ -247,7 +247,7 @@ class Core:
             def up(r: FileRef) -> FileRef:
                 if not r.is_local:
                     return r
-                stored = self.upload("/v1/files", r)
+                stored = self.upload("/v1/lowco-api/files", r)
                 return Files.id(stored["file_id"], password=r.password)
             named = [(f, up(r)) for f, r in named]
             many = [up(r) for r in many] if many is not None else None
@@ -308,7 +308,7 @@ class Core:
     def wait_for_job(self, job_id: str, *, timeout: float = 300.0, max_interval: float = 10.0) -> Dict[str, Any]:
         deadline = time.monotonic() + timeout
         while True:
-            raw = self._send("GET", self._url(f"/v1/jobs/{parse.quote(job_id, safe='')}"))
+            raw = self._send("GET", self._url(f"/v1/lowco-api/jobs/{parse.quote(job_id, safe='')}"))
             job = self._data(raw)
             if job["status"] in _TERMINAL:
                 if job["status"] == "succeeded":
