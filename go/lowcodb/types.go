@@ -30,6 +30,10 @@ type Base struct {
 	ConnectionID string   `json:"connectionId,omitempty"`
 	BaseType     BaseType `json:"baseType,omitempty"`
 	Schema       string   `json:"schema,omitempty"`
+	// Gateway is where the base's data is served; the manager attaches it to every
+	// base it lists or returns, so a caller holding a Base knows its gateway without a
+	// second call.
+	Gateway *GatewayInfo `json:"gateway,omitempty"`
 }
 
 type Table struct {
@@ -217,4 +221,20 @@ type ListParams struct {
 	Size   int
 	Filter string
 	Sort   string
+}
+
+// TransactionOperation is one write in ExecuteTransaction.
+type TransactionOperation struct {
+	// Type is create, update or delete.
+	Type  string `json:"type"`
+	Table string `json:"table"`
+	// ID identifies the row for update and delete.
+	ID string `json:"id,omitempty"`
+	// Record carries the fields for create and update.
+	Record Record `json:"record,omitempty"`
+}
+
+// TransactionResult is what a transaction answers: one entry per operation.
+type TransactionResult struct {
+	Results []map[string]any `json:"results"`
 }

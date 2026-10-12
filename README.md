@@ -12,7 +12,8 @@ lowco-sdk/
 │   ├── workflow/       ← github.com/lowcoai/lowco-sdk/go/workflow
 │   ├── integrations/   ← github.com/lowcoai/lowco-sdk/go/integrations
 │   ├── flux/           ← github.com/lowcoai/lowco-sdk/go/flux
-│   └── docs/           ← github.com/lowcoai/lowco-sdk/go/docs
+│   ├── docs/           ← github.com/lowcoai/lowco-sdk/go/docs
+│   └── api/            ← github.com/lowcoai/lowco-sdk/go/api   (generated from specs/lowco-api.json)
 ├── npm/
 │   ├── lowcodb/        ← @lowcoai/lowcodb
 │   ├── agentx/         ← @lowcoai/agentx
@@ -21,7 +22,8 @@ lowco-sdk/
 │   ├── flux/           ← @lowcoai/flux
 │   ├── auth/           ← @lowcoai/auth      (React)
 │   ├── engage/         ← @lowcoai/engage    (browser)
-│   └── docs/           ← @lowcoai/docs
+│   ├── docs/           ← @lowcoai/docs
+│   └── api/            ← @lowcoai/api
 ├── python/
 │   ├── lowcodb/        ← lowcoai-lowcodb       (import lowcoai.lowcodb)
 │   ├── agentx/         ← lowcoai-agentx        (import lowcoai.agentx)
@@ -30,7 +32,8 @@ lowco-sdk/
 │   ├── flux/           ← lowcoai-flux          (import lowcoai.flux, asyncio)
 │   ├── auth/           ← lowcoai-auth          (import lowcoai.auth)
 │   ├── engage/         ← lowcoai-engage        (import lowcoai.engage)
-│   └── docs/           ← lowcoai-docs          (import lowcoai.docs)
+│   ├── docs/           ← lowcoai-docs          (import lowcoai.docs)
+│   └── api/            ← lowcoai-api           (import lowcoai.api)
 ├── flutter/
 │   ├── lowcodb/        ← lowcoai_lowcodb       (pure Dart)
 │   ├── agentx/         ← lowcoai_agentx        (pure Dart)
@@ -39,7 +42,9 @@ lowco-sdk/
 │   ├── flux/           ← lowcoai_flux          (pure Dart)
 │   ├── auth/           ← lowcoai_auth          (Flutter)
 │   ├── engage/         ← lowcoai_engage        (Flutter)
-│   └── docs/           ← lowcoai_docs          (pure Dart)
+│   ├── docs/           ← lowcoai_docs          (pure Dart)
+│   └── api/            ← lowcoai_api           (pure Dart)
+├── specs/lowco-api.json ← the Lowco API's OpenAPI document (tools/apigen generates the four api packages)
 └── docs/
     ├── lowcodb.md       ← REST surface reference (language-agnostic)
     ├── workflow.md      ← REST surface reference (language-agnostic)
@@ -64,6 +69,7 @@ The Dart API clients are pure Dart (`package:http` / `web_socket_channel`), so t
 | `workflow`     | workflow-orchestrator                     | `github.com/lowcoai/lowco-sdk/go/workflow`     | `@lowcoai/workflow`     | `lowcoai-workflow`     | `lowcoai_workflow`     | [docs/workflow.md](docs/workflow.md)         |
 | `integrations` | integrations-manager                      | `github.com/lowcoai/lowco-sdk/go/integrations` | `@lowcoai/integrations` | `lowcoai-integrations` | `lowcoai_integrations` | [docs/integrations.md](docs/integrations.md) |
 | `docs`         | document manager                          | `github.com/lowcoai/lowco-sdk/go/docs`         | `@lowcoai/docs`         | `lowcoai-docs`         | `lowcoai_docs`         | [docs/docs.md](docs/docs.md)                 |
+| `api`          | Lowco API (PDF, render, OCR, Document AI, codes) | `github.com/lowcoai/lowco-sdk/go/api`   | `@lowcoai/api`          | `lowcoai-api`          | `lowcoai_api`          | [docs/api.md](docs/api.md)                   |
 | `flux`         | flux realtime WebSocket                   | `github.com/lowcoai/lowco-sdk/go/flux`         | `@lowcoai/flux`         | `lowcoai-flux`         | `lowcoai_flux`         | [npm/flux/README.md](npm/flux/README.md)     |
 | `auth`         | lowco OAuth (Authorization Code + PKCE)   | —                                                       | `@lowcoai/auth`         | `lowcoai-auth`         | `lowcoai_auth`         | [npm/auth/README.md](npm/auth/README.md)     |
 | `engage`       | engage event tracking                     | —                                                       | `@lowcoai/engage`       | `lowcoai-engage`       | `lowcoai_engage`       | [npm/engage/README.md](npm/engage/README.md) |

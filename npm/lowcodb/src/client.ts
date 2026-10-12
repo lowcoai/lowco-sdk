@@ -1,4 +1,4 @@
-import { LowcodbError } from "./errors.js";
+import { LowcodbError, parseQuotaExceeded } from "./errors.js";
 import {
   HEADER_ORG_ID,
   type APIErrorPayload,
@@ -44,8 +44,38 @@ const BASE_URL = "https://api.lowco.ai";
 
 const DEFAULT_API_BASE_PATH = "/v1/lowcodb";
 
+/** Which address of a base's gateway data calls are sent to. */
+export type GatewayOrigin = "public" | "internal";
+
+/** Where a base's data is served, as `GET /v1/lowcodb/bases/{id}/gateway` answers it. */
+export interface GatewayInfo {
+  gatewayId: string;
+  hash?: string;
+  contextPath?: string;
+  url?: string;
+  internalUrl?: string;
+  gatewayType?: string;
+  routes?: { tables: string; views: string; functions: string; transactions?: string };
+  sync?: { status: string; syncedAt?: string; routeCount?: number; error?: string };
+}
+
+/** How long a resolved gateway is reused before it is looked up again. */
+export const DEFAULT_GATEWAY_CACHE_TTL_MS = 10 * 60_000;
+
+/** Header carrying an `lc_` API key; user tokens travel as `Authorization: Bearer`. */
+export const HEADER_API_KEY = "X-Api-Key";
+
+/** Whether `token` is a Lowco API key rather than a user token. */
+export function isApiKey(token: string): boolean {
+  return token.trim().startsWith("lc_");
+}
+
 export interface LowcodbClientOptions {
-  /** User token or API key sent as `Authorization: Bearer <token>` on every request. Required. */
+  /**
+   * User token or `lc_` API key. Required. A user token is sent as
+   * `Authorization: Bearer <token>`, an API key as `X-Api-Key`, which is how the
+   * gateway and the API expect each.
+   */
   token: string;
   /** X-Org-Id header value. */
   orgId?: string;
@@ -62,11 +92,24 @@ export interface LowcodbClientOptions {
   fetch?: typeof fetch;
   /** Per-request timeout in milliseconds (default 30 000). 0 disables. */
   timeoutMs?: number;
+  /**
+   * Pinned gateways by schema: the context path (`/gateway/<hash>`, joined to
+   * `baseUrl`) or a full origin + path. A pinned schema is never looked up — for API
+   * keys that may call the gateway but not the management API, and for in-cluster
+   * callers that know the gateway's Service.
+   */
+  gateways?: Record<string, string>;
+  /** `public` (default): `https://api.lowco.ai/gateway/<hash>`; `internal`: the in-cluster Service. */
+  gatewayOrigin?: GatewayOrigin;
+  /** Overrides DEFAULT_GATEWAY_CACHE_TTL_MS. */
+  gatewayCacheTtlMs?: number;
 }
 
 interface RequestInternalOptions {
   method: string;
+  /** A path on `baseUrl`, or an absolute URL when `absolute` is set. */
   path: string;
+  absolute?: boolean;
   query?: URLSearchParams | null;
   body?: unknown;
   enveloped?: boolean;
@@ -79,6 +122,10 @@ export class LowcodbClient {
   private readonly fetchFn: typeof fetch;
   private readonly timeoutMs: number;
   private readonly headers: Record<string, string>;
+  private readonly gateways: Record<string, string>;
+  private readonly gatewayOrigin: GatewayOrigin;
+  private readonly gatewayCacheTtlMs: number;
+  private readonly gatewayCache = new Map<string, { base: string; expires: number }>();
 
   constructor(opts: LowcodbClientOptions) {
     if (!opts.token || !opts.token.trim()) {
@@ -90,8 +137,92 @@ export class LowcodbClient {
     this.timeoutMs = opts.timeoutMs ?? 30_000;
 
     this.headers = { ...(opts.defaultHeaders ?? {}) };
-    this.headers.Authorization = `Bearer ${opts.token}`;
+    if (isApiKey(opts.token)) this.headers[HEADER_API_KEY] = opts.token.trim();
+    else this.headers.Authorization = `Bearer ${opts.token}`;
     if (opts.orgId) this.headers[HEADER_ORG_ID] = opts.orgId;
+    this.gateways = { ...(opts.gateways ?? {}) };
+    this.gatewayOrigin = opts.gatewayOrigin === "internal" ? "internal" : "public";
+    this.gatewayCacheTtlMs = opts.gatewayCacheTtlMs ?? DEFAULT_GATEWAY_CACHE_TTL_MS;
+  }
+
+  // --- Gateway (where a base's data is served) -----------------------------
+  //
+  // Records, view rows, DB functions and transactions are served by the base's API
+  // gateway; the manager's data routes are cluster-internal. The schema argument of the
+  // data methods names the base, whose gateway is resolved (and cached) here.
+
+  /** Where a base's data is served, by schema. */
+  getGateway(schema: string): Promise<GatewayInfo> {
+    return this.request({ method: "GET", path: this.api("bases", "gateway-by-schema", schema), enveloped: true });
+  }
+
+  /** Where a base's data is served, by base id. */
+  getGatewayByBaseId(baseId: string): Promise<GatewayInfo> {
+    return this.request({ method: "GET", path: this.api("bases", baseId, "gateway"), enveloped: true });
+  }
+
+  /**
+   * A client bound to one gateway, for callers that hold its URL or context path rather
+   * than the base's schema. Its methods mirror the record, view, function and
+   * transaction methods without the schema argument.
+   */
+  gateway(pathOrUrl: string): GatewayClient {
+    return new GatewayClient(this, this.absoluteGateway(pathOrUrl));
+  }
+
+  /** @internal absolute prefix (origin + context path) of a schema's gateway. */
+  async gatewayBase(schema: string): Promise<{ base: string; pinned: boolean }> {
+    const key = schema.trim();
+    if (!key) throw new Error("lowcodb: schema is required");
+    const pinned = this.gateways[key];
+    if (pinned) return { base: this.absoluteGateway(pinned), pinned: true };
+    const cached = this.gatewayCache.get(key);
+    if (cached && cached.expires > Date.now()) return { base: cached.base, pinned: false };
+    const info = await this.getGateway(key);
+    const base = this.pickGatewayBase(info);
+    if (!base) {
+      throw new LowcodbError({ statusCode: 404, message: `lowcodb: base ${key} has no usable gateway yet`, body: "" });
+    }
+    this.gatewayCache.set(key, { base, expires: Date.now() + this.gatewayCacheTtlMs });
+    return { base, pinned: false };
+  }
+
+  /** @internal */
+  forgetGateway(schema: string): void {
+    this.gatewayCache.delete(schema.trim());
+  }
+
+  private pickGatewayBase(info: GatewayInfo): string {
+    if (this.gatewayOrigin === "internal" && info.internalUrl?.trim()) {
+      return info.internalUrl.trim().replace(/\/+$/g, "");
+    }
+    if (info.url?.trim()) return info.url.trim().replace(/\/+$/g, "");
+    if (info.contextPath?.trim()) return this.absoluteGateway(info.contextPath);
+    return "";
+  }
+
+  private absoluteGateway(pathOrUrl: string): string {
+    const p = pathOrUrl.trim().replace(/\/+$/g, "");
+    if (/^https?:\/\//i.test(p)) return p;
+    return `${this.baseUrl}/${p.replace(/^\/+/g, "")}`;
+  }
+
+  /**
+   * @internal One data-plane call for `schema` through its gateway. A 404 from a gateway
+   * that was looked up is retried once after a fresh lookup: the base's access hash may
+   * have been regenerated since it was cached.
+   */
+  async dataRequest<T>(schema: string, opts: Omit<RequestInternalOptions, "path"> & { route: string }): Promise<T> {
+    const { base, pinned } = await this.gatewayBase(schema);
+    try {
+      return await this.request<T>({ ...opts, path: base + opts.route, absolute: true });
+    } catch (err) {
+      if (pinned || !(err instanceof LowcodbError) || err.statusCode !== 404) throw err;
+      this.forgetGateway(schema);
+      const fresh = await this.gatewayBase(schema);
+      if (fresh.base === base) throw err;
+      return this.request<T>({ ...opts, path: fresh.base + opts.route, absolute: true });
+    }
   }
 
   setOrgId(orgId: string | null): void {
@@ -278,17 +409,17 @@ export class LowcodbClient {
   // --- Records -----------------------------------------------------------
 
   createRecord(schema: string, tableName: string, record: LowcodbRecord): Promise<LowcodbRecord> {
-    return this.request({
+    return this.dataRequest(schema, {
       method: "POST",
-      path: this.data(schema, "tables", tableName, "records"),
+      route: tableRoute(tableName),
       body: record,
       enveloped: true,
     });
   }
   getRecord(schema: string, tableName: string, id: string): Promise<LowcodbRecord> {
-    return this.request({
+    return this.dataRequest(schema, {
       method: "GET",
-      path: this.data(schema, "tables", tableName, "records", id),
+      route: tableRoute(tableName, id),
       enveloped: true,
     });
   }
@@ -298,17 +429,17 @@ export class LowcodbClient {
     id: string,
     record: LowcodbRecord,
   ): Promise<LowcodbRecord> {
-    return this.request({
+    return this.dataRequest(schema, {
       method: "PUT",
-      path: this.data(schema, "tables", tableName, "records", id),
+      route: tableRoute(tableName, id),
       body: record,
       enveloped: true,
     });
   }
   deleteRecord(schema: string, tableName: string, id: string): Promise<DeleteCountResponse> {
-    return this.request({
+    return this.dataRequest(schema, {
       method: "DELETE",
-      path: this.data(schema, "tables", tableName, "records", id),
+      route: tableRoute(tableName, id),
       enveloped: true,
     });
   }
@@ -317,17 +448,17 @@ export class LowcodbClient {
     tableName: string,
     params?: ListParams,
   ): Promise<LowcodbRecord[]> {
-    return this.request({
+    return this.dataRequest(schema, {
       method: "GET",
-      path: this.data(schema, "tables", tableName, "records"),
+      route: tableRoute(tableName),
       query: this.listQuery(params),
       enveloped: true,
     });
   }
   countRecords(schema: string, tableName: string, params?: ListParams): Promise<CountResponse> {
-    return this.request({
+    return this.dataRequest(schema, {
       method: "GET",
-      path: this.data(schema, "tables", tableName, "records", "count"),
+      route: tableRoute(tableName, "count"),
       query: this.listQuery(params),
       enveloped: true,
     });
@@ -337,9 +468,9 @@ export class LowcodbClient {
     tableName: string,
     records: LowcodbRecord[],
   ): Promise<void> {
-    await this.request({
+    await this.dataRequest(schema, {
       method: "POST",
-      path: this.data(schema, "tables", tableName, "records", "bulk"),
+      route: tableRoute(tableName, "bulk"),
       body: records,
       enveloped: true,
     });
@@ -349,9 +480,9 @@ export class LowcodbClient {
     tableName: string,
     records: LowcodbRecord[],
   ): Promise<RecordsBulkResult> {
-    return this.request({
+    return this.dataRequest(schema, {
       method: "PUT",
-      path: this.data(schema, "tables", tableName, "records", "bulk"),
+      route: tableRoute(tableName, "bulk"),
       body: records,
       enveloped: true,
     });
@@ -365,9 +496,9 @@ export class LowcodbClient {
     tableName: string,
     body: unknown,
   ): Promise<void> {
-    await this.request({
+    await this.dataRequest(schema, {
       method: "DELETE",
-      path: this.data(schema, "tables", tableName, "records", "bulk"),
+      route: tableRoute(tableName, "bulk"),
       body,
       enveloped: true,
     });
@@ -376,9 +507,9 @@ export class LowcodbClient {
   // --- View data --------------------------------------------------------
 
   getViewRecord(schema: string, viewName: string, id: string): Promise<LowcodbRecord> {
-    return this.request({
+    return this.dataRequest(schema, {
       method: "GET",
-      path: this.data(schema, "views", viewName, "records", id),
+      route: viewRoute(viewName, id),
       enveloped: true,
     });
   }
@@ -387,9 +518,9 @@ export class LowcodbClient {
     viewName: string,
     params?: ListParams,
   ): Promise<LowcodbRecord[]> {
-    return this.request({
+    return this.dataRequest(schema, {
       method: "GET",
-      path: this.data(schema, "views", viewName, "records"),
+      route: viewRoute(viewName),
       query: this.listQuery(params),
       enveloped: true,
     });
@@ -399,9 +530,9 @@ export class LowcodbClient {
     viewName: string,
     params?: ListParams,
   ): Promise<CountResponse> {
-    return this.request({
+    return this.dataRequest(schema, {
       method: "GET",
-      path: this.data(schema, "views", viewName, "records", "count"),
+      route: viewRoute(viewName, "count"),
       query: this.listQuery(params),
       enveloped: true,
     });
@@ -526,9 +657,9 @@ export class LowcodbClient {
    * transaction — all succeed or none apply. Internal bases only.
    */
   executeTransaction(schema: string, operations: TransactionOperation[]): Promise<TransactionResult> {
-    return this.request({
+    return this.dataRequest(schema, {
       method: "POST",
-      path: this.api("data", schema, "transactions"),
+      route: transactionsRoute(),
       body: { operations },
       enveloped: true,
     });
@@ -611,9 +742,9 @@ export class LowcodbClient {
     body?: unknown,
     opts?: FunctionInvokeOptions,
   ): Promise<unknown> {
-    return this.request({
+    return this.dataRequest(schema, {
       method: opts?.method ?? "POST",
-      path: this.api("fn", schema, functionKey),
+      route: functionRoute(functionKey),
       body,
       enveloped: true,
     });
@@ -689,17 +820,7 @@ export class LowcodbClient {
     return "/" + segs.join("/");
   }
 
-  private data(schema: string, objectType: string, objectName: string, ...parts: string[]): string {
-    const segs = [
-      this.apiBasePath.replace(/^\/+|\/+$/g, ""),
-      "data",
-      encodeURIComponent(schema),
-      objectType,
-      encodeURIComponent(objectName),
-    ];
-    for (const p of parts) segs.push(encodeURIComponent(p));
-    return "/" + segs.join("/");
-  }
+
 
   private listQuery(params?: ListParams): URLSearchParams | null {
     if (!params) return null;
@@ -712,7 +833,7 @@ export class LowcodbClient {
   }
 
   private async request<T>(opts: RequestInternalOptions): Promise<T> {
-    const url = new URL(this.baseUrl + opts.path);
+    const url = new URL(opts.absolute ? opts.path : this.baseUrl + opts.path);
     if (opts.query) {
       opts.query.forEach((v, k) => url.searchParams.append(k, v));
     }
@@ -803,6 +924,10 @@ function buildHttpError(status: number, text: string): LowcodbError {
   } catch {
     /* keep raw text */
   }
+  if (status === 402) {
+    const quota = parseQuotaExceeded(status, message, text);
+    if (quota) return quota;
+  }
   return new LowcodbError({ statusCode: status, message, code, body: text });
 }
 
@@ -819,4 +944,99 @@ function decodeEnvelope<T>(text: string): T {
     return env.data as T;
   }
   return env as T;
+}
+
+// --- Gateway routes --------------------------------------------------------
+
+const seg = (p: string): string => encodeURIComponent(p.replace(/^\/+|\/+$/g, ""));
+/** @internal */
+export function tableRoute(table: string, ...parts: string[]): string {
+  return "/" + ["v1", seg(table), ...parts.map(seg)].join("/");
+}
+/** @internal */
+export function viewRoute(view: string, ...parts: string[]): string {
+  return "/" + ["v1", "views", seg(view), ...parts.map(seg)].join("/");
+}
+/** @internal */
+export function functionRoute(key: string): string {
+  return "/" + ["v1", "fn", seg(key)].join("/");
+}
+/** @internal */
+export function transactionsRoute(): string {
+  return "/v1/transactions";
+}
+
+/**
+ * A client bound to one base gateway (`client.gateway("/gateway/<hash>")`): the record,
+ * view, function and transaction methods without the schema argument, for callers that
+ * hold the gateway rather than the base.
+ */
+export class GatewayClient {
+  constructor(
+    private readonly client: LowcodbClient,
+    /** Absolute prefix: origin + `/gateway/<hash>`. */
+    readonly url: string,
+  ) {}
+
+  private req<T>(opts: Omit<RequestInternalOptions, "path"> & { route: string }): Promise<T> {
+    // Direct call: no schema, nothing to resolve or retry.
+    return (this.client as unknown as { request<T>(o: RequestInternalOptions): Promise<T> }).request<T>({
+      ...opts,
+      path: this.url + opts.route,
+      absolute: true,
+    });
+  }
+
+  createRecord(tableName: string, record: LowcodbRecord): Promise<LowcodbRecord> {
+    return this.req({ method: "POST", route: tableRoute(tableName), body: record, enveloped: true });
+  }
+  getRecord(tableName: string, id: string): Promise<LowcodbRecord> {
+    return this.req({ method: "GET", route: tableRoute(tableName, id), enveloped: true });
+  }
+  updateRecord(tableName: string, id: string, record: LowcodbRecord): Promise<LowcodbRecord> {
+    return this.req({ method: "PUT", route: tableRoute(tableName, id), body: record, enveloped: true });
+  }
+  deleteRecord(tableName: string, id: string): Promise<DeleteCountResponse> {
+    return this.req({ method: "DELETE", route: tableRoute(tableName, id), enveloped: true });
+  }
+  listRecords(tableName: string, params?: ListParams): Promise<LowcodbRecord[]> {
+    return this.req({ method: "GET", route: tableRoute(tableName), query: listQueryOf(params), enveloped: true });
+  }
+  countRecords(tableName: string, params?: ListParams): Promise<CountResponse> {
+    return this.req({ method: "GET", route: tableRoute(tableName, "count"), query: listQueryOf(params), enveloped: true });
+  }
+  async createBulkRecords(tableName: string, records: LowcodbRecord[]): Promise<void> {
+    await this.req({ method: "POST", route: tableRoute(tableName, "bulk"), body: records, enveloped: true });
+  }
+  updateBulkRecords(tableName: string, records: LowcodbRecord[]): Promise<RecordsBulkResult> {
+    return this.req({ method: "PUT", route: tableRoute(tableName, "bulk"), body: records, enveloped: true });
+  }
+  async deleteBulkRecords(tableName: string, body: unknown): Promise<void> {
+    await this.req({ method: "DELETE", route: tableRoute(tableName, "bulk"), body, enveloped: true });
+  }
+  getViewRecord(viewName: string, id: string): Promise<LowcodbRecord> {
+    return this.req({ method: "GET", route: viewRoute(viewName, id), enveloped: true });
+  }
+  listViewRecords(viewName: string, params?: ListParams): Promise<LowcodbRecord[]> {
+    return this.req({ method: "GET", route: viewRoute(viewName), query: listQueryOf(params), enveloped: true });
+  }
+  countViewRecords(viewName: string, params?: ListParams): Promise<CountResponse> {
+    return this.req({ method: "GET", route: viewRoute(viewName, "count"), query: listQueryOf(params), enveloped: true });
+  }
+  invokeFunction(functionKey: string, body?: unknown, opts?: FunctionInvokeOptions): Promise<unknown> {
+    return this.req({ method: opts?.method ?? "POST", route: functionRoute(functionKey), body, enveloped: true });
+  }
+  executeTransaction(operations: TransactionOperation[]): Promise<TransactionResult> {
+    return this.req({ method: "POST", route: transactionsRoute(), body: { operations }, enveloped: true });
+  }
+}
+
+function listQueryOf(params?: ListParams): URLSearchParams | null {
+  if (!params) return null;
+  const q = new URLSearchParams();
+  if (params.pageNo !== undefined) q.set("pageNo", String(params.pageNo));
+  if (params.size !== undefined) q.set("size", String(params.size));
+  if (params.filter !== undefined) q.set("filter", params.filter);
+  if (params.sort !== undefined) q.set("sort", params.sort);
+  return q;
 }

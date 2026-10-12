@@ -12,8 +12,54 @@ The API host is always `https://api.lowco.ai`. Every request carries:
 
 | Header           | Purpose                                                        |
 | ---------------- | -------------------------------------------------------------- |
-| `Authorization`  | `Bearer <user-token-or-api-key>` — required; identifies the acting user. |
+| `Authorization`  | `Bearer <user-token>` — identifies the acting user.             |
+| `X-Api-Key`      | `lc_…` API key — instead of `Authorization`. The SDKs pick the header from the token's shape. |
 | `X-Org-Id`       | Tenant ID — scopes reads and writes.                            |
+
+## Where a base's data is served: the gateway
+
+The **management plane** (bases, tables, columns, views, functions, query, …) lives under
+`/v1/lowcodb`. The **data plane** — records, view rows, DB-function invocation and
+transactions — is served only by the base's **API gateway**:
+
+```
+https://api.lowco.ai/gateway/<hash>/v1/<table>[/<id>|/count|/bulk]
+https://api.lowco.ai/gateway/<hash>/v1/views/<view>[/<id>|/count]
+https://api.lowco.ai/gateway/<hash>/v1/fn/<functionKey>
+https://api.lowco.ai/gateway/<hash>/v1/transactions
+```
+
+The manager's `/v1/lowcodb/data/...` and `/v1/lowcodb/fn/...` routes are cluster-internal.
+Every base has a gateway from creation; `GET /v1/lowcodb/bases/{id}/gateway` and
+`GET /v1/lowcodb/bases/gateway-by-schema/{schema}` answer where it is:
+
+```json
+{ "gatewayId": "…", "hash": "WOsqwRyURn", "contextPath": "/gateway/WOsqwRyURn",
+  "url": "https://api.lowco.ai/gateway/WOsqwRyURn",
+  "internalUrl": "http://gateway-svc-…:80/gateway/WOsqwRyURn",
+  "routes": { "tables": "/v1/{table}", "views": "/v1/views/{view}", "functions": "/v1/fn/{key}", "transactions": "/v1/transactions" },
+  "sync": { "status": "synced", "syncedAt": "…", "routeCount": 42 } }
+```
+
+The SDKs keep their `(schema, table)` signatures and resolve the schema's gateway behind
+them (looked up once, cached 10 minutes, looked up again on a 404 — the hash can be
+regenerated). Each also offers:
+
+- a **pinned gateway** per schema (`WithGateway` / `gateways:` / `gateways=` /
+  `gateways:`), for API keys that may call the gateway but not the management API;
+- the **internal origin** (`WithGatewayOrigin(GatewayOriginInternal)` /
+  `gatewayOrigin: "internal"` / `gateway_origin="internal"` / `GatewayOrigin.internal`),
+  for callers inside the cluster;
+- a **GatewayClient** (`client.Gateway(path)` / `client.gateway(path)`) with the same
+  data methods minus the schema, for callers that hold the gateway rather than the base.
+
+The gateway authenticates every call (kavach) and requires a permission per route — the
+platform's `lowcodb.data.tables.read|write|delete`, `lowcodb.data.views.read`,
+`lowcodb.functions.invoke.execute`, `lowcodb.records.transactions.write` unless the
+base's app publishes its own policy. List and count routes forward only `filter`,
+`sort`, `pageNo` and `size`. A plan cap answers **402** with `{"code": "QUOTA_EXCEEDED",
+"meter", "consumed", "included", "hard_cap", "period_end", "app_key", "upgrade": {…}}`,
+which the SDKs raise as `QuotaExceededError` / `QuotaExceededException`.
 
 ```go
 lowcodb.NewClient("<token-or-api-key>", lowcodb.WithOrgID("..."))
@@ -147,19 +193,21 @@ A *base* is a logical database (its own schema, optionally backed by an external
 
 ### Records (table data)
 
-All record routes are scoped to `{schema}` (the base's `schema` field) and `{tableName}` (the table's `name`).
+Served by the base's gateway (see above). `{table}` is the table's key.
 
-| Method | Path                                                         | Purpose                          |
-| ------ | ------------------------------------------------------------ | -------------------------------- |
-| GET    | `/data/{schema}/tables/{tableName}/records`                  | Paginated list.                  |
-| GET    | `/data/{schema}/tables/{tableName}/records/count`            | Row count (honors `filter`).     |
-| GET    | `/data/{schema}/tables/{tableName}/records/{id}`             | Fetch one.                       |
-| POST   | `/data/{schema}/tables/{tableName}/records`                  | Insert.                          |
-| PUT    | `/data/{schema}/tables/{tableName}/records/{id}`             | Update.                          |
-| DELETE | `/data/{schema}/tables/{tableName}/records/{id}`             | Delete one. Returns `{deletedCount}`. |
-| POST   | `/data/{schema}/tables/{tableName}/records/bulk`             | Bulk insert.                     |
-| PUT    | `/data/{schema}/tables/{tableName}/records/bulk`             | Bulk update. Returns `RecordsBulkResult`. |
-| DELETE | `/data/{schema}/tables/{tableName}/records/bulk`             | Bulk delete; body is the criterion. |
+| Method | Path (under `/gateway/<hash>`) | Purpose                          |
+| ------ | ------------------------------ | -------------------------------- |
+| GET    | `/v1/{table}`                  | Paginated list (`filter`, `sort`, `pageNo`, `size`). |
+| GET    | `/v1/{table}/count`            | Row count (honors `filter`).     |
+| GET    | `/v1/{table}/{id}`             | Fetch one.                       |
+| POST   | `/v1/{table}`                  | Insert.                          |
+| PUT    | `/v1/{table}/{id}`             | Update.                          |
+| DELETE | `/v1/{table}/{id}`             | Delete one. Returns `{deletedCount}`. |
+| POST   | `/v1/{table}/bulk`             | Bulk insert.                     |
+| PUT    | `/v1/{table}/bulk`             | Bulk update. Returns `RecordsBulkResult`. |
+| DELETE | `/v1/{table}/bulk`             | Bulk delete; body is the criterion. |
+| POST   | `/v1/transactions`             | Ordered writes in one transaction (internal bases). |
+| *      | `/v1/fn/{functionKey}`         | Invoke an active DB function (methods as it allows). |
 
 Validation errors are returned as `400` with a per-field map (the SDKs surface them through `LowcodbError`/`RequestError`/`LowcodbException`).
 
@@ -176,13 +224,13 @@ Metadata routes:
 | DELETE | `/views/{id}`    | Drop.               |
 | POST   | `/views/{id}/refresh` | Refresh a materialized view; body `{ "concurrent": bool }`. |
 
-Read-only data routes (mirror tables):
+Read-only data routes, on the base's gateway:
 
-| Method | Path                                               | Purpose            |
-| ------ | -------------------------------------------------- | ------------------ |
-| GET    | `/data/{schema}/views/{viewName}/records`          | Paginated list.    |
-| GET    | `/data/{schema}/views/{viewName}/records/count`    | Count.             |
-| GET    | `/data/{schema}/views/{viewName}/records/{id}`     | Fetch one row.     |
+| Method | Path (under `/gateway/<hash>`) | Purpose            |
+| ------ | ------------------------------ | ------------------ |
+| GET    | `/v1/views/{view}`             | Paginated list.    |
+| GET    | `/v1/views/{view}/count`       | Count.             |
+| GET    | `/v1/views/{view}/{id}`        | Fetch one row.     |
 
 ### Triggers
 
@@ -259,18 +307,18 @@ Read-only data routes (mirror tables):
 | `PUT /tables/{tableId}/index/{id}`                      | `UpdateTableIndex`         | `updateTableIndex`       |
 | `GET /tables/{tableId}/indexes`                         | `ListTableIndexes`         | `listTableIndexes`       |
 | `DELETE /tables/{tableId}/index/{id}`                   | `DeleteTableIndex`         | `deleteTableIndex`       |
-| `POST /data/{schema}/tables/{name}/records`             | `CreateRecord`             | `createRecord`           |
-| `GET /data/{schema}/tables/{name}/records`              | `ListRecords`              | `listRecords`            |
-| `GET /data/{schema}/tables/{name}/records/{id}`         | `GetRecord`                | `getRecord`              |
-| `PUT /data/{schema}/tables/{name}/records/{id}`         | `UpdateRecord`             | `updateRecord`           |
-| `DELETE /data/{schema}/tables/{name}/records/{id}`      | `DeleteRecord`             | `deleteRecord`           |
-| `GET /data/{schema}/tables/{name}/records/count`        | `CountRecords`             | `countRecords`           |
-| `POST /data/{schema}/tables/{name}/records/bulk`        | `CreateBulkRecords`        | `createBulkRecords`      |
-| `PUT /data/{schema}/tables/{name}/records/bulk`         | `UpdateBulkRecords`        | `updateBulkRecords`      |
-| `DELETE /data/{schema}/tables/{name}/records/bulk`      | `DeleteBulkRecords`        | `deleteBulkRecords`      |
-| `GET /data/{schema}/views/{name}/records`               | `ListViewRecords`          | `listViewRecords`        |
-| `GET /data/{schema}/views/{name}/records/{id}`          | `GetViewRecord`            | `getViewRecord`          |
-| `GET /data/{schema}/views/{name}/records/count`         | `CountViewRecords`         | `countViewRecords`       |
+| `POST /gateway/<hash>/v1/{table}`                        | `CreateRecord`             | `createRecord`           |
+| `GET /gateway/<hash>/v1/{table}`                         | `ListRecords`              | `listRecords`            |
+| `GET /gateway/<hash>/v1/{table}/{id}`                    | `GetRecord`                | `getRecord`              |
+| `PUT /gateway/<hash>/v1/{table}/{id}`                    | `UpdateRecord`             | `updateRecord`           |
+| `DELETE /gateway/<hash>/v1/{table}/{id}`                 | `DeleteRecord`             | `deleteRecord`           |
+| `GET /gateway/<hash>/v1/{table}/count`                   | `CountRecords`             | `countRecords`           |
+| `POST /gateway/<hash>/v1/{table}/bulk`                   | `CreateBulkRecords`        | `createBulkRecords`      |
+| `PUT /gateway/<hash>/v1/{table}/bulk`                    | `UpdateBulkRecords`        | `updateBulkRecords`      |
+| `DELETE /gateway/<hash>/v1/{table}/bulk`                 | `DeleteBulkRecords`        | `deleteBulkRecords`      |
+| `GET /gateway/<hash>/v1/views/{view}`                    | `ListViewRecords`          | `listViewRecords`        |
+| `GET /gateway/<hash>/v1/views/{view}/{id}`               | `GetViewRecord`            | `getViewRecord`          |
+| `GET /gateway/<hash>/v1/views/{view}/count`         | `CountViewRecords`         | `countViewRecords`       |
 | `GET /views`                                            | `ListViews`                | `listViews`              |
 | `POST /views`                                           | `CreateView`               | `createView`             |
 | `GET /views/{id}`                                       | `GetView`                  | `getView`                |

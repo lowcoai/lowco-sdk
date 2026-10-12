@@ -1,6 +1,6 @@
 name: lowcoai_lowcodb
 description: Official Dart and Flutter client for the lowco lowcodb manager service (bases, tables, records, views, DB functions).
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/lowcoai/lowco-sdk/tree/main/flutter/lowcodb
 topics:
   - lowco

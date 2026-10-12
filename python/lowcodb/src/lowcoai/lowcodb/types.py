@@ -10,6 +10,9 @@ from typing import Any, Literal
 from typing_extensions import Required, TypedDict
 
 __all__ = [
+    "GatewayInfo",
+    "GatewayRouteTemplates",
+    "GatewaySyncInfo",
     "APIErrorPayload",
     "Base",
     "BaseEntity",
@@ -350,3 +353,34 @@ class APIErrorPayload(TypedDict, total=False):
     """The opaque platform code (``"AAS-00105"``), *not* the human message."""
     details: str | dict[str, Any]
     """Where the real message actually lives. A string on the wire."""
+
+class GatewayRouteTemplates(TypedDict, total=False):
+    """Path templates a base gateway serves under its context path."""
+
+    tables: str
+    views: str
+    functions: str
+    transactions: str
+
+
+class GatewaySyncInfo(TypedDict, total=False):
+    """Route sync state of a base's gateway."""
+
+    status: str
+    syncedAt: str
+    routeCount: int
+    error: str
+
+
+class GatewayInfo(TypedDict, total=False):
+    """Where a base's data is served: its API gateway (``GET /bases/{id}/gateway``)."""
+
+    gatewayId: str
+    hash: str
+    contextPath: str
+    url: str
+    internalUrl: str
+    gatewayType: str
+    routes: GatewayRouteTemplates
+    sync: GatewaySyncInfo
+

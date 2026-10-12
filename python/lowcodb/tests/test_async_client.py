@@ -22,6 +22,8 @@ async def test_async_request_roundtrip() -> None:
     seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if "gateway-by-schema" in request.url.path:
+            return httpx.Response(200, json={"data": {"gatewayId": "gw", "hash": "h1", "contextPath": "/gateway/h1", "url": "https://api.lowco.ai/gateway/h1"}})
         seen.append(request)
         return httpx.Response(200, json={"data": {"id": "r1", "name": "Ada"}})
 
@@ -30,7 +32,7 @@ async def test_async_request_roundtrip() -> None:
     assert row == {"id": "r1", "name": "Ada"}
     req = seen[0]
     assert req.method == "POST"
-    assert req.url.path == "/v1/lowcodb/data/app_crm/tables/leads/records"
+    assert req.url.path == "/gateway/h1/v1/leads"
     assert req.headers["Authorization"] == "Bearer tok_123"
     assert req.headers["X-Org-Id"] == "org_1"
     assert json.loads(req.content) == {"name": "Ada"}
@@ -67,8 +69,11 @@ def test_sync_and_async_clients_expose_the_same_api() -> None:
     async_.pop("aclose")
     assert sync.keys() == async_.keys()
     for name, sig in sync.items():
-        assert str(sig) == str(async_[name]), name
+        # gateway() returns GatewayClient / AsyncGatewayClient: same shape, different class.
+        if name != "gateway":
+            assert str(sig) == str(async_[name]), name
         assert inspect.iscoroutinefunction(getattr(AsyncLowcodbClient, name)) or name in {
             "set_org_id",
             "set_header",
+            "gateway",
         }, name

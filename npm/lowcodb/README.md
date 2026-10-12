@@ -58,7 +58,7 @@ return { lead };`,
 // Console/test run — full result with logs and errors:
 const run = await client.executeFunction(fn.id!, { email: "a@b.co", score: 10 });
 
-// Data-plane invocation (what the gateway proxies /v1/fn/{key} to):
+// Invoke through the base's gateway (/gateway/<hash>/v1/fn/{key}):
 const out = await client.invokeFunction(base.schema!, fn.functionKey!, { email: "a@b.co" });
 ```
 
@@ -76,6 +76,22 @@ const { results } = await client.executeTransaction(base.schema!, [
 // Publish a data event on the platform bus:
 await client.publishEvent(base.schema!, { eventType: "order.placed", record: { id: "o1" } });
 ```
+
+## Data goes through the base's gateway
+
+Records, view rows, DB functions and transactions are served by the base's API gateway
+(`https://api.lowco.ai/gateway/<hash>/v1/...`); the manager's data routes are
+cluster-internal. The methods above keep their `(schema, table)` arguments — the client
+resolves the schema's gateway once (`getGateway`) and caches it. Options:
+
+```ts
+new LowcodbClient({ token, gateways: { app_crm: "/gateway/WOsqwRyURn" } }); // pin
+new LowcodbClient({ token, gatewayOrigin: "internal" });                     // in-cluster address
+const g = client.gateway("/gateway/WOsqwRyURn");                             // schema-less GatewayClient
+```
+
+An `lc_` API key is sent as `X-Api-Key`, a user token as `Authorization: Bearer`. A plan
+cap answers 402 → `QuotaExceededError` (`isQuotaExceeded(err)`).
 
 ## Options
 

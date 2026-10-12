@@ -86,3 +86,4 @@ The wrapper triggers `loginWithRedirect()` when the user isn't authenticated and
 - Uses `crypto.subtle` for PKCE — requires a secure context (HTTPS or `localhost`).
 - Stores tokens under `lowco:tokens:<tenantId>:<clientId>` (localStorage or in-memory).
 - The provider auto-refreshes a minute before expiry when a `refresh_token` is present, and falls back to `loginWithRedirect` on refresh failure.
+- Refresh tokens are single-use (the server rotates them), so tabs sharing localStorage refresh one at a time under a Web Lock and adopt the tokens another tab stored instead of replaying a rotated one.

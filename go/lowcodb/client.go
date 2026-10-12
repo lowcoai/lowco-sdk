@@ -27,6 +27,7 @@ type Client struct {
 	apiBasePath string
 	httpClient  *http.Client
 	headers     http.Header
+	gatewayState
 }
 
 // NewClient returns a Client targeting DefaultBaseURL. token is required –
@@ -48,11 +49,29 @@ func NewClient(token string, opts ...Option) (*Client, error) {
 		httpClient:  &http.Client{Timeout: 30 * time.Second},
 		headers:     make(http.Header),
 	}
-	c.headers.Set("Authorization", "Bearer "+token)
+	setCredential(c.headers, token)
 	for _, opt := range opts {
 		opt(c)
 	}
 	return c, nil
+}
+
+// HeaderAPIKey carries an lc_ API key, which is how the gateway (and the API) expect
+// one; user tokens travel as Authorization: Bearer.
+const HeaderAPIKey = "X-Api-Key"
+
+// IsAPIKey reports whether token is a Lowco API key rather than a user token.
+func IsAPIKey(token string) bool {
+	return strings.HasPrefix(strings.TrimSpace(token), "lc_")
+}
+
+func setCredential(h http.Header, token string) {
+	token = strings.TrimSpace(token)
+	if IsAPIKey(token) {
+		h.Set(HeaderAPIKey, token)
+		return
+	}
+	h.Set("Authorization", "Bearer "+token)
 }
 
 // WithHTTPClient overrides the default http.Client (30s timeout).
@@ -297,11 +316,15 @@ func (c *Client) DeleteTableIndex(ctx context.Context, tableID, id string) error
 	return c.do(ctx, http.MethodDelete, c.apiPath("tables", tableID, "index", id), nil, nil, nil, true)
 }
 
-// --- Records -------------------------------------------------------------
+// --- Records (through the base's gateway) ---------------------------------
+//
+// Records, view rows, DB functions and transactions are served by the base's API
+// gateway; the manager's data routes are cluster-internal. The schema argument names
+// the base, whose gateway is resolved (and cached) by the client — see gateway.go.
 
 func (c *Client) CreateRecord(ctx context.Context, schema, tableName string, record Record) (*Record, error) {
 	var out Record
-	if err := c.do(ctx, http.MethodPost, c.dataPath(schema, "tables", tableName, "records"), nil, record, &out, true); err != nil {
+	if err := c.dataDo(ctx, schema, http.MethodPost, tableRoute(tableName), nil, record, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -309,7 +332,7 @@ func (c *Client) CreateRecord(ctx context.Context, schema, tableName string, rec
 
 func (c *Client) GetRecord(ctx context.Context, schema, tableName, id string) (*Record, error) {
 	var out Record
-	if err := c.do(ctx, http.MethodGet, c.dataPath(schema, "tables", tableName, "records", id), nil, nil, &out, true); err != nil {
+	if err := c.dataDo(ctx, schema, http.MethodGet, tableRoute(tableName, id), nil, nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -317,7 +340,7 @@ func (c *Client) GetRecord(ctx context.Context, schema, tableName, id string) (*
 
 func (c *Client) UpdateRecord(ctx context.Context, schema, tableName, id string, record Record) (*Record, error) {
 	var out Record
-	if err := c.do(ctx, http.MethodPut, c.dataPath(schema, "tables", tableName, "records", id), nil, record, &out, true); err != nil {
+	if err := c.dataDo(ctx, schema, http.MethodPut, tableRoute(tableName, id), nil, record, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -325,7 +348,7 @@ func (c *Client) UpdateRecord(ctx context.Context, schema, tableName, id string,
 
 func (c *Client) DeleteRecord(ctx context.Context, schema, tableName, id string) (*DeleteCountResponse, error) {
 	var out DeleteCountResponse
-	if err := c.do(ctx, http.MethodDelete, c.dataPath(schema, "tables", tableName, "records", id), nil, nil, &out, true); err != nil {
+	if err := c.dataDo(ctx, schema, http.MethodDelete, tableRoute(tableName, id), nil, nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -333,7 +356,7 @@ func (c *Client) DeleteRecord(ctx context.Context, schema, tableName, id string)
 
 func (c *Client) ListRecords(ctx context.Context, schema, tableName string, params *ListParams) ([]Record, error) {
 	var out []Record
-	if err := c.do(ctx, http.MethodGet, c.dataPath(schema, "tables", tableName, "records"), params.values(), nil, &out, true); err != nil {
+	if err := c.dataDo(ctx, schema, http.MethodGet, tableRoute(tableName), params.values(), nil, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -341,19 +364,19 @@ func (c *Client) ListRecords(ctx context.Context, schema, tableName string, para
 
 func (c *Client) CountRecords(ctx context.Context, schema, tableName string, params *ListParams) (*CountResponse, error) {
 	var out CountResponse
-	if err := c.do(ctx, http.MethodGet, c.dataPath(schema, "tables", tableName, "records", "count"), params.values(), nil, &out, true); err != nil {
+	if err := c.dataDo(ctx, schema, http.MethodGet, tableRoute(tableName, "count"), params.values(), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
 }
 
 func (c *Client) CreateBulkRecords(ctx context.Context, schema, tableName string, records []Record) error {
-	return c.do(ctx, http.MethodPost, c.dataPath(schema, "tables", tableName, "records", "bulk"), nil, records, nil, true)
+	return c.dataDo(ctx, schema, http.MethodPost, tableRoute(tableName, "bulk"), nil, records, nil)
 }
 
 func (c *Client) UpdateBulkRecords(ctx context.Context, schema, tableName string, records []Record) (*RecordsBulkResult, error) {
 	var out RecordsBulkResult
-	if err := c.do(ctx, http.MethodPut, c.dataPath(schema, "tables", tableName, "records", "bulk"), nil, records, &out, true); err != nil {
+	if err := c.dataDo(ctx, schema, http.MethodPut, tableRoute(tableName, "bulk"), nil, records, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -362,14 +385,14 @@ func (c *Client) UpdateBulkRecords(ctx context.Context, schema, tableName string
 // DeleteBulkRecords accepts any JSON-marshalable body (typically an array of
 // ids or filter clauses) – the manager treats it as the deletion criterion.
 func (c *Client) DeleteBulkRecords(ctx context.Context, schema, tableName string, body any) error {
-	return c.do(ctx, http.MethodDelete, c.dataPath(schema, "tables", tableName, "records", "bulk"), nil, body, nil, true)
+	return c.dataDo(ctx, schema, http.MethodDelete, tableRoute(tableName, "bulk"), nil, body, nil)
 }
 
 // --- View data -----------------------------------------------------------
 
 func (c *Client) GetViewRecord(ctx context.Context, schema, viewName, id string) (*Record, error) {
 	var out Record
-	if err := c.do(ctx, http.MethodGet, c.dataPath(schema, "views", viewName, "records", id), nil, nil, &out, true); err != nil {
+	if err := c.dataDo(ctx, schema, http.MethodGet, viewRoute(viewName, id), nil, nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -377,7 +400,7 @@ func (c *Client) GetViewRecord(ctx context.Context, schema, viewName, id string)
 
 func (c *Client) ListViewRecords(ctx context.Context, schema, viewName string, params *ListParams) ([]Record, error) {
 	var out []Record
-	if err := c.do(ctx, http.MethodGet, c.dataPath(schema, "views", viewName, "records"), params.values(), nil, &out, true); err != nil {
+	if err := c.dataDo(ctx, schema, http.MethodGet, viewRoute(viewName), params.values(), nil, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -385,7 +408,7 @@ func (c *Client) ListViewRecords(ctx context.Context, schema, viewName string, p
 
 func (c *Client) CountViewRecords(ctx context.Context, schema, viewName string, params *ListParams) (*CountResponse, error) {
 	var out CountResponse
-	if err := c.do(ctx, http.MethodGet, c.dataPath(schema, "views", viewName, "records", "count"), params.values(), nil, &out, true); err != nil {
+	if err := c.dataDo(ctx, schema, http.MethodGet, viewRoute(viewName, "count"), params.values(), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -639,20 +662,6 @@ func (c *Client) apiPath(parts ...string) string {
 	return "/" + strings.Join(pathParts, "/")
 }
 
-func (c *Client) dataPath(schema, objectType, objectName string, parts ...string) string {
-	pathParts := []string{
-		strings.Trim(c.apiBasePath, "/"),
-		"data",
-		strings.Trim(schema, "/"),
-		objectType,
-		strings.Trim(objectName, "/"),
-	}
-	for _, part := range parts {
-		pathParts = append(pathParts, strings.Trim(part, "/"))
-	}
-	return "/" + strings.Join(pathParts, "/")
-}
-
 func (c *Client) do(ctx context.Context, method, endpoint string, query url.Values, body, out any, enveloped bool) error {
 	respBody, status, err := c.doRaw(ctx, method, endpoint, query, body)
 	if err != nil {
@@ -757,10 +766,16 @@ func parseRequestError(status int, body []byte) error {
 			message = env.Message
 		}
 	}
-	return &RequestError{
+	reqErr := &RequestError{
 		StatusCode: status,
 		Message:    message,
 		Code:       code,
 		Body:       string(body),
 	}
+	if status == http.StatusPaymentRequired {
+		if q := parseQuotaExceeded(reqErr, body); q != nil {
+			return q
+		}
+	}
+	return reqErr
 }

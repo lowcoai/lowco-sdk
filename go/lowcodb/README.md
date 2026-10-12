@@ -72,6 +72,22 @@ func main() {
 }
 ```
 
+## Data goes through the base's gateway
+
+Records, view rows, DB functions and transactions are served by the base's API gateway
+(`https://api.lowco.ai/gateway/<hash>/v1/...`); the manager's data routes are
+cluster-internal. The methods above keep their `(schema, table)` arguments — the client
+resolves the schema's gateway once (`GetGateway`) and caches it. Options:
+
+```go
+lowcodb.WithGateway("app_crm", "/gateway/WOsqwRyURn")      // pin: never looked up
+lowcodb.WithGatewayOrigin(lowcodb.GatewayOriginInternal)    // in-cluster address
+g := client.Gateway("/gateway/WOsqwRyURn")                   // schema-less GatewayClient
+```
+
+An `lc_` API key is sent as `X-Api-Key`, a user token as `Authorization: Bearer`. A plan
+cap answers 402 → `*lowcodb.QuotaExceededError` (`errors.As`; `IsQuotaExceeded`).
+
 ## Options
 
 | Option | Description |

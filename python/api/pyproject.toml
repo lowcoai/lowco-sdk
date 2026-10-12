@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lowcoai-api"
+version = "1.1.0"
+description = "Official Python client for the Lowco API: PDF, render, OCR, Document AI, QR and barcodes, with jobs, file inputs, webhooks and typed errors."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+dependencies = [
+    "typing-extensions>=4.7; python_version < '3.11'",
+]
+keywords = ["lowco", "pdf", "ocr", "document-ai", "invoice", "gst", "qr", "upi", "sdk"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Repository = "https://github.com/lowcoai/lowco-sdk"
+Source = "https://github.com/lowcoai/lowco-sdk/tree/main/python/api"
+
+[project.optional-dependencies]
+dev = ["mypy>=1.10", "ruff>=0.5"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lowcoai"]
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+explicit_package_bases = true
+warn_return_any = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+extend-exclude = ["src/lowcoai/api/_generated.py"]
