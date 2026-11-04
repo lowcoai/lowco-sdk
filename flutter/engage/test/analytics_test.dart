@@ -126,6 +126,57 @@ void main() {
       }
     });
 
+    test('no X-Engage-App-Id or X-Api-Key by default', () async {
+      await init();
+      await analytics().track('x');
+      final headers = rec.requests.single.headers;
+      expect(headers.containsKey('X-Engage-App-Id'), isFalse);
+      expect(headers.containsKey('X-Api-Key'), isFalse);
+    });
+
+    test('appId is sent as X-Engage-App-Id on every event', () async {
+      await init(cfg: const EngageConfig(apiKey: 'key_secret', orgId: 'org_1', appId: ' app_42 '));
+      await analytics().track('x');
+      await analytics().page();
+      await analytics().identifyUser('u1');
+      expect([for (final r in rec.requests) r.headers['X-Engage-App-Id']],
+          ['app_42', 'app_42', 'app_42']);
+      expect(rec.requests.last.headers['X-Org-Id'], 'org_1');
+    });
+
+    test('a blank appId means the default app', () async {
+      await init(cfg: const EngageConfig(apiKey: 'key_secret', orgId: 'org_1', appId: '  '));
+      await analytics().track('x');
+      expect(rec.requests.single.headers.containsKey('X-Engage-App-Id'), isFalse);
+    });
+
+    test('an lc_ API key is sent as X-Api-Key, not Authorization', () async {
+      await init(cfg: const EngageConfig(apiKey: ' lc_secret ', orgId: 'org_1', appId: 'app_7'));
+      await analytics().track('x');
+      final headers = rec.requests.single.headers;
+      expect(headers['X-Api-Key'], 'lc_secret');
+      expect(headers.containsKey('Authorization'), isFalse);
+      expect(headers['X-Org-Id'], 'org_1');
+      expect(headers['X-Engage-App-Id'], 'app_7');
+    });
+
+    test('isApiKey and trackHeaders', () {
+      expect(isApiKey('lc_abc'), isTrue);
+      expect(isApiKey('  lc_abc'), isTrue);
+      expect(isApiKey('eyJhbGciOi.token'), isFalse);
+      expect(trackHeaders(const EngageConfig(apiKey: 'tok', orgId: 'o')), {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer tok',
+        headerOrgId: 'o',
+      });
+      expect(trackHeaders(const EngageConfig(apiKey: 'lc_k', orgId: 'o', appId: 'a')), {
+        'Content-Type': 'application/json',
+        headerApiKey: 'lc_k',
+        headerOrgId: 'o',
+        headerEngageAppId: 'a',
+      });
+    });
+
     test('event_time is UTC with millisecond precision', () async {
       clock.current = DateTime.fromMicrosecondsSinceEpoch(1790000000123456);
       await init();
