@@ -11,11 +11,15 @@ import pytest
 
 from lowcoai.engage import (
     ATTRIBUTION_KEYS,
+    HEADER_API_KEY,
+    HEADER_ENGAGE_APP_ID,
+    HEADER_ORG_ID,
     DeviceInfo,
     EngageClient,
     EngageError,
     LocationInfo,
     attribution_from_url,
+    is_api_key,
 )
 
 FIXED = datetime(2026, 9, 30, 12, 34, 56, 789123, tzinfo=timezone.utc)
@@ -92,6 +96,62 @@ def test_track_sends_one_event_with_headers_and_url() -> None:
         "session_id",
         "event_time",
     ]
+
+
+def test_no_app_header_by_default() -> None:
+    rec = Recorder()
+    client = make_client(rec)
+    client.track("x")
+    assert "X-Engage-App-Id" not in rec.last.headers
+    assert "X-Api-Key" not in rec.last.headers
+    assert client.app_id is None
+
+
+def test_app_id_is_sent_as_engage_app_header() -> None:
+    rec = Recorder()
+    client = make_client(rec, app_id=" app_42 ")
+    assert client.app_id == "app_42"
+    client.track("x")
+    client.page()
+    client.identify_user("u1")
+    assert [r.headers["X-Engage-App-Id"] for r in rec.requests] == ["app_42"] * 3
+    assert rec.last.headers["X-Org-Id"] == "org_1"
+
+
+@pytest.mark.parametrize("app_id", ["", "   "])
+def test_blank_app_id_means_default_app(app_id: str) -> None:
+    rec = Recorder()
+    client = make_client(rec, app_id=app_id)
+    client.track("x")
+    assert client.app_id is None
+    assert "X-Engage-App-Id" not in rec.last.headers
+
+
+def test_lc_api_key_is_sent_as_x_api_key() -> None:
+    rec = Recorder()
+    client = EngageClient(
+        " lc_secret ",
+        "org_1",
+        app_id="app_7",
+        http_client=httpx.Client(transport=httpx.MockTransport(rec)),
+    )
+    client.track("x")
+    assert rec.last.headers["X-Api-Key"] == "lc_secret"
+    assert "Authorization" not in rec.last.headers
+    assert rec.last.headers["X-Org-Id"] == "org_1"
+    assert rec.last.headers["X-Engage-App-Id"] == "app_7"
+
+
+def test_is_api_key() -> None:
+    assert is_api_key("lc_abc")
+    assert is_api_key("  lc_abc")
+    assert not is_api_key("eyJhbGciOi.token")
+    assert not is_api_key("LC_abc")
+    assert (HEADER_API_KEY, HEADER_ORG_ID, HEADER_ENGAGE_APP_ID) == (
+        "X-Api-Key",
+        "X-Org-Id",
+        "X-Engage-App-Id",
+    )
 
 
 def test_none_fields_are_omitted_and_event_data_defaults_to_empty() -> None:

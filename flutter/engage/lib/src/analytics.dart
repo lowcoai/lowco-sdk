@@ -19,6 +19,16 @@ const String engageTrackPath = '/v1/engage/track';
 /// Header carrying the organization id.
 const String headerOrgId = 'X-Org-Id';
 
+/// Header carrying an `lc_` API key; other tokens travel as
+/// `Authorization: Bearer`.
+const String headerApiKey = 'X-Api-Key';
+
+/// Header selecting the engage app; absent means the org's default app.
+const String headerEngageAppId = 'X-Engage-App-Id';
+
+/// Whether [apiKey] is a Lowco API key (`lc_…`) rather than an access token.
+bool isApiKey(String apiKey) => apiKey.trim().startsWith('lc_');
+
 /// Storage key of the persistent device (anonymous) id.
 const String deviceIdStorageKey = 'lowco_uuid';
 
@@ -328,11 +338,7 @@ class LowcoAnalytics {
     try {
       final abort = Completer<void>();
       final request = http.AbortableRequest('POST', _trackUri, abortTrigger: abort.future)
-        ..headers.addAll({
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${config.apiKey}',
-          headerOrgId: config.orgId,
-        })
+        ..headers.addAll(trackHeaders(config))
         ..bodyBytes = utf8.encode(jsonEncode(event.toJson(), toEncodable: _toEncodable));
       final response = await client.send(request).then(http.Response.fromStream).timeout(
         _requestTimeout,
@@ -391,6 +397,20 @@ class LowcoAnalytics {
     _http = null;
     _ownsHttp = false;
   }
+}
+
+/// The headers of a track request: the credential (`X-Api-Key` for an `lc_`
+/// API key, otherwise `Authorization: Bearer`), `X-Org-Id`, and
+/// `X-Engage-App-Id` when [EngageConfig.appId] is set.
+Map<String, String> trackHeaders(EngageConfig config) {
+  final apiKey = config.apiKey.trim();
+  final appId = config.appId?.trim();
+  return {
+    'Content-Type': 'application/json',
+    if (isApiKey(apiKey)) headerApiKey: apiKey else 'Authorization': 'Bearer $apiKey',
+    headerOrgId: config.orgId,
+    if (appId != null && appId.isNotEmpty) headerEngageAppId: appId,
+  };
 }
 
 /// Extracts the [attributionKeys] from [uri]'s query string and from the query

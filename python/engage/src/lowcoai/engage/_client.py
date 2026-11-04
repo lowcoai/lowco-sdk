@@ -24,7 +24,9 @@ class EngageClient(BaseClient):
     """Server-side client for the lowco engage track API.
 
     Every call sends one event to ``POST https://api.lowco.ai/v1/engage/track``
-    with ``Authorization: Bearer <api_key>`` and ``X-Org-Id: <org_id>``.
+    with the credential (``X-Api-Key`` for an ``lc_`` API key, otherwise
+    ``Authorization: Bearer``), ``X-Org-Id: <org_id>`` and, when ``app_id`` is
+    set, ``X-Engage-App-Id: <app_id>``.
 
     Unlike the browser SDK, the client is **stateless**: it never remembers a
     user id (``identify_user`` does not bind later events to that user), keeps
@@ -43,21 +45,26 @@ class EngageClient(BaseClient):
         api_key: str,
         org_id: str,
         *,
+        app_id: str | None = None,
         device_id: str | None = None,
         timeout: float | None = DEFAULT_TIMEOUT,
         http_client: httpx.Client | None = None,
     ) -> None:
         """
         Args:
-            api_key: Engage API key, sent as ``Authorization: Bearer <api_key>``. Required.
+            api_key: Credential. Required. An ``lc_`` API key is sent as
+                ``X-Api-Key``; anything else (an OAuth2 access token) as
+                ``Authorization: Bearer <api_key>``.
             org_id: Organisation id, sent as the ``X-Org-Id`` header. Required.
+            app_id: Engage app to track into, sent as ``X-Engage-App-Id``.
+                Optional: without it events go to the org's default app.
             device_id: Default ``device_id`` for events that don't pass one.
                 Defaults to a uuid4 generated for this client instance.
             timeout: Per-request timeout in seconds (default 30). ``None`` disables it.
             http_client: Custom ``httpx.Client`` (proxies, retries, mocks). It is
                 not closed by :meth:`close`.
         """
-        super().__init__(api_key, org_id, device_id=device_id)
+        super().__init__(api_key, org_id, app_id=app_id, device_id=device_id)
         self._timeout = timeout
         self._owns_http = http_client is None
         self._http = http_client if http_client is not None else httpx.Client()
@@ -181,21 +188,26 @@ class AsyncEngageClient(BaseClient):
         api_key: str,
         org_id: str,
         *,
+        app_id: str | None = None,
         device_id: str | None = None,
         timeout: float | None = DEFAULT_TIMEOUT,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         """
         Args:
-            api_key: Engage API key, sent as ``Authorization: Bearer <api_key>``. Required.
+            api_key: Credential. Required. An ``lc_`` API key is sent as
+                ``X-Api-Key``; anything else (an OAuth2 access token) as
+                ``Authorization: Bearer <api_key>``.
             org_id: Organisation id, sent as the ``X-Org-Id`` header. Required.
+            app_id: Engage app to track into, sent as ``X-Engage-App-Id``.
+                Optional: without it events go to the org's default app.
             device_id: Default ``device_id`` for events that don't pass one.
                 Defaults to a uuid4 generated for this client instance.
             timeout: Per-request timeout in seconds (default 30). ``None`` disables it.
             http_client: Custom ``httpx.AsyncClient`` (proxies, retries, mocks). It is
                 not closed by :meth:`aclose`.
         """
-        super().__init__(api_key, org_id, device_id=device_id)
+        super().__init__(api_key, org_id, app_id=app_id, device_id=device_id)
         self._timeout = timeout
         self._owns_http = http_client is None
         self._http = http_client if http_client is not None else httpx.AsyncClient()

@@ -9,15 +9,21 @@ class EngageConfig {
   const EngageConfig({
     required this.apiKey,
     required this.orgId,
+    this.appId,
     this.autoTrack = false,
     this.onError,
   });
 
-  /// API key, sent as `Authorization: Bearer <apiKey>`. Never logged.
+  /// Credential. Never logged. An `lc_…` API key is sent as `X-Api-Key`;
+  /// anything else (an OAuth2 access token) as `Authorization: Bearer <apiKey>`.
   final String apiKey;
 
   /// Organization id, sent as the `X-Org-Id` header.
   final String orgId;
+
+  /// Engage app to track into, sent as `X-Engage-App-Id`. Optional: when
+  /// `null` or blank, events go to the org's default app.
+  final String? appId;
 
   /// On web, also capture attribution from the page URL (`Uri.base`) during
   /// `init`. Route page views come from `LowcoAnalyticsObserver`.
@@ -28,7 +34,8 @@ class EngageConfig {
   final void Function(Object error)? onError;
 
   @override
-  String toString() => 'EngageConfig(orgId: $orgId, autoTrack: $autoTrack, apiKey: <redacted>)';
+  String toString() =>
+      'EngageConfig(orgId: $orgId, appId: $appId, autoTrack: $autoTrack, apiKey: <redacted>)';
 }
 
 /// `device_info.browser` (web only).
