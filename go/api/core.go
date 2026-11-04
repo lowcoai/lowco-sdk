@@ -21,6 +21,7 @@ var sprintf = fmt.Sprintf
 
 type core struct {
 	key     string
+	org     string
 	base    string
 	http    *http.Client
 	retries int
@@ -111,6 +112,9 @@ func (c *core) send(ctx context.Context, in sendInput) (*rawAnswer, error) {
 		}
 		if in.auth {
 			req.Header.Set("Authorization", "Bearer "+c.key)
+			if c.org != "" {
+				req.Header.Set("X-Org-Id", c.org)
+			}
 		}
 		if id := in.callOptions.requestID; id != "" {
 			req.Header.Set("X-Request-Id", id)
@@ -363,7 +367,7 @@ func (c *core) operation(ctx context.Context, path, inputKind string, main FileI
 				return f, nil
 			}
 			var stored StoredFile
-			if err := c.upload(ctx, "/v1/files", f, &stored, nil); err != nil {
+			if err := c.upload(ctx, "/v1/lowco-api/files", f, &stored, nil); err != nil {
 				return nil, err
 			}
 			return &fileRef{kind: "id", value: stored.FileID, password: f.password}, nil
@@ -490,7 +494,7 @@ func (c *core) waitForJob(ctx context.Context, jobID string, opts []WaitOption) 
 	}
 	deadline := time.Now().Add(w.timeout)
 	for {
-		raw, err := c.send(ctx, sendInput{method: http.MethodGet, url: c.url("/v1/jobs/"+url.PathEscape(jobID), nil), auth: true, retrySafe: true})
+		raw, err := c.send(ctx, sendInput{method: http.MethodGet, url: c.url("/v1/lowco-api/jobs/"+url.PathEscape(jobID), nil), auth: true, retrySafe: true})
 		if err != nil {
 			return nil, err
 		}

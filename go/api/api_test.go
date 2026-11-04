@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/lowcoai/lowco-sdk/go/api"
+	api "github.com/lowcoai/lowco-sdk/go/api/v2"
 )
 
 var png = []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
@@ -39,7 +39,7 @@ func env(data any) []byte { b, _ := json.Marshal(map[string]any{"status": 1, "da
 func job(id, status string, extra map[string]any) map[string]any {
 	j := map[string]any{"job_id": id, "service": "docai", "operation": "invoice", "status": status, "progress": nil, "input": map[string]any{},
 		"result": nil, "error": nil, "usage": nil, "attempts": 1, "created_at": "2026-10-09T09:30:00Z", "started_at": nil, "finished_at": nil,
-		"expires_at": "2026-10-16T09:30:00Z", "links": map[string]any{"self": "/v1/jobs/" + id, "cancel": "/v1/jobs/" + id + "/cancel"}}
+		"expires_at": "2026-10-16T09:30:00Z", "links": map[string]any{"self": "/v1/lowco-api/jobs/" + id, "cancel": "/v1/lowco-api/jobs/" + id + "/cancel"}}
 	for k, v := range extra {
 		j[k] = v
 	}
@@ -70,25 +70,25 @@ func newMock(t *testing.T) *mock {
 			b, _ := json.Marshal(map[string]any{"status": 0, "error": map[string]any{"code": status, "reason": reason, "message": msg, "param": param, "request_id": "req_err", "doc_url": "https://docs.lowco.ai/api/errors#" + reason}})
 			return b
 		}
-		if r.Header.Get("Authorization") != "Bearer lc_test_sdk" && !strings.HasPrefix(r.URL.Path, "/v1/downloads/") {
+		if r.Header.Get("Authorization") != "Bearer lc_test_sdk" && !strings.HasPrefix(r.URL.Path, "/v1/lowco-api/downloads/") {
 			send(401, apiErr(401, "missing_key", "No key", ""))
 			return
 		}
 		switch r.Method + " " + r.URL.Path {
-		case "POST /v1/qr/generate":
+		case "POST /v1/lowco-api/qr/generate":
 			if r.Header.Get("Accept") == "image/png" {
 				w.Header().Set("Content-Type", "image/png")
 				_, _ = w.Write(png)
 				return
 			}
 			send(200, env(map[string]any{"format": "png", "width": 512}), "X-Lowco-Credits-Used", "0.0500")
-		case "POST /v1/docai/invoice":
+		case "POST /v1/lowco-api/docai/invoice":
 			if q["mode"] == "async" {
 				send(202, env(job("job_inv", "queued", nil)), "Retry-After", "0")
 				return
 			}
 			send(200, env(map[string]any{}))
-		case "GET /v1/jobs/job_inv":
+		case "GET /v1/lowco-api/jobs/job_inv":
 			m.mu.Lock()
 			m.polls++
 			n := m.polls
@@ -98,25 +98,25 @@ func newMock(t *testing.T) *mock {
 				return
 			}
 			send(200, env(job("job_inv", "succeeded", map[string]any{"result": map[string]any{"invoice_number": map[string]any{"value": "INV-1", "confidence": 0.98, "source": map[string]any{"page": 1}}}})))
-		case "GET /v1/jobs/job_bad":
+		case "GET /v1/lowco-api/jobs/job_bad":
 			send(200, env(job("job_bad", "failed", map[string]any{"error": map[string]any{"code": 422, "reason": "file_corrupt", "message": "The file is not a readable PDF.", "doc_url": "x"}})))
-		case "GET /v1/jobs/job_slow":
+		case "GET /v1/lowco-api/jobs/job_slow":
 			send(200, env(job("job_slow", "processing", nil)), "Retry-After", "0")
-		case "GET /v1/jobs":
+		case "GET /v1/lowco-api/jobs":
 			if q["cursor"] == "" {
 				send(200, env(map[string]any{"items": []any{job("j1", "succeeded", nil), job("j2", "succeeded", nil)}, "next_cursor": "c2"}))
 				return
 			}
 			send(200, env(map[string]any{"items": []any{job("j3", "failed", nil)}, "next_cursor": nil}))
-		case "POST /v1/files":
+		case "POST /v1/lowco-api/files":
 			send(201, env(map[string]any{"file_id": "file_uploaded", "filename": "file", "bytes": 3, "mime_type": "application/pdf", "sha256": "x", "source": "upload", "expires_at": nil, "created_at": "2026-10-09T09:30:00Z"}))
-		case "POST /v1/pdf/merge":
+		case "POST /v1/lowco-api/pdf/merge":
 			send(200, env(map[string]any{"pages": 2, "files_merged": 2, "file": map[string]any{"file_id": "file_m", "url": nil}}))
-		case "POST /v1/pdf/rotate":
+		case "POST /v1/lowco-api/pdf/rotate":
 			send(400, apiErr(400, "invalid_param", "angle must be 90, 180 or 270.", "angle"))
-		case "POST /v1/ocr/text":
+		case "POST /v1/lowco-api/ocr/text":
 			send(202, env(job("job_ocr", "queued", nil)), "Idempotent-Replayed", "true")
-		case "GET /v1/settings":
+		case "GET /v1/lowco-api/settings":
 			m.mu.Lock()
 			m.settings++
 			n := m.settings
@@ -126,17 +126,17 @@ func newMock(t *testing.T) *mock {
 				return
 			}
 			send(200, env(map[string]any{"environment": "test"}))
-		case "GET /v1/files/file_x/content":
-			w.Header().Set("Location", m.srv.URL+"/v1/downloads/tok_x")
+		case "GET /v1/lowco-api/files/file_x/content":
+			w.Header().Set("Location", m.srv.URL+"/v1/lowco-api/downloads/tok_x")
 			w.WriteHeader(307)
-		case "GET /v1/usage":
+		case "GET /v1/lowco-api/usage":
 			if q["format"] == "csv" {
 				w.Header().Set("Content-Type", "text/csv")
 				_, _ = w.Write([]byte("day,credits\n2026-10-09,1.50\n"))
 				return
 			}
 			send(200, env(map[string]any{"rows": []any{}}))
-		case "GET /v1/downloads/tok_x":
+		case "GET /v1/lowco-api/downloads/tok_x":
 			w.Header().Set("Content-Type", "application/pdf")
 			_, _ = w.Write([]byte("%PDF-1.7"))
 		default:
@@ -177,11 +177,11 @@ func TestInlineAnswerAndBytes(t *testing.T) {
 		t.Fatalf("answer %+v", a)
 	}
 	var sent map[string]any
-	_ = json.Unmarshal(m.last("/v1/qr/generate").body, &sent)
+	_ = json.Unmarshal(m.last("/v1/lowco-api/qr/generate").body, &sent)
 	if len(sent) != 4 || sent["pa"] != "acme@okhdfcbank" {
 		t.Fatalf("body %v", sent)
 	}
-	if !strings.HasPrefix(m.last("/v1/qr/generate").header.Get("X-Client-User-Agent"), "lowcoai-api-go/") {
+	if !strings.HasPrefix(m.last("/v1/lowco-api/qr/generate").header.Get("X-Client-User-Agent"), "lowcoai-api-go/") {
 		t.Fatal("user agent")
 	}
 	raw, err := client(t, m).QR.Generate(ctx, api.QrGenerateParams{Content: api.String("x")}, api.WithAccept("image/png"))
@@ -203,7 +203,7 @@ func TestMultipartThenResult(t *testing.T) {
 	if a.Status != 202 || a.Job.JobID != "job_inv" {
 		t.Fatalf("answer %+v", a)
 	}
-	sent := m.last("/v1/docai/invoice")
+	sent := m.last("/v1/lowco-api/docai/invoice")
 	if !strings.HasPrefix(sent.header.Get("Content-Type"), "multipart/form-data") || sent.query["mode"] != "async" {
 		t.Fatalf("sent %v %v", sent.header, sent.query)
 	}
@@ -229,16 +229,16 @@ func TestReferencesAndMixedInputs(t *testing.T) {
 	if _, err := c.PDF.Merge(ctx, api.PdfMergeParams{Files: []api.FileInput{api.FileID("file_a"), api.FileURL("https://example.com/b.pdf")}, Bookmarks: api.Bool(true)}); err != nil {
 		t.Fatal(err)
 	}
-	if got := string(m.last("/v1/pdf/merge").body); got != `{"bookmarks":true,"files":[{"file_id":"file_a"},{"file_url":"https://example.com/b.pdf"}]}` {
+	if got := string(m.last("/v1/lowco-api/pdf/merge").body); got != `{"bookmarks":true,"files":[{"file_id":"file_a"},{"file_url":"https://example.com/b.pdf"}]}` {
 		t.Fatalf("json %s", got)
 	}
 	if _, err := c.PDF.Merge(ctx, api.PdfMergeParams{Files: []api.FileInput{api.FileID("file_a"), api.FileBytes([]byte("%PD"))}}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(m.last("/v1/files").header.Get("Content-Type"), "multipart/form-data") {
+	if !strings.HasPrefix(m.last("/v1/lowco-api/files").header.Get("Content-Type"), "multipart/form-data") {
 		t.Fatal("no upload")
 	}
-	if got := string(m.last("/v1/pdf/merge").body); got != `{"files":[{"file_id":"file_a"},{"file_id":"file_uploaded"}]}` {
+	if got := string(m.last("/v1/lowco-api/pdf/merge").body); got != `{"files":[{"file_id":"file_a"},{"file_id":"file_uploaded"}]}` {
 		t.Fatalf("mixed json %s", got)
 	}
 }
@@ -261,7 +261,7 @@ func TestIdempotencyRetryAndPaging(t *testing.T) {
 	c := client(t, m)
 	key := api.NewIdempotencyKey()
 	a, err := c.OCR.Text(ctx, api.OcrTextParams{File: api.FileID("file_a")}, api.WithIdempotencyKey(key), api.WithMode("async"))
-	if err != nil || !a.Replayed || m.last("/v1/ocr/text").header.Get("Idempotency-Key") != key {
+	if err != nil || !a.Replayed || m.last("/v1/lowco-api/ocr/text").header.Get("Idempotency-Key") != key {
 		t.Fatalf("idempotency %v %v", a, err)
 	}
 	s, err := c.Settings.Get(ctx)
@@ -269,7 +269,7 @@ func TestIdempotencyRetryAndPaging(t *testing.T) {
 		t.Fatalf("retry %v %v %d", s, err, m.settings)
 	}
 	jobs, err := c.Jobs.ListAll(ctx, &api.JobsListQuery{Status: api.String("succeeded")}).All(ctx)
-	if err != nil || len(jobs) != 3 || jobs[2].JobID != "j3" || m.last("/v1/jobs").query["cursor"] != "c2" {
+	if err != nil || len(jobs) != 3 || jobs[2].JobID != "j3" || m.last("/v1/lowco-api/jobs").query["cursor"] != "c2" {
 		t.Fatalf("paging %v %v", jobs, err)
 	}
 }
@@ -296,11 +296,11 @@ func TestContentURLAndDownload(t *testing.T) {
 	ctx := context.Background()
 	c := client(t, m)
 	link, err := c.Files.ContentURL(ctx, "file_x")
-	if err != nil || link != m.srv.URL+"/v1/downloads/tok_x" {
+	if err != nil || link != m.srv.URL+"/v1/lowco-api/downloads/tok_x" {
 		t.Fatalf("link %q %v", link, err)
 	}
 	b, err := c.Files.Download(ctx, link)
-	if err != nil || string(b) != "%PDF-1.7" || m.last("/v1/downloads/tok_x").header.Get("Authorization") != "" {
+	if err != nil || string(b) != "%PDF-1.7" || m.last("/v1/lowco-api/downloads/tok_x").header.Get("Authorization") != "" {
 		t.Fatalf("download %q %v", b, err)
 	}
 }
@@ -336,5 +336,31 @@ func TestWebhookVectorsFromLowcoAPI(t *testing.T) {
 	ev, err := api.ConstructEvent([]byte(ok.Body), ok.Header, ok.Secret, api.WithNow(time.Unix(ok.Now, 0)))
 	if err != nil || ev.Type != "job.succeeded" {
 		t.Fatalf("event %v %v", ev, err)
+	}
+}
+
+// OrgID (or LOWCO_ORG_ID) goes as X-Org-Id on authenticated calls only.
+func TestOrgIDHeader(t *testing.T) {
+	m := newMock(t)
+	ctx := context.Background()
+	c, err := api.NewClient(api.Config{APIKey: "lc_test_sdk", BaseURL: m.srv.URL, OrgID: "7412"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Settings.Get(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.last("/v1/lowco-api/settings").header.Get("X-Org-Id"); got != "7412" {
+		t.Fatalf("X-Org-Id %q", got)
+	}
+	if _, err := c.Files.Download(ctx, m.srv.URL+"/v1/lowco-api/downloads/tok_x"); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.last("/v1/lowco-api/downloads/tok_x").header.Get("X-Org-Id"); got != "" {
+		t.Fatalf("a signed link carried X-Org-Id %q", got)
+	}
+	t.Setenv("LOWCO_ORG_ID", "9001")
+	if _, err := client(t, m).Settings.Get(ctx); err != nil || m.last("/v1/lowco-api/settings").header.Get("X-Org-Id") != "9001" {
+		t.Fatalf("LOWCO_ORG_ID: %v", err)
 	}
 }

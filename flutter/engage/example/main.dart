@@ -5,8 +5,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LowcoAnalytics.instance.init(
     EngageConfig(
-      apiKey: '<api-key>',
+      apiKey: 'lc_…', // API key (sent as X-Api-Key) or an OAuth2 access token
       orgId: 'org_123',
+      appId: 'app_123', // optional: omit to track into the org's default app
       autoTrack: true, // web: capture utm_* / click ids from the page URL
       onError: (error) => debugPrint('engage: $error'),
     ),

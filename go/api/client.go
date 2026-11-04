@@ -14,7 +14,7 @@ const DefaultBaseURL = "https://api.lowco.ai"
 
 // SDKVersion is this SDK's version; its major and minor follow the API
 // document it was generated from.
-const SDKVersion = "1.1.0"
+const SDKVersion = "2.0.0"
 
 // ErrMissingAPIKey is returned by NewClient when no key is configured.
 var ErrMissingAPIKey = errors.New("lowco api: an API key is required (lc_live_… or lc_test_…): set Config.APIKey or LOWCO_API_KEY")
@@ -26,6 +26,10 @@ type Config struct {
 	APIKey string
 	// BaseURL defaults to LOWCO_API_BASE_URL, else DefaultBaseURL.
 	BaseURL string
+	// OrgID is your Lowco organization id, sent as X-Org-Id. Defaults to
+	// LOWCO_ORG_ID. An org-scoped key carries its org already; a
+	// tenant-level key needs it.
+	OrgID string
 	// HTTPClient defaults to a client with Timeout.
 	HTTPClient *http.Client
 	// Timeout is the per-request timeout (default 60 s).
@@ -58,6 +62,9 @@ func NewClient(cfg Config) (*Client, error) {
 	if cfg.BaseURL == "" {
 		cfg.BaseURL = DefaultBaseURL
 	}
+	if cfg.OrgID == "" {
+		cfg.OrgID = os.Getenv("LOWCO_ORG_ID")
+	}
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 60 * time.Second
 	}
@@ -70,7 +77,7 @@ func NewClient(cfg Config) (*Client, error) {
 	if cfg.MaxRetries < 0 {
 		cfg.MaxRetries = 0
 	}
-	c := &core{key: cfg.APIKey, base: strings.TrimRight(cfg.BaseURL, "/"), http: cfg.HTTPClient, retries: cfg.MaxRetries}
+	c := &core{key: cfg.APIKey, org: strings.TrimSpace(cfg.OrgID), base: strings.TrimRight(cfg.BaseURL, "/"), http: cfg.HTTPClient, retries: cfg.MaxRetries}
 	return &Client{services: newServices(c), c: c}, nil
 }
 

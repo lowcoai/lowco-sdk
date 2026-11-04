@@ -1,6 +1,6 @@
 {
   "name": "@lowcoai/api",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "Official Node/TypeScript client for the Lowco API: PDF, render, OCR, Document AI, QR and barcodes, with jobs, file inputs, webhooks and typed errors.",
   "license": "MIT",
   "repository": {

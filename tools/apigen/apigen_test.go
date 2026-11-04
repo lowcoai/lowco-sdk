@@ -27,7 +27,7 @@ func TestGeneratedFilesAreCurrent(t *testing.T) {
 			t.Errorf("%s is stale; run make api-gen", rel)
 		}
 	}
-	if len(m.Ops) != 54 || len(m.Reasons) != 56 {
+	if len(m.Ops) != 55 || len(m.Reasons) != 56 { // 55 since docai/text
 		t.Fatalf("%d operations, %d reasons", len(m.Ops), len(m.Reasons))
 	}
 }
@@ -81,24 +81,24 @@ func TestCompatFailsOnBreakingChanges(t *testing.T) {
 		name, want string
 		f          func(doc map[string]any)
 	}{
-		{"route removed", "BREAKING: POST /v1/pdf/rotate: route removed", func(d map[string]any) { delete(d["paths"].(map[string]any), "/v1/pdf/rotate") }},
-		{"response field removed", "BREAKING: POST /v1/pdf/merge 200.data.files_merged: removed", func(d map[string]any) {
+		{"route removed", "BREAKING: POST /v1/lowco-api/pdf/rotate: route removed", func(d map[string]any) { delete(d["paths"].(map[string]any), "/v1/lowco-api/pdf/rotate") }},
+		{"response field removed", "BREAKING: POST /v1/lowco-api/pdf/merge 200.data.files_merged: removed", func(d map[string]any) {
 			delete(props(d, "PdfMergeResult"), "files_merged")
 		}},
-		{"new required option", "BREAKING: POST /v1/pdf/merge body.dpi: new required property", func(d map[string]any) {
+		{"new required option", "BREAKING: POST /v1/lowco-api/pdf/merge body.dpi: new required property", func(d map[string]any) {
 			props(d, "PdfMergeRequest")["dpi"] = map[string]any{"type": "integer"}
 			s := schemas(d)["PdfMergeRequest"].(map[string]any)
 			s["required"] = append(s["required"].([]any), "dpi")
 		}},
-		{"option removed", "BREAKING: POST /v1/pdf/merge body.bookmarks: removed", func(d map[string]any) { delete(props(d, "PdfMergeRequest"), "bookmarks") }},
-		{"enum value removed", `BREAKING: POST /v1/pdf/to-images body.format: enum value "jpeg" removed`, func(d map[string]any) {
+		{"option removed", "BREAKING: POST /v1/lowco-api/pdf/merge body.bookmarks: removed", func(d map[string]any) { delete(props(d, "PdfMergeRequest"), "bookmarks") }},
+		{"enum value removed", `BREAKING: POST /v1/lowco-api/pdf/to-images body.format: enum value "jpeg" removed`, func(d map[string]any) {
 			props(d, "PdfToImagesRequest")["format"].(map[string]any)["enum"] = []any{"png", "webp"}
 		}},
-		{"type change", "BREAKING: POST /v1/pdf/rotate body.angle: type integer became string", func(d map[string]any) {
+		{"type change", "BREAKING: POST /v1/lowco-api/pdf/rotate body.angle: type integer became string", func(d map[string]any) {
 			props(d, "PdfRotateRequest")["angle"] = map[string]any{"type": "string"}
 		}},
-		{"query parameter removed", "BREAKING: GET /v1/jobs: query parameter status removed", func(d map[string]any) {
-			op := d["paths"].(map[string]any)["/v1/jobs"].(map[string]any)["get"].(map[string]any)
+		{"query parameter removed", "BREAKING: GET /v1/lowco-api/jobs: query parameter status removed", func(d map[string]any) {
+			op := d["paths"].(map[string]any)["/v1/lowco-api/jobs"].(map[string]any)["get"].(map[string]any)
 			var keep []any
 			for _, p := range op["parameters"].([]any) {
 				if pm, ok := p.(map[string]any); ok && pm["name"] == "status" {
@@ -118,7 +118,7 @@ func TestCompatFailsOnBreakingChanges(t *testing.T) {
 			}
 			r["enum"] = keep
 		}},
-		{"response becomes nullable", "BREAKING: POST /v1/pdf/merge 200.data.pages: may now be null", func(d map[string]any) {
+		{"response becomes nullable", "BREAKING: POST /v1/lowco-api/pdf/merge 200.data.pages: may now be null", func(d map[string]any) {
 			props(d, "PdfMergeResult")["pages"].(map[string]any)["nullable"] = true
 		}},
 	}
@@ -131,9 +131,9 @@ func TestCompatFailsOnBreakingChanges(t *testing.T) {
 	code, out := compatOutput(t, mutate(t, func(d map[string]any) {
 		props(d, "PdfMergeRequest")["title"] = map[string]any{"type": "string"}
 		props(d, "PdfMergeResult")["bytes_saved"] = map[string]any{"type": "integer"}
-		d["paths"].(map[string]any)["/v1/pdf/repair"] = d["paths"].(map[string]any)["/v1/pdf/unlock"]
+		d["paths"].(map[string]any)["/v1/lowco-api/pdf/repair"] = d["paths"].(map[string]any)["/v1/lowco-api/pdf/unlock"]
 	}))
-	if code != 0 || !strings.Contains(out, "additive: POST /v1/pdf/repair: route added") || !strings.Contains(out, "body.title: added") || strings.Contains(out, "BREAKING") {
+	if code != 0 || !strings.Contains(out, "additive: POST /v1/lowco-api/pdf/repair: route added") || !strings.Contains(out, "body.title: added") || strings.Contains(out, "BREAKING") {
 		t.Fatalf("additive changes: exit %d\n%s", code, out)
 	}
 }

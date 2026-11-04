@@ -35,7 +35,12 @@ type Field struct {
 	Desc     string
 }
 
-// Op is one Lowco API operation (POST /v1/{service}/{operation}).
+// PathPrefix is where every Lowco API route mounts (lowco-api's
+// registry.PathPrefix); only the deprecated POST /v1/pdf alias, which the
+// SDKs skip, sits outside it.
+const PathPrefix = "/v1/lowco-api"
+
+// Op is one Lowco API operation (POST /v1/lowco-api/{service}/{operation}).
 type Op struct {
 	Service     string
 	Name        string // operation, e.g. to-images
@@ -97,10 +102,10 @@ var fileKeys = map[string]bool{"file_id": true, "file_url": true, "file_base64":
 
 // resourceNames maps operationIds to SDK groups and methods.
 var resourceNames = map[string][2]string{
-	"files_upload": {"files", "upload"}, "files_get": {"files", "get"}, "files_delete": {"files", "delete"},
+	"files_upload": {"files", "upload"}, "files_get": {"files", "get"}, "files_delete": {"files", "delete"}, "files_list": {"files", "list"},
 	"files_content": {"files", "contentUrl"},
 	"jobs_list":     {"jobs", "list"}, "jobs_get": {"jobs", "get"}, "jobs_cancel": {"jobs", "cancel"}, "jobs_events": {"jobs", "events"},
-	"requests_get":    {"requests", "get"},
+	"requests_get": {"requests", "get"}, "requests_list": {"requests", "list"},
 	"webhooks_create": {"webhooks", "create"}, "webhooks_list": {"webhooks", "list"}, "webhooks_get": {"webhooks", "get"},
 	"webhooks_update": {"webhooks", "update"}, "webhooks_delete": {"webhooks", "delete"}, "webhooks_ping": {"webhooks", "ping"},
 	"webhooks_deliveries": {"webhooks", "listDeliveries"}, "webhooks_retry": {"webhooks", "retryDelivery"}, "webhooks_delivery": {"webhooks", "getDelivery"},
@@ -110,7 +115,7 @@ var resourceNames = map[string][2]string{
 	"render_templates_delete": {"templates", "delete"}, "render_templates_versions": {"templates", "listVersions"},
 	"render_templates_pin": {"templates", "pin"}, "render_templates_unpin": {"templates", "unpin"},
 	"settings_get": {"settings", "get"}, "settings_update": {"settings", "update"}, "settings_purge": {"settings", "purge"}, "data_handling": {"settings", "dataHandling"},
-	"usage_get": {"usage", "get"}, "usage_alerts": {"usage", "alerts"}, "overview": {"usage", "overview"},
+	"usage_get": {"usage", "get"}, "usage_alerts": {"usage", "alerts"}, "overview": {"usage", "overview"}, "analytics": {"usage", "analytics"},
 	"audit_list": {"audit", "list"}, "verify_audit_list": {"audit", "listVerify"},
 	"keys_list": {"keys", "list"}, "keys_validate": {"keys", "validate"}, "keys_sync": {"keys", "sync"},
 	"sign_requests_create": {"sign", "create"}, "sign_requests_list": {"sign", "list"}, "sign_requests_get": {"sign", "get"},
@@ -375,7 +380,7 @@ func (m *Model) schema(ref string) obj {
 }
 
 func (m *Model) operation(path string, op obj) (*Op, error) {
-	parts := strings.Split(strings.TrimPrefix(path, "/v1/"), "/")
+	parts := strings.Split(strings.TrimPrefix(path, PathPrefix+"/"), "/")
 	o := &Op{
 		Service: parts[0], Name: parts[1], OperationID: str(op["operationId"]), Path: path,
 		Summary: str(op["summary"]), Description: str(op["description"]),

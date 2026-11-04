@@ -39,8 +39,8 @@ class LowcoApi(GeneratedClient):
     ``base_url`` to LOWCO_API_BASE_URL, else https://api.lowco.ai."""
 
     def __init__(self, api_key: Optional[str] = None, *, base_url: Optional[str] = None, timeout: float = 60.0,
-                 max_retries: int = 2) -> None:
-        super().__init__(Core(api_key, base_url=base_url, timeout=timeout, max_retries=max_retries))
+                 max_retries: int = 2, org_id: Optional[str] = None) -> None:
+        super().__init__(Core(api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, org_id=org_id))
 
     def wait_for_result(self, answer: Answer[T], *, timeout: float = 300.0, max_interval: float = 10.0) -> T:
         """The result of an operation's answer: inline data, or the job's result once it finishes."""

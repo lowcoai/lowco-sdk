@@ -21,7 +21,7 @@ List<int> env(Object? data) => utf8.encode(jsonEncode({'status': 1, 'data': data
 Map<String, dynamic> job(String id, String status, [Map<String, dynamic> extra = const {}]) => {
       'job_id': id, 'service': 'docai', 'operation': 'invoice', 'status': status, 'progress': null, 'input': <String, dynamic>{},
       'result': null, 'error': null, 'usage': null, 'attempts': 1, 'created_at': '2026-10-09T09:30:00Z', 'started_at': null,
-      'finished_at': null, 'expires_at': '2026-10-16T09:30:00Z', 'links': {'self': '/v1/jobs/$id', 'cancel': '/v1/jobs/$id/cancel'}, ...extra,
+      'finished_at': null, 'expires_at': '2026-10-16T09:30:00Z', 'links': {'self': '/v1/lowco-api/jobs/$id', 'cancel': '/v1/lowco-api/jobs/$id/cancel'}, ...extra,
     };
 
 void main() {
@@ -53,17 +53,17 @@ void main() {
             'status': 0,
             'error': {'code': code, 'reason': reason, 'message': message, 'param': param, 'request_id': 'req_err', 'doc_url': 'https://docs.lowco.ai/api/errors#$reason'}
           }));
-      if (req.headers.value('authorization') != 'Bearer lc_test_sdk' && !req.uri.path.startsWith('/v1/downloads/')) {
+      if (req.headers.value('authorization') != 'Bearer lc_test_sdk' && !req.uri.path.startsWith('/v1/lowco-api/downloads/')) {
         return send(401, err(401, 'missing_key', 'No key'));
       }
       switch ('${req.method} ${req.uri.path}') {
-        case 'POST /v1/qr/generate':
+        case 'POST /v1/lowco-api/qr/generate':
           if (req.headers.value('accept') == 'image/png') return send(200, png, type: 'image/png');
           return send(200, env({'format': 'png', 'width': 512}), headers: {'x-lowco-credits-used': '0.0500'});
-        case 'POST /v1/docai/invoice':
+        case 'POST /v1/lowco-api/docai/invoice':
           if (req.uri.queryParameters['mode'] == 'async') return send(202, env(job('job_inv', 'queued')), headers: {'retry-after': '0'});
           return send(200, env(<String, dynamic>{}));
-        case 'GET /v1/jobs/job_inv':
+        case 'GET /v1/lowco-api/jobs/job_inv':
           polls++;
           if (polls < 3) return send(200, env(job('job_inv', 'processing')), headers: {'retry-after': '0'});
           return send(200, env(job('job_inv', 'succeeded', {
@@ -71,34 +71,34 @@ void main() {
                   'invoice_number': {'value': 'INV-1', 'confidence': 0.98, 'source': {'page': 1}}
                 }
               })));
-        case 'GET /v1/jobs/job_bad':
+        case 'GET /v1/lowco-api/jobs/job_bad':
           return send(200, env(job('job_bad', 'failed', {
                 'error': {'code': 422, 'reason': 'file_corrupt', 'message': 'The file is not a readable PDF.', 'doc_url': 'x'}
               })));
-        case 'GET /v1/jobs/job_slow':
+        case 'GET /v1/lowco-api/jobs/job_slow':
           return send(200, env(job('job_slow', 'processing')), headers: {'retry-after': '0'});
-        case 'GET /v1/jobs':
+        case 'GET /v1/lowco-api/jobs':
           if (req.uri.queryParameters['cursor'] == null) {
             return send(200, env({'items': [job('j1', 'succeeded'), job('j2', 'succeeded')], 'next_cursor': 'c2'}));
           }
           return send(200, env({'items': [job('j3', 'failed')], 'next_cursor': null}));
-        case 'POST /v1/files':
+        case 'POST /v1/lowco-api/files':
           return send(201, env({'file_id': 'file_uploaded'}));
-        case 'POST /v1/pdf/merge':
+        case 'POST /v1/lowco-api/pdf/merge':
           return send(200, env({'pages': 2, 'files_merged': 2, 'file': {'file_id': 'file_m', 'url': null}}));
-        case 'POST /v1/pdf/rotate':
+        case 'POST /v1/lowco-api/pdf/rotate':
           return send(400, err(400, 'invalid_param', 'angle must be 90, 180 or 270.', 'angle'));
-        case 'POST /v1/ocr/text':
+        case 'POST /v1/lowco-api/ocr/text':
           return send(202, env(job('job_ocr', 'queued')), headers: {'idempotent-replayed': 'true'});
-        case 'GET /v1/settings':
+        case 'GET /v1/lowco-api/settings':
           settings++;
           if (settings == 1) return send(429, err(429, 'rate_limited', 'Slow down'), headers: {'retry-after': '0'});
           return send(200, env({'environment': 'test'}));
-        case 'GET /v1/files/file_x/content':
+        case 'GET /v1/lowco-api/files/file_x/content':
           res.statusCode = 307;
-          res.headers.set('location', '$base/v1/downloads/tok_x');
+          res.headers.set('location', '$base/v1/lowco-api/downloads/tok_x');
           return res.close();
-        case 'GET /v1/downloads/tok_x':
+        case 'GET /v1/lowco-api/downloads/tok_x':
           return send(200, utf8.encode('%PDF-1.7'), type: 'application/pdf');
       }
       send(404, err(404, 'route_not_found', 'no route'));
@@ -114,8 +114,8 @@ void main() {
     expect(a.data!.width, 512);
     expect(a.requestId, 'req_test');
     expect(a.creditsUsed, '0.0500');
-    expect(jsonDecode(utf8.decode(last('/v1/qr/generate').body)), {'type': 'upi', 'pa': 'acme@okhdfcbank', 'pn': 'Acme', 'am': '1499.00'});
-    expect(last('/v1/qr/generate').headers.value('x-client-user-agent'), startsWith('lowcoai-api-dart/'));
+    expect(jsonDecode(utf8.decode(last('/v1/lowco-api/qr/generate').body)), {'type': 'upi', 'pa': 'acme@okhdfcbank', 'pn': 'Acme', 'am': '1499.00'});
+    expect(last('/v1/lowco-api/qr/generate').headers.value('x-client-user-agent'), startsWith('lowcoai-api-dart/'));
   });
 
   test('accept returns the output file bytes', () async {
@@ -131,7 +131,7 @@ void main() {
     final a = await lowco.docai.invoice(DocaiInvoiceParams(file: FileInput.path(f.path), languages: const ['eng', 'hin']), const CallOptions(mode: 'async'));
     expect(a.status, 202);
     expect(a.job!.jobId, 'job_inv');
-    final sent = last('/v1/docai/invoice');
+    final sent = last('/v1/lowco-api/docai/invoice');
     expect(sent.headers.contentType!.mimeType, 'multipart/form-data');
     final text = utf8.decode(sent.body);
     expect(text, contains('name="file"; filename="invoice.pdf"'));
@@ -145,13 +145,13 @@ void main() {
 
   test('remote inputs go as JSON references; mixed inputs upload the local ones first', () async {
     await client().pdf.merge(PdfMergeParams(files: [FileInput.id('file_a'), FileInput.url('https://example.com/b.pdf')], bookmarks: true));
-    expect(jsonDecode(utf8.decode(last('/v1/pdf/merge').body)), {
+    expect(jsonDecode(utf8.decode(last('/v1/lowco-api/pdf/merge').body)), {
       'bookmarks': true,
       'files': [{'file_id': 'file_a'}, {'file_url': 'https://example.com/b.pdf'}]
     });
     await client().pdf.merge(PdfMergeParams(files: [FileInput.id('file_a'), FileInput.bytes([37, 80, 68])]));
-    expect(last('/v1/files').headers.contentType!.mimeType, 'multipart/form-data');
-    expect(jsonDecode(utf8.decode(last('/v1/pdf/merge').body)), {
+    expect(last('/v1/lowco-api/files').headers.contentType!.mimeType, 'multipart/form-data');
+    expect(jsonDecode(utf8.decode(last('/v1/lowco-api/pdf/merge').body)), {
       'files': [{'file_id': 'file_a'}, {'file_id': 'file_uploaded'}]
     });
   });
@@ -172,13 +172,13 @@ void main() {
   test('Idempotency-Key, 429 retries and pagination', () async {
     final key = newIdempotencyKey();
     final a = await client().ocr.text(OcrTextParams(file: FileInput.id('file_a')), CallOptions(idempotencyKey: key, mode: 'async'));
-    expect(last('/v1/ocr/text').headers.value('idempotency-key'), key);
+    expect(last('/v1/lowco-api/ocr/text').headers.value('idempotency-key'), key);
     expect(a.replayed, isTrue);
     expect((await client().settings.get()).environment, 'test');
     expect(settings, 2);
     final ids = await client().jobs.listAll(const JobsListQuery(status: 'succeeded')).map((j) => j.jobId).toList();
     expect(ids, ['j1', 'j2', 'j3']);
-    expect(last('/v1/jobs').query['cursor'], 'c2');
+    expect(last('/v1/lowco-api/jobs').query['cursor'], 'c2');
   });
 
   test('a failed job throws LowcoJobError; a slow one times out', () async {
@@ -190,9 +190,9 @@ void main() {
   test('contentUrl returns the signed link and download fetches it without the key', () async {
     final lowco = client();
     final link = await lowco.files.contentUrl('file_x');
-    expect(link, '$base/v1/downloads/tok_x');
+    expect(link, '$base/v1/lowco-api/downloads/tok_x');
     expect(utf8.decode(await lowco.files.download(link)), '%PDF-1.7');
-    expect(last('/v1/downloads/tok_x').headers.value('authorization'), isNull);
+    expect(last('/v1/lowco-api/downloads/tok_x').headers.value('authorization'), isNull);
   });
 
   test('webhook signatures: the vectors made by lowco-api core/webhooksig', () {

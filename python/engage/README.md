@@ -11,7 +11,7 @@ pip install lowcoai-engage
 ```python
 from lowcoai.engage import EngageClient
 
-engage = EngageClient("<api-key>", "org_123")  # create once, share across requests
+engage = EngageClient("lc_…", "org_123")  # create once, share across requests
 
 engage.track("signup_completed", {"plan": "pro"}, user_id="user_123")
 engage.page({"path": "/pricing", "title": "Pricing"}, user_id="user_123")
@@ -49,13 +49,26 @@ Each call sends exactly one event (one HTTP request) and returns once the servic
 
 | Argument      | Description                                                                               |
 | ------------- | ----------------------------------------------------------------------------------------- |
-| `api_key`     | Engage API key, sent as `Authorization: Bearer <api_key>`. Required.                      |
+| `api_key`     | Required. An `lc_…` API key is sent as `X-Api-Key`; any other value (an OAuth2 access token) as `Authorization: Bearer <api_key>`. |
 | `org_id`      | Sent as the `X-Org-Id` header. Required.                                                  |
+| `app_id`      | Optional. The engage app to track into, sent as `X-Engage-App-Id`. Omitted (or blank): the org's default app. |
 | `device_id`   | Default `device_id` for events that don't pass one. Defaults to a uuid4 per client.       |
 | `timeout`     | Per-request timeout in seconds (default `30`). `None` disables it.                        |
 | `http_client` | Your own `httpx.Client` / `httpx.AsyncClient` (proxies, retries, test transports). It is not closed by the SDK. |
 
 Events are always sent to `https://api.lowco.ai/v1/engage/track`.
+
+### Credentials and apps
+
+- **API key** (`lc_…`, generated in the admin portal) — the usual credential for a server. It travels as `X-Api-Key`, the header the gateway reads API keys from.
+- **Access token** — a user's OAuth2 token travels as `Authorization: Bearer`.
+- **Apps** — an org can have several engage apps, each with its own events and users. Pass `app_id=` (engage → Settings → Apps) to track into one; without it events land in the org's default app. `client.app_id` returns the configured app (`None` for the default).
+
+```python
+engage = EngageClient("lc_…", "org_123", app_id="app_123")
+```
+
+`HEADER_API_KEY`, `HEADER_ORG_ID`, `HEADER_ENGAGE_APP_ID` and `is_api_key(api_key)` are exported.
 
 ## Surface
 

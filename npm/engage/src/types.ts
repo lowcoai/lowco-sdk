@@ -1,6 +1,17 @@
 export interface Config {
+  /**
+   * Credential. Required. An `lc_…` API key (admin portal) is sent as
+   * `X-Api-Key`; anything else (an OAuth2 access token) as
+   * `Authorization: Bearer <apiKey>`.
+   */
   apiKey: string;
+  /** Sent as `X-Org-Id`. Required. */
   orgId: string;
+  /**
+   * Engage app to track into, sent as `X-Engage-App-Id`. Optional: without
+   * it events go to the org's default app.
+   */
+  appId?: string;
   autoTrack?: boolean;
 }
 

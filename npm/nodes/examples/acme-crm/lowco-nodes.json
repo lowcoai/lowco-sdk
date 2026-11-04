@@ -1,0 +1,7 @@
+{
+  "key": "acme_crm",
+  "name": "Acme CRM",
+  "description": "Contacts and lead scoring for the Acme CRM API.",
+  "entry": "index.mjs",
+  "timeoutSeconds": 20
+}

@@ -16,7 +16,7 @@ import 'generated.dart';
 const defaultBaseUrl = 'https://api.lowco.ai';
 
 /// This SDK's version; its major and minor follow the API document it was generated from.
-const sdkVersion = '1.1.0';
+const sdkVersion = '2.0.0';
 
 /// Thrown for every failed call: an error envelope, a network failure, a timeout or invalid input.
 class LowcoApiError implements Exception {
@@ -364,7 +364,7 @@ class Core {
     return decode(_data(raw));
   }
 
-  /// POST /v1/files and the like: one multipart file.
+  /// POST /v1/lowco-api/files and the like: one multipart file.
   Future<T> upload<T>(String path, FileInput file, T Function(Object?) decode, [RequestOptions? options]) async {
     if (file is! _LocalFile) {
       throw LowcoApiError('upload takes a local file (path, bytes or stream)', status: 0, reason: ErrorReason.invalidParam, param: 'file');
@@ -404,7 +404,7 @@ class Core {
     if (local > 0 && local < all.length) {
       Future<FileInput> up(FileInput f) async {
         if (!f._local) return f;
-        final stored = await upload('/v1/files', f, (j) => StoredFile.fromJson(j as Map<String, dynamic>));
+        final stored = await upload('/v1/lowco-api/files', f, (j) => StoredFile.fromJson(j as Map<String, dynamic>));
         return FileInput.id(stored.fileId!, password: f.password);
       }
       for (final k in refs.keys.toList()) {
@@ -472,7 +472,7 @@ class Core {
   Future<Job> waitForJob(String jobId, {Duration timeout = const Duration(minutes: 5), Duration maxInterval = const Duration(seconds: 10)}) async {
     final deadline = DateTime.now().add(timeout);
     for (;;) {
-      final raw = await _send('GET', _uri('/v1/jobs/${Uri.encodeComponent(jobId)}'));
+      final raw = await _send('GET', _uri('/v1/lowco-api/jobs/${Uri.encodeComponent(jobId)}'));
       final job = Job.fromJson(_data(raw) as Map<String, dynamic>);
       if (_terminal.contains(job.status)) {
         if (job.status == 'succeeded') return job;

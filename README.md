@@ -2,7 +2,7 @@
 
 Official client SDKs for the [lowco](https://lowco.ai) platform services.
 
-The repository is a **multi-module monorepo**: one folder per ecosystem (Go / npm / Python / Flutter), and one sub-folder per backend product.
+The repository is a **multi-module monorepo**: one folder per ecosystem (Go / npm / Python / Flutter / Android), and one sub-folder per backend product.
 
 ```
 lowco-sdk/
@@ -13,7 +13,8 @@ lowco-sdk/
 │   ├── integrations/   ← github.com/lowcoai/lowco-sdk/go/integrations
 │   ├── flux/           ← github.com/lowcoai/lowco-sdk/go/flux
 │   ├── docs/           ← github.com/lowcoai/lowco-sdk/go/docs
-│   └── api/            ← github.com/lowcoai/lowco-sdk/go/api   (generated from specs/lowco-api.json)
+│   ├── engage/         ← github.com/lowcoai/lowco-sdk/go/engage   (server-side event tracking)
+│   └── api/            ← github.com/lowcoai/lowco-sdk/go/api/v2   (generated from specs/lowco-api.json)
 ├── npm/
 │   ├── lowcodb/        ← @lowcoai/lowcodb
 │   ├── agentx/         ← @lowcoai/agentx
@@ -23,6 +24,7 @@ lowco-sdk/
 │   ├── auth/           ← @lowcoai/auth      (React)
 │   ├── engage/         ← @lowcoai/engage    (browser)
 │   ├── docs/           ← @lowcoai/docs
+│   ├── nodes/          ← @lowcoai/nodes     (write workflow nodes in code; CLI lowco-nodes)
 │   └── api/            ← @lowcoai/api
 ├── python/
 │   ├── lowcodb/        ← lowcoai-lowcodb       (import lowcoai.lowcodb)
@@ -44,6 +46,8 @@ lowco-sdk/
 │   ├── engage/         ← lowcoai_engage        (Flutter)
 │   ├── docs/           ← lowcoai_docs          (pure Dart)
 │   └── api/            ← lowcoai_api           (pure Dart)
+├── android/
+│   └── engage/         ← ai.lowco:engage       (Android library, Kotlin)
 ├── specs/lowco-api.json ← the Lowco API's OpenAPI document (tools/apigen generates the four api packages)
 └── docs/
     ├── lowcodb.md       ← REST surface reference (language-agnostic)
@@ -69,12 +73,15 @@ The Dart API clients are pure Dart (`package:http` / `web_socket_channel`), so t
 | `workflow`     | workflow-orchestrator                     | `github.com/lowcoai/lowco-sdk/go/workflow`     | `@lowcoai/workflow`     | `lowcoai-workflow`     | `lowcoai_workflow`     | [docs/workflow.md](docs/workflow.md)         |
 | `integrations` | integrations-manager                      | `github.com/lowcoai/lowco-sdk/go/integrations` | `@lowcoai/integrations` | `lowcoai-integrations` | `lowcoai_integrations` | [docs/integrations.md](docs/integrations.md) |
 | `docs`         | document manager                          | `github.com/lowcoai/lowco-sdk/go/docs`         | `@lowcoai/docs`         | `lowcoai-docs`         | `lowcoai_docs`         | [docs/docs.md](docs/docs.md)                 |
-| `api`          | Lowco API (PDF, render, OCR, Document AI, codes) | `github.com/lowcoai/lowco-sdk/go/api`   | `@lowcoai/api`          | `lowcoai-api`          | `lowcoai_api`          | [docs/api.md](docs/api.md)                   |
+| `api`          | Lowco API (PDF, render, OCR, Document AI, codes) | `github.com/lowcoai/lowco-sdk/go/api/v2` | `@lowcoai/api`          | `lowcoai-api`          | `lowcoai_api`          | [docs/api.md](docs/api.md)                   |
 | `flux`         | flux realtime WebSocket                   | `github.com/lowcoai/lowco-sdk/go/flux`         | `@lowcoai/flux`         | `lowcoai-flux`         | `lowcoai_flux`         | [npm/flux/README.md](npm/flux/README.md)     |
 | `auth`         | lowco OAuth (Authorization Code + PKCE)   | —                                                       | `@lowcoai/auth`         | `lowcoai-auth`         | `lowcoai_auth`         | [npm/auth/README.md](npm/auth/README.md)     |
-| `engage`       | engage event tracking                     | —                                                       | `@lowcoai/engage`       | `lowcoai-engage`       | `lowcoai_engage`       | [npm/engage/README.md](npm/engage/README.md) |
+| `engage`       | engage event tracking                     | `github.com/lowcoai/lowco-sdk/go/engage`       | `@lowcoai/engage`       | `lowcoai-engage`       | `lowcoai_engage`       | [npm/engage/README.md](npm/engage/README.md) |
+| `nodes`        | workflow node libraries (code nodes)      | —                                                       | `@lowcoai/nodes`        | —                      | —                      | [npm/nodes/README.md](npm/nodes/README.md)   |
 
-Every package has its own README with the full surface (`python/<product>/README.md`, `flutter/<product>/README.md`).
+Every package has its own README with the full surface (`python/<product>/README.md`, `flutter/<product>/README.md`). `engage` also ships a native Android library, `ai.lowco:engage` ([android/engage/README.md](android/engage/README.md)).
+
+Every engage SDK takes the same credentials: an `lc_…` API key is sent as `X-Api-Key` and any other token as `Authorization: Bearer`; `orgId` is required (`X-Org-Id`), and the optional `appId` selects the engage app (`X-Engage-App-Id`, the org's default app when absent).
 
 > Future products will follow the same `go/<product>` + `npm/<product>` + `python/<product>` + `flutter/<product>` pattern.
 
@@ -173,6 +180,24 @@ url, _ := client.Files.DownloadURL(ctx, bucket.Name, "reports/q3.pdf") // short-
 ```
 
 See [go/docs/README.md](go/docs/README.md).
+
+```bash
+go get github.com/lowcoai/lowco-sdk/go/engage
+```
+
+```go
+import "github.com/lowcoai/lowco-sdk/go/engage"
+
+client, _ := engage.NewClient(engage.Config{
+    APIKey: "lc_…",    // X-Api-Key; any other token goes as Authorization: Bearer
+    OrgID:  "org_123",
+    AppID:  "app_123", // optional: the org's default app when empty
+})
+_ = client.Track(ctx, "signup_completed", engage.Metadata{"plan": "pro"},
+    &engage.EventOptions{UserID: "user_123"})
+```
+
+See [go/engage/README.md](go/engage/README.md).
 
 ### npm
 
@@ -374,6 +399,19 @@ final url = await client.files.downloadUrl(bucket, 'reports/q3.pdf'); // not on 
 
 In Flutter apps, `lowcoai_auth` provides `LowcoAuth` (a `ChangeNotifier`), `LowcoAuthProvider` and `WithAuthenticationRequired` for the lowco PKCE login. `lowcoai_engage` provides `LowcoAnalytics.instance` and a `LowcoAnalyticsObserver` for automatic screen views. See `flutter/<product>/README.md`.
 
+### Android
+
+```kotlin
+implementation("ai.lowco:engage:0.1.0")
+```
+
+```kotlin
+LowcoAnalytics.init(this, EngageConfig(apiKey = "lc_…", orgId = "org_123", appId = "app_123", autoTrack = true))
+LowcoAnalytics.track("signup_completed", mapOf("plan" to "pro"))
+```
+
+See [android/engage/README.md](android/engage/README.md).
+
 ---
 
 ## Adding a new product to this SDK
@@ -396,10 +434,11 @@ Each package is self-contained; run its checks from its own folder.
 | Ecosystem | Checks |
 | --------- | ------ |
 | Go        | `go vet ./... && go test ./...` |
-| npm       | `npm install && npm run typecheck && npm run build` |
+| npm       | `npm install && npm run typecheck && npm run build` (`npm/nodes`: `npm test`, which also checks its copies of the workflow engine's SDK) |
 | Python    | `pip install -e ".[dev]"`, then `pytest`, `ruff check .`, `ruff format --check .`, `mypy src tests` |
 | Dart      | `dart pub get && dart format --set-exit-if-changed . && dart analyze && dart test` |
 | Flutter   | `flutter pub get && dart format --set-exit-if-changed . && flutter analyze && flutter test` (`flutter/auth`, `flutter/engage`) |
+| Android   | `./gradlew testDebugUnitTest` (needs an Android SDK: `ANDROID_HOME` or `local.properties`) |
 
 ---
 
@@ -413,8 +452,10 @@ Each package is self-contained; run its checks from its own folder.
 - Method names mirror the controller verbs in the corresponding service so the SDKs and server stay in lockstep (snake_case in Python, lowerCamelCase in Dart).
 - Wire payloads keep the server's field names in every language: TypedDicts with camelCase keys in Python, model classes with `fromJson` / `toJson` (nulls omitted) in Dart.
 
-NPM packages — `@lowcoai/lowcodb`, `@lowcoai/agentx`, `@lowcoai/workflow`, `@lowcoai/integrations`, `@lowcoai/docs`, `@lowcoai/flux`, `@lowcoai/auth`, `@lowcoai/engage`.
+NPM packages — `@lowcoai/lowcodb`, `@lowcoai/agentx`, `@lowcoai/workflow`, `@lowcoai/integrations`, `@lowcoai/docs`, `@lowcoai/flux`, `@lowcoai/auth`, `@lowcoai/engage`, `@lowcoai/nodes`.
 
 PyPI packages — `lowcoai-lowcodb`, `lowcoai-agentx`, `lowcoai-workflow`, `lowcoai-integrations`, `lowcoai-docs`, `lowcoai-flux`, `lowcoai-auth`, `lowcoai-engage`.
 
 pub.dev packages — `lowcoai_lowcodb`, `lowcoai_agentx`, `lowcoai_workflow`, `lowcoai_integrations`, `lowcoai_docs`, `lowcoai_flux`, `lowcoai_auth`, `lowcoai_engage`.
+
+Maven (Android) — `ai.lowco:engage`.

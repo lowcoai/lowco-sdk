@@ -8,7 +8,7 @@ import { ERROR_REASONS, Files, LowcoApi, LowcoApiError, LowcoJobError, LowcoTime
 
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
 const env = (data) => JSON.stringify({ status: 1, data });
-const job = (id, status, extra = {}) => ({ job_id: id, service: "docai", operation: "invoice", status, progress: null, input: {}, result: null, error: null, usage: null, attempts: 1, created_at: "2026-10-09T09:30:00Z", started_at: null, finished_at: null, expires_at: "2026-10-16T09:30:00Z", links: { self: `/v1/jobs/${id}`, cancel: `/v1/jobs/${id}/cancel` }, ...extra });
+const job = (id, status, extra = {}) => ({ job_id: id, service: "docai", operation: "invoice", status, progress: null, input: {}, result: null, error: null, usage: null, attempts: 1, created_at: "2026-10-09T09:30:00Z", started_at: null, finished_at: null, expires_at: "2026-10-16T09:30:00Z", links: { self: `/v1/lowco-api/jobs/${id}`, cancel: `/v1/lowco-api/jobs/${id}/cancel` }, ...extra });
 
 const seen = [];
 let polls = 0;
@@ -33,46 +33,46 @@ before(async () => {
       res.writeHead(status, { "content-type": "application/json", "x-request-id": "req_test", ...headers });
       res.end(payload);
     };
-    if (req.headers.authorization !== "Bearer lc_test_sdk" && !url.pathname.startsWith("/v1/downloads/")) {
+    if (req.headers.authorization !== "Bearer lc_test_sdk" && !url.pathname.startsWith("/v1/lowco-api/downloads/")) {
       return send(401, JSON.stringify({ status: 0, error: { code: 401, reason: "missing_key", message: "No key", doc_url: "https://docs.lowco.ai/api/errors#missing_key" } }));
     }
     switch (`${req.method} ${url.pathname}`) {
-      case "POST /v1/qr/generate":
+      case "POST /v1/lowco-api/qr/generate":
         if (req.headers.accept === "image/png") {
           res.writeHead(200, { "content-type": "image/png" });
           return res.end(PNG);
         }
-        return send(200, env({ format: "png", width: 512, height: 512, file: { file_id: "file_out", url: `${base}/v1/downloads/tok` } }), { "x-lowco-credits-used": "0.0500" });
-      case "POST /v1/docai/invoice":
+        return send(200, env({ format: "png", width: 512, height: 512, file: { file_id: "file_out", url: `${base}/v1/lowco-api/downloads/tok` } }), { "x-lowco-credits-used": "0.0500" });
+      case "POST /v1/lowco-api/docai/invoice":
         if (url.searchParams.get("mode") === "async") return send(202, env(job("job_inv", "queued")), { "retry-after": "0" });
         return send(200, env({ invoice_number: { value: "INV-1", confidence: 0.98, source: { page: 1 } } }));
-      case "GET /v1/jobs/job_inv":
+      case "GET /v1/lowco-api/jobs/job_inv":
         polls++;
         if (polls < 3) return send(200, env(job("job_inv", "processing")), { "retry-after": "0" });
         return send(200, env(job("job_inv", "succeeded", { result: { invoice_number: { value: "INV-1", confidence: 0.98, source: { page: 1 } } } })));
-      case "GET /v1/jobs/job_bad":
+      case "GET /v1/lowco-api/jobs/job_bad":
         return send(200, env(job("job_bad", "failed", { error: { code: 422, reason: "file_corrupt", message: "The file is not a readable PDF.", doc_url: "https://docs.lowco.ai/api/errors#file_corrupt" } })));
-      case "GET /v1/jobs/job_slow":
+      case "GET /v1/lowco-api/jobs/job_slow":
         return send(200, env(job("job_slow", "processing")), { "retry-after": "0" });
-      case "GET /v1/jobs":
+      case "GET /v1/lowco-api/jobs":
         if (!url.searchParams.get("cursor")) return send(200, env({ items: [job("j1", "succeeded"), job("j2", "succeeded")], next_cursor: "c2" }));
         return send(200, env({ items: [job("j3", "failed")], next_cursor: null }));
-      case "POST /v1/files":
+      case "POST /v1/lowco-api/files":
         return send(201, env({ file_id: "file_uploaded", filename: "a.pdf", bytes: 3, mime_type: "application/pdf", sha256: "x", source: "upload", expires_at: null, created_at: "2026-10-09T09:30:00Z" }));
-      case "POST /v1/pdf/merge":
+      case "POST /v1/lowco-api/pdf/merge":
         return send(200, env({ pages: 2, files_merged: 2, file: { file_id: "file_m", url: null } }));
-      case "POST /v1/pdf/rotate":
+      case "POST /v1/lowco-api/pdf/rotate":
         return send(400, JSON.stringify({ status: 0, error: { code: 400, reason: "invalid_param", message: "angle must be 90, 180 or 270.", param: "angle", request_id: "req_err", doc_url: "https://docs.lowco.ai/api/errors#invalid_param" } }));
-      case "POST /v1/ocr/text":
+      case "POST /v1/lowco-api/ocr/text":
         return send(202, env(job("job_ocr", "queued")), { "idempotent-replayed": "true" });
-      case "GET /v1/settings":
+      case "GET /v1/lowco-api/settings":
         settingsCalls++;
         if (settingsCalls === 1) return send(429, JSON.stringify({ status: 0, error: { code: 429, reason: "rate_limited", message: "Slow down", doc_url: "x", retryable: true } }), { "retry-after": "0" });
         return send(200, env({ environment: "test", retention_input_hours: 24 }));
-      case "GET /v1/files/file_x/content":
-        res.writeHead(307, { location: `${base}/v1/downloads/tok_x` });
+      case "GET /v1/lowco-api/files/file_x/content":
+        res.writeHead(307, { location: `${base}/v1/lowco-api/downloads/tok_x` });
         return res.end();
-      case "GET /v1/downloads/tok_x":
+      case "GET /v1/lowco-api/downloads/tok_x":
         res.writeHead(200, { "content-type": "application/pdf" });
         return res.end("%PDF-1.7");
     }
@@ -92,7 +92,7 @@ test("an inline answer carries data, the request id and credits", async () => {
   assert.equal(a.data.width, 512);
   assert.equal(a.requestId, "req_test");
   assert.equal(a.creditsUsed, "0.0500");
-  const sent = last("/v1/qr/generate");
+  const sent = last("/v1/lowco-api/qr/generate");
   assert.equal(sent.headers["content-type"], "application/json");
   assert.deepEqual(JSON.parse(sent.body), { type: "upi", pa: "acme@okhdfcbank", pn: "Acme", am: "1499.00" });
   assert.match(sent.headers["x-client-user-agent"], /^lowcoai-api-node\//);
@@ -111,7 +111,7 @@ test("a local file goes as multipart with the options as JSON, then a job is wai
   const a = await lowco.docai.invoice({ file: Files.path(join(dir, "invoice.pdf")), languages: ["eng", "hin"] }, { mode: "async" });
   assert.equal(a.status, 202);
   assert.equal(a.job.job_id, "job_inv");
-  const sent = last("/v1/docai/invoice");
+  const sent = last("/v1/lowco-api/docai/invoice");
   assert.match(sent.headers["content-type"], /^multipart\/form-data/);
   const text = sent.body.toString();
   assert.match(text, /name="file"; filename="invoice.pdf"/);
@@ -125,10 +125,10 @@ test("a local file goes as multipart with the options as JSON, then a job is wai
 
 test("remote inputs go as JSON references; mixed inputs upload the local ones first", async () => {
   await client().pdf.merge({ files: [Files.id("file_a"), Files.url("https://example.com/b.pdf")], bookmarks: true });
-  assert.deepEqual(JSON.parse(last("/v1/pdf/merge").body), { bookmarks: true, files: [{ file_id: "file_a" }, { file_url: "https://example.com/b.pdf" }] });
+  assert.deepEqual(JSON.parse(last("/v1/lowco-api/pdf/merge").body), { bookmarks: true, files: [{ file_id: "file_a" }, { file_url: "https://example.com/b.pdf" }] });
   await client().pdf.merge({ files: [Files.id("file_a"), new Uint8Array([37, 80, 68])] });
-  assert.match(last("/v1/files").headers["content-type"], /^multipart\/form-data/);
-  assert.deepEqual(JSON.parse(last("/v1/pdf/merge").body), { files: [{ file_id: "file_a" }, { file_id: "file_uploaded" }] });
+  assert.match(last("/v1/lowco-api/files").headers["content-type"], /^multipart\/form-data/);
+  assert.deepEqual(JSON.parse(last("/v1/lowco-api/pdf/merge").body), { files: [{ file_id: "file_a" }, { file_id: "file_uploaded" }] });
 });
 
 test("an error envelope becomes a typed LowcoApiError", async () => {
@@ -148,7 +148,7 @@ test("an error envelope becomes a typed LowcoApiError", async () => {
 test("Idempotency-Key is sent and a replay is reported", async () => {
   const key = newIdempotencyKey();
   const a = await client().ocr.text({ file: Files.id("file_a") }, { idempotencyKey: key, mode: "async" });
-  assert.equal(last("/v1/ocr/text").headers["idempotency-key"], key);
+  assert.equal(last("/v1/lowco-api/ocr/text").headers["idempotency-key"], key);
   assert.equal(a.replayed, true);
 });
 
@@ -162,7 +162,7 @@ test("listAll follows next_cursor", async () => {
   const ids = [];
   for await (const j of client().jobs.listAll({ status: "succeeded" })) ids.push(j.job_id);
   assert.deepEqual(ids, ["j1", "j2", "j3"]);
-  assert.equal(last("/v1/jobs").query.cursor, "c2");
+  assert.equal(last("/v1/lowco-api/jobs").query.cursor, "c2");
 });
 
 test("a failed job throws LowcoJobError with its reason; a slow one times out", async () => {
@@ -173,10 +173,10 @@ test("a failed job throws LowcoJobError with its reason; a slow one times out", 
 test("contentUrl returns the signed link and download fetches it without the key", async () => {
   const lowco = client();
   const link = await lowco.files.contentUrl("file_x");
-  assert.equal(link, `${base}/v1/downloads/tok_x`);
+  assert.equal(link, `${base}/v1/lowco-api/downloads/tok_x`);
   const bytes = await lowco.files.download(link);
   assert.equal(Buffer.from(bytes).toString(), "%PDF-1.7");
-  assert.equal(last("/v1/downloads/tok_x").headers.authorization, undefined);
+  assert.equal(last("/v1/lowco-api/downloads/tok_x").headers.authorization, undefined);
 });
 
 test("a missing key is refused before any request", () => {
@@ -200,4 +200,11 @@ test("webhook signatures: the vectors made by lowco-api core/webhooksig", () => 
   const ok = vectors[0];
   assert.equal(constructEvent(ok.body, ok.header, ok.secret, { now: ok.now }).type, "job.succeeded");
   assert.throws(() => constructEvent(ok.body + " ", ok.header, ok.secret, { now: ok.now }), /does not match/);
+});
+
+test("orgId goes as X-Org-Id on authenticated calls", async () => {
+  await new LowcoApi({ apiKey: "lc_test_sdk", baseUrl: base, orgId: "7412" }).settings.get();
+  assert.equal(last("/v1/lowco-api/settings").headers["x-org-id"], "7412");
+  await client().settings.get();
+  assert.equal(last("/v1/lowco-api/settings").headers["x-org-id"], undefined);
 });

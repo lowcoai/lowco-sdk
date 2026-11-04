@@ -1,4 +1,10 @@
-import { generateId } from "./utils";
+import {
+  generateId,
+  HEADER_API_KEY,
+  HEADER_ENGAGE_APP_ID,
+  HEADER_ORG_ID,
+  isApiKey,
+} from "./utils";
 import { Config, DeviceInfo, Event, LocationInfo, Metadata } from "./types";
 import UAParser from "ua-parser-js";
 
@@ -42,7 +48,12 @@ class LowcoAnalytics {
 
   public init(config: Config) {
     this.config = { ...config };
-    console.log("Analytics initialized with config:", config);
+    // The credential stays out of the log.
+    console.log("Analytics initialized with config:", {
+      orgId: config.orgId,
+      appId: config.appId,
+      autoTrack: config.autoTrack,
+    });
     this.initializeSession();
     if (config.autoTrack && this.canUseBrowserApis()) {
       this.trackPageView();
@@ -53,6 +64,29 @@ class LowcoAnalytics {
     if (this.canUseBrowserApis()) {
       this.setDeviceInfo();
     }
+  }
+
+  /**
+   * An `lc_` API key travels as `X-Api-Key`, any other token as
+   * `Authorization: Bearer`. `X-Engage-App-Id` is sent only when `appId` is
+   * set; without it the service uses the org's default app.
+   */
+  private buildHeaders(config: Config): Record<string, string> {
+    const apiKey = config.apiKey.trim();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      [HEADER_ORG_ID]: config.orgId,
+    };
+    if (isApiKey(apiKey)) {
+      headers[HEADER_API_KEY] = apiKey;
+    } else {
+      headers.Authorization = `Bearer ${apiKey}`;
+    }
+    const appId = config.appId?.trim();
+    if (appId) {
+      headers[HEADER_ENGAGE_APP_ID] = appId;
+    }
+    return headers;
   }
 
   private canUseBrowserApis(): boolean {
@@ -377,11 +411,7 @@ class LowcoAnalytics {
     fetch(`${BASE_URL}/v1/engage/track`, {
       method: "POST",
       body: JSON.stringify(event),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.config.apiKey}`,
-        "X-Org-Id": this.config.orgId,
-      },
+      headers: this.buildHeaders(this.config),
     });
   }
 }

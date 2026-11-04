@@ -18,7 +18,7 @@ from ._errors import LowcoApiError, LowcoJobError, LowcoTimeoutError
 from ._files import FileRef, Files
 
 DEFAULT_BASE_URL = "https://api.lowco.ai"
-SDK_VERSION = "1.1.0"
+SDK_VERSION = "2.0.0"
 _TERMINAL = {"succeeded", "failed", "cancelled"}
 
 T = TypeVar("T")
@@ -87,12 +87,15 @@ def _multipart(fields: List[Tuple[str, str]], files: List[Tuple[str, str, str, b
 class Core:
     """Sends requests and decodes answers."""
 
-    def __init__(self, api_key: Optional[str] = None, *, base_url: Optional[str] = None, timeout: float = 60.0, max_retries: int = 2) -> None:
+    def __init__(self, api_key: Optional[str] = None, *, base_url: Optional[str] = None, timeout: float = 60.0, max_retries: int = 2,
+                 org_id: Optional[str] = None) -> None:
         key = api_key or os.environ.get("LOWCO_API_KEY")
         if not key:
             raise LowcoApiError("api_key is required (lc_live_… or lc_test_…): pass it or set LOWCO_API_KEY", status=0, reason="missing_key")
         self._key = key
         self.base_url = (base_url or os.environ.get("LOWCO_API_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
+        # Sent as X-Org-Id: an org-scoped key carries its org already; a tenant-level key needs it.
+        self.org_id = (org_id or os.environ.get("LOWCO_ORG_ID") or "").strip()
         self._timeout = timeout
         self._max_retries = max_retries
         self._opener = request.build_opener()
@@ -123,6 +126,8 @@ class Core:
         h.update(headers or {})
         if auth:
             h["Authorization"] = f"Bearer {self._key}"
+            if self.org_id:
+                h["X-Org-Id"] = self.org_id
         if request_id:
             h["X-Request-Id"] = request_id
         if idempotency_key:
@@ -247,7 +252,7 @@ class Core:
             def up(r: FileRef) -> FileRef:
                 if not r.is_local:
                     return r
-                stored = self.upload("/v1/files", r)
+                stored = self.upload("/v1/lowco-api/files", r)
                 return Files.id(stored["file_id"], password=r.password)
             named = [(f, up(r)) for f, r in named]
             many = [up(r) for r in many] if many is not None else None
@@ -308,7 +313,7 @@ class Core:
     def wait_for_job(self, job_id: str, *, timeout: float = 300.0, max_interval: float = 10.0) -> Dict[str, Any]:
         deadline = time.monotonic() + timeout
         while True:
-            raw = self._send("GET", self._url(f"/v1/jobs/{parse.quote(job_id, safe='')}"))
+            raw = self._send("GET", self._url(f"/v1/lowco-api/jobs/{parse.quote(job_id, safe='')}"))
             job = self._data(raw)
             if job["status"] in _TERMINAL:
                 if job["status"] == "succeeded":

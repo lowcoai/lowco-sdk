@@ -3,6 +3,8 @@ import type { Metadata } from "./types";
 export interface InlineSnippetOptions {
   apiKey?: string;
   orgId?: string;
+  /** Emitted only when given; without it events go to the org's default app. */
+  appId?: string;
   autoTrack?: boolean;
   eventName?: string;
   eventData?: Metadata;
@@ -27,6 +29,7 @@ function stringifyObject(value: Record<string, unknown>): string {
 export function createInlineSnippet({
   apiKey = "YOUR_API_KEY",
   orgId = "YOUR_ORG_ID",
+  appId,
   autoTrack = true,
   eventName = "signup_completed",
   eventData,
@@ -34,6 +37,7 @@ export function createInlineSnippet({
   const config = stringifyObject({
     apiKey,
     orgId,
+    appId: appId || undefined,
     autoTrack,
   });
 

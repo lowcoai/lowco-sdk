@@ -4,7 +4,7 @@ Flutter analytics SDK for the **lowco engage** service — the app counterpart o
 
 ```yaml
 dependencies:
-  lowcoai_engage: ^0.1.0
+  lowcoai_engage: ^0.2.0
 ```
 
 ## Quick start
@@ -16,7 +16,7 @@ import 'package:lowcoai_engage/lowcoai_engage.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LowcoAnalytics.instance.init(
-    EngageConfig(apiKey: '<api-key>', orgId: 'org_123', onError: (e) => debugPrint('$e')),
+    EngageConfig(apiKey: 'lc_…', orgId: 'org_123', onError: (e) => debugPrint('$e')),
   );
   runApp(
     MaterialApp(
@@ -37,10 +37,15 @@ LowcoAnalytics.instance.identifyUser('user_123', {'email': 'alice@example.com'})
 
 | Field       | Description                                                                                          |
 | ----------- | ---------------------------------------------------------------------------------------------------- |
-| `apiKey`    | API key sent as `Authorization: Bearer …`. Required; never logged (`toString()` redacts it).         |
+| `apiKey`    | Required; never logged (`toString()` redacts it). An `lc_…` API key is sent as `X-Api-Key`; any other value (an OAuth2 access token) as `Authorization: Bearer …`. |
 | `orgId`     | Sent as the `X-Org-Id` header. Required.                                                             |
+| `appId`     | Optional. The engage app to track into, sent as `X-Engage-App-Id`. `null` or blank: the org's default app. |
 | `autoTrack` | On web, capture attribution from the page URL (`Uri.base`) during `init`. Default `false`.           |
 | `onError`   | Receives every delivery and storage error. Without it errors are only `debugPrint`ed in debug mode. |
+
+An org can have several engage apps, each with its own events and users. Set `appId` to the app's id (engage → Settings → Apps) to track into it. An API key built into an app can be read out of it by anyone who has the app.
+
+`headerApiKey`, `headerOrgId`, `headerEngageAppId`, `isApiKey(apiKey)` and `trackHeaders(config)` are exported.
 
 `init(config, {storage, httpClient})` also takes an `EngageStorage` (default `SharedPreferencesEngageStorage`) and your own `http.Client` (never closed by the SDK). Calling `init` again reconfigures the client.
 

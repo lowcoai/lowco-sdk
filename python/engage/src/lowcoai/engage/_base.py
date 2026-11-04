@@ -15,6 +15,10 @@ from .types import DeviceInfo, Event, LocationInfo
 BASE_URL = "https://api.lowco.ai"
 TRACK_PATH = "/v1/engage/track"
 HEADER_ORG_ID = "X-Org-Id"
+HEADER_API_KEY = "X-Api-Key"
+"""Carries an ``lc_`` API key; any other token travels as ``Authorization: Bearer``."""
+HEADER_ENGAGE_APP_ID = "X-Engage-App-Id"
+"""Selects the engage app; without it the service uses the org's default app."""
 PAGE_VIEW_EVENT = "page_view"
 IDENTIFY_EVENT = "_lowco_identify"
 DEFAULT_TIMEOUT = 30.0
@@ -33,26 +37,48 @@ ATTRIBUTION_KEYS: tuple[str, ...] = (
 """Query parameters the browser SDK captures as attribution (same order)."""
 
 
+def is_api_key(api_key: str) -> bool:
+    """Whether ``api_key`` is a Lowco API key (``lc_…``) rather than an access token."""
+    return api_key.strip().startswith("lc_")
+
+
 class BaseClient:
     """Holds configuration and builds / encodes events for both clients."""
 
-    def __init__(self, api_key: str, org_id: str, *, device_id: str | None) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        org_id: str,
+        *,
+        app_id: str | None,
+        device_id: str | None,
+    ) -> None:
         if not api_key or not api_key.strip():
             raise ValueError("EngageClient: api_key is required")
         if not org_id or not org_id.strip():
             raise ValueError("EngageClient: org_id is required")
         self._device_id = device_id or str(uuid.uuid4())
+        self._app_id = app_id.strip() if app_id and app_id.strip() else None
         self._track_url = BASE_URL + TRACK_PATH
-        self._headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-            HEADER_ORG_ID: org_id,
-        }
+        api_key = api_key.strip()
+        self._headers = {"Content-Type": "application/json"}
+        if is_api_key(api_key):
+            self._headers[HEADER_API_KEY] = api_key
+        else:
+            self._headers["Authorization"] = f"Bearer {api_key}"
+        self._headers[HEADER_ORG_ID] = org_id
+        if self._app_id is not None:
+            self._headers[HEADER_ENGAGE_APP_ID] = self._app_id
 
     @property
     def device_id(self) -> str:
         """Default ``device_id`` for events that don't pass one (uuid4 unless configured)."""
         return self._device_id
+
+    @property
+    def app_id(self) -> str | None:
+        """The engage app events go to, or ``None`` for the org's default app."""
+        return self._app_id
 
     def _build_event(
         self,

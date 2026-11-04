@@ -12,7 +12,7 @@ import (
 	"os"
 	"strings"
 
-	api "github.com/lowcoai/lowco-sdk/go/api"
+	api "github.com/lowcoai/lowco-sdk/go/api/v2"
 )
 
 func main() {

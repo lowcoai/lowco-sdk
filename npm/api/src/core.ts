@@ -6,7 +6,7 @@ import type { ErrorDetail, ErrorReason, Job } from "./generated.js";
 export const DEFAULT_BASE_URL = "https://api.lowco.ai";
 
 /** This SDK's version; its major and minor follow the API document it was generated from. */
-export const SDK_VERSION = "1.1.0";
+export const SDK_VERSION = "2.0.0";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_WAIT_MS = 300_000;
@@ -72,6 +72,8 @@ export interface ClientOptions {
   apiKey?: string;
   /** Defaults to the LOWCO_API_BASE_URL environment variable, else https://api.lowco.ai. */
   baseUrl?: string;
+  /** Your Lowco organization id, sent as X-Org-Id. Defaults to the LOWCO_ORG_ID environment variable. An org-scoped key carries its org already; a tenant-level key needs this. */
+  orgId?: string;
   /** Per-request timeout (default 60 s). */
   timeoutMs?: number;
   /** Retries of retryable failures (429, 503, network) for requests safe to repeat: GETs and calls with an Idempotency-Key. Default 2. */
@@ -214,6 +216,7 @@ function reference(f: FileRef): Json {
 export class Core {
   readonly baseUrl: string;
   private readonly apiKey: string;
+  readonly orgId: string;
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
   private readonly fetchImpl: typeof fetch;
@@ -226,6 +229,7 @@ export class Core {
     }
     this.apiKey = apiKey;
     this.baseUrl = (options.baseUrl ?? envVars.LOWCO_API_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    this.orgId = (options.orgId ?? envVars.LOWCO_ORG_ID ?? "").trim();
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.maxRetries = options.maxRetries ?? 2;
     const f = options.fetch ?? globalThis.fetch;
@@ -244,7 +248,10 @@ export class Core {
 
   private async send(method: string, url: string, init: { body?: BodyInit; headers?: Record<string, string>; auth?: boolean; redirect?: RequestRedirect }, options?: RequestOptions, retrySafe = method === "GET"): Promise<Raw> {
     const headers: Record<string, string> = { "X-Client-User-Agent": `lowcoai-api-node/${SDK_VERSION}`, ...init.headers };
-    if (init.auth !== false) headers.Authorization = `Bearer ${this.apiKey}`;
+    if (init.auth !== false) {
+      headers.Authorization = `Bearer ${this.apiKey}`;
+      if (this.orgId) headers["X-Org-Id"] = this.orgId;
+    }
     if (options?.requestId) headers["X-Request-Id"] = options.requestId;
     if (options?.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
     const safe = retrySafe || !!options?.idempotencyKey;
@@ -329,7 +336,7 @@ export class Core {
     return this.data<T>(await this.send(method, this.url(path, input.query), init, options));
   }
 
-  /** POST /v1/files and the like: one multipart file. */
+  /** POST /v1/lowco-api/files and the like: one multipart file. */
   async upload<T>(path: string, file: FileInput, options?: RequestOptions): Promise<T> {
     const f = normalise(file);
     if (!isLocal(f)) throw new LowcoApiError("upload takes a local file (path, bytes or stream)", { status: 0, reason: "invalid_param", param: "file" });
@@ -380,7 +387,7 @@ export class Core {
     if (local > 0 && local < all.length) {
       const up = async (ref: FileRef): Promise<FileRef> => {
         if (!isLocal(ref)) return ref;
-        const stored = await this.upload<{ file_id: string }>("/v1/files", ref, { signal: options?.signal });
+        const stored = await this.upload<{ file_id: string }>("/v1/lowco-api/files", ref, { signal: options?.signal });
         return { kind: "id", fileId: stored.file_id, password: ref.password };
       };
       for (const n of named) n.ref = await up(n.ref);
@@ -451,7 +458,7 @@ export class Core {
     const maxInterval = options?.maxIntervalMs ?? 10_000;
     const deadline = Date.now() + timeout;
     for (;;) {
-      const raw = await this.send("GET", this.url(`/v1/jobs/${encodeURIComponent(jobId)}`), {}, { signal: options?.signal });
+      const raw = await this.send("GET", this.url(`/v1/lowco-api/jobs/${encodeURIComponent(jobId)}`), {}, { signal: options?.signal });
       const job = this.data<Job>(raw);
       if (TERMINAL.has(job.status)) {
         if (job.status === "succeeded") return job;

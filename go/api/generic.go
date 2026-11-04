@@ -21,7 +21,7 @@ type OperationInput struct {
 	Params map[string]any
 }
 
-// Operation calls any operation by its path (POST /v1/{service}/{operation})
+// Operation calls any operation by its path (POST /v1/lowco-api/{service}/{operation})
 // with the same file handling, retries and errors as the typed services; the
 // answer's Data is the operation's result as raw JSON, and Result waits for a
 // job the same way.
@@ -46,7 +46,7 @@ func (c *Client) Operation(ctx context.Context, path string, in OperationInput, 
 	return out.decode(c.c)
 }
 
-// Request calls any resource route (GET /v1/jobs, PATCH /v1/settings, …) and
+// Request calls any resource route (GET /v1/lowco-api/jobs, PATCH /v1/lowco-api/settings, …) and
 // returns the envelope's data as raw JSON. body is sent as JSON when not nil.
 // GETs are retried like the typed resources.
 func (c *Client) Request(ctx context.Context, method, path string, query url.Values, body any, opts ...RequestOption) (json.RawMessage, error) {

@@ -54,6 +54,29 @@ async def test_async_track_page_identify() -> None:
     assert bodies[2]["device_id"] == "dev_2"
 
 
+async def test_async_api_key_and_app_id_headers() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200)
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    async with AsyncEngageClient("lc_secret", "org_1", app_id="app_7", http_client=http) as client:
+        assert client.app_id == "app_7"
+        await client.track("x")
+    async with make_client(handler) as client:
+        assert client.app_id is None
+        await client.track("y")
+
+    assert seen[0].headers["X-Api-Key"] == "lc_secret"
+    assert "Authorization" not in seen[0].headers
+    assert seen[0].headers["X-Engage-App-Id"] == "app_7"
+    assert seen[1].headers["Authorization"] == "Bearer key_123"
+    assert "X-Engage-App-Id" not in seen[1].headers
+    await http.aclose()
+
+
 async def test_async_error_mapping() -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(
@@ -100,3 +123,5 @@ def test_sync_and_async_clients_expose_the_same_api() -> None:
     )
     assert isinstance(EngageClient.device_id, property)
     assert isinstance(AsyncEngageClient.device_id, property)
+    assert isinstance(EngageClient.app_id, property)
+    assert isinstance(AsyncEngageClient.app_id, property)

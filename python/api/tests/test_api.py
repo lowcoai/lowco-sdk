@@ -33,7 +33,7 @@ def job(job_id, status, **extra):
     j = {"job_id": job_id, "service": "docai", "operation": "invoice", "status": status, "progress": None, "input": {},
          "result": None, "error": None, "usage": None, "attempts": 1, "created_at": "2026-10-09T09:30:00Z",
          "started_at": None, "finished_at": None, "expires_at": "2026-10-16T09:30:00Z",
-         "links": {"self": f"/v1/jobs/{job_id}", "cancel": f"/v1/jobs/{job_id}/cancel"}}
+         "links": {"self": f"/v1/lowco-api/jobs/{job_id}", "cancel": f"/v1/lowco-api/jobs/{job_id}/cancel"}}
     j.update(extra)
     return j
 
@@ -58,52 +58,52 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         SEEN.append({"method": self.command, "path": u.path, "query": q, "headers": dict(self.headers), "body": body})
-        if self.headers.get("Authorization") != "Bearer lc_test_sdk" and not u.path.startswith("/v1/downloads/"):
+        if self.headers.get("Authorization") != "Bearer lc_test_sdk" and not u.path.startswith("/v1/lowco-api/downloads/"):
             return self.send(401, json.dumps({"status": 0, "error": {"code": 401, "reason": "missing_key", "message": "No key", "doc_url": "x"}}).encode())
         key = f"{self.command} {u.path}"
-        if key == "POST /v1/qr/generate":
+        if key == "POST /v1/lowco-api/qr/generate":
             if self.headers.get("Accept") == "image/png":
                 return self.send(200, PNG, "image/png")
             return self.send(200, env({"format": "png", "width": 512}), headers={"X-Lowco-Credits-Used": "0.0500"})
-        if key == "POST /v1/docai/invoice":
+        if key == "POST /v1/lowco-api/docai/invoice":
             if q.get("mode") == "async":
                 return self.send(202, env(job("job_inv", "queued")), headers={"Retry-After": "0"})
             return self.send(200, env({"invoice_number": {"value": "INV-1", "confidence": 0.98, "source": {"page": 1}}}))
-        if key == "GET /v1/jobs/job_inv":
+        if key == "GET /v1/lowco-api/jobs/job_inv":
             STATE["polls"] += 1
             if STATE["polls"] < 3:
                 return self.send(200, env(job("job_inv", "processing")), headers={"Retry-After": "0"})
             return self.send(200, env(job("job_inv", "succeeded", result={"invoice_number": {"value": "INV-1", "confidence": 0.98, "source": {"page": 1}}})))
-        if key == "GET /v1/jobs/job_bad":
+        if key == "GET /v1/lowco-api/jobs/job_bad":
             return self.send(200, env(job("job_bad", "failed", error={"code": 422, "reason": "file_corrupt", "message": "The file is not a readable PDF.", "doc_url": "x"})))
-        if key == "GET /v1/jobs/job_slow":
+        if key == "GET /v1/lowco-api/jobs/job_slow":
             return self.send(200, env(job("job_slow", "processing")), headers={"Retry-After": "0"})
-        if key == "GET /v1/jobs":
+        if key == "GET /v1/lowco-api/jobs":
             if not q.get("cursor"):
                 return self.send(200, env({"items": [job("j1", "succeeded"), job("j2", "succeeded")], "next_cursor": "c2"}))
             return self.send(200, env({"items": [job("j3", "failed")], "next_cursor": None}))
-        if key == "POST /v1/files":
+        if key == "POST /v1/lowco-api/files":
             return self.send(201, env({"file_id": "file_uploaded"}))
-        if key == "POST /v1/pdf/merge":
+        if key == "POST /v1/lowco-api/pdf/merge":
             return self.send(200, env({"pages": 2, "files_merged": 2, "file": {"file_id": "file_m", "url": None}}))
-        if key == "POST /v1/pdf/rotate":
+        if key == "POST /v1/lowco-api/pdf/rotate":
             return self.send(400, json.dumps({"status": 0, "error": {"code": 400, "reason": "invalid_param", "message": "angle must be 90, 180 or 270.", "param": "angle", "request_id": "req_err", "doc_url": "https://docs.lowco.ai/api/errors#invalid_param"}}).encode())
-        if key == "POST /v1/ocr/text":
+        if key == "POST /v1/lowco-api/ocr/text":
             return self.send(202, env(job("job_ocr", "queued")), headers={"Idempotent-Replayed": "true"})
-        if key == "GET /v1/settings":
+        if key == "GET /v1/lowco-api/settings":
             STATE["settings"] += 1
             if STATE["settings"] == 1:
                 return self.send(429, json.dumps({"status": 0, "error": {"code": 429, "reason": "rate_limited", "message": "Slow down", "doc_url": "x"}}).encode(), headers={"Retry-After": "0"})
             return self.send(200, env({"environment": "test"}))
-        if key == "GET /v1/usage":
+        if key == "GET /v1/lowco-api/usage":
             return self.send(200, env({"from": q.get("from"), "to": q.get("to")}))
-        if key == "GET /v1/files/file_x/content":
+        if key == "GET /v1/lowco-api/files/file_x/content":
             self.send_response(307)
-            self.send_header("Location", BASE + "/v1/downloads/tok_x")
+            self.send_header("Location", BASE + "/v1/lowco-api/downloads/tok_x")
             self.send_header("Content-Length", "0")
             self.end_headers()
             return None
-        if key == "GET /v1/downloads/tok_x":
+        if key == "GET /v1/lowco-api/downloads/tok_x":
             return self.send(200, b"%PDF-1.7", "application/pdf")
         return self.send(404, json.dumps({"status": 0, "error": {"code": 404, "reason": "route_not_found", "message": "no", "doc_url": "x"}}).encode())
 
@@ -130,7 +130,7 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(a.data["width"], 512)
         self.assertEqual(a.request_id, "req_test")
         self.assertEqual(a.credits_used, "0.0500")
-        sent = last("/v1/qr/generate")
+        sent = last("/v1/lowco-api/qr/generate")
         self.assertEqual(json.loads(sent["body"]), {"type": "upi", "pa": "acme@okhdfcbank", "pn": "Acme", "am": "1499.00"})
         self.assertTrue(sent["headers"]["X-Client-User-Agent"].startswith("lowcoai-api-python/"))
 
@@ -147,7 +147,7 @@ class ApiTest(unittest.TestCase):
             a = lowco.docai.invoice(file=Files.path(p), languages=["eng", "hin"], mode="async")
         self.assertEqual(a.status, 202)
         self.assertEqual(a.job["job_id"], "job_inv")
-        sent = last("/v1/docai/invoice")
+        sent = last("/v1/lowco-api/docai/invoice")
         self.assertTrue(sent["headers"]["Content-Type"].startswith("multipart/form-data"))
         text = sent["body"].decode()
         self.assertIn('name="file"; filename="invoice.pdf"', text)
@@ -160,10 +160,10 @@ class ApiTest(unittest.TestCase):
 
     def test_references_and_mixed_inputs(self):
         client().pdf.merge(files=[Files.id("file_a"), Files.url("https://example.com/b.pdf")], bookmarks=True)
-        self.assertEqual(json.loads(last("/v1/pdf/merge")["body"]), {"bookmarks": True, "files": [{"file_id": "file_a"}, {"file_url": "https://example.com/b.pdf"}]})
+        self.assertEqual(json.loads(last("/v1/lowco-api/pdf/merge")["body"]), {"bookmarks": True, "files": [{"file_id": "file_a"}, {"file_url": "https://example.com/b.pdf"}]})
         client().pdf.merge(files=[Files.id("file_a"), b"%PD"])
-        self.assertTrue(last("/v1/files")["headers"]["Content-Type"].startswith("multipart/form-data"))
-        self.assertEqual(json.loads(last("/v1/pdf/merge")["body"]), {"files": [{"file_id": "file_a"}, {"file_id": "file_uploaded"}]})
+        self.assertTrue(last("/v1/lowco-api/files")["headers"]["Content-Type"].startswith("multipart/form-data"))
+        self.assertEqual(json.loads(last("/v1/lowco-api/pdf/merge")["body"]), {"files": [{"file_id": "file_a"}, {"file_id": "file_uploaded"}]})
 
     def test_typed_error(self):
         with self.assertRaises(LowcoApiError) as cm:
@@ -177,7 +177,7 @@ class ApiTest(unittest.TestCase):
     def test_idempotency_key(self):
         key = new_idempotency_key()
         a = client().ocr.text(file=Files.id("file_a"), idempotency_key=key, mode="async")
-        self.assertEqual(last("/v1/ocr/text")["headers"]["Idempotency-Key"], key)
+        self.assertEqual(last("/v1/lowco-api/ocr/text")["headers"]["Idempotency-Key"], key)
         self.assertTrue(a.replayed)
 
     def test_get_retries_429(self):
@@ -191,7 +191,7 @@ class ApiTest(unittest.TestCase):
     def test_list_all(self):
         ids = [j["job_id"] for j in client().jobs.list_all(status="succeeded")]
         self.assertEqual(ids, ["j1", "j2", "j3"])
-        self.assertEqual(last("/v1/jobs")["query"]["cursor"], "c2")
+        self.assertEqual(last("/v1/lowco-api/jobs")["query"]["cursor"], "c2")
 
     def test_failed_and_slow_jobs(self):
         with self.assertRaises(LowcoJobError) as cm:
@@ -204,9 +204,15 @@ class ApiTest(unittest.TestCase):
     def test_content_url_and_download(self):
         lowco = client()
         link = lowco.files.content_url("file_x")
-        self.assertEqual(link, BASE + "/v1/downloads/tok_x")
+        self.assertEqual(link, BASE + "/v1/lowco-api/downloads/tok_x")
         self.assertEqual(lowco.files.download(link), b"%PDF-1.7")
-        self.assertNotIn("Authorization", last("/v1/downloads/tok_x")["headers"])
+        self.assertNotIn("Authorization", last("/v1/lowco-api/downloads/tok_x")["headers"])
+
+    def test_org_id_header(self):
+        LowcoApi("lc_test_sdk", base_url=BASE, org_id="7412").settings.get()
+        self.assertEqual(last("/v1/lowco-api/settings")["headers"].get("X-Org-Id"), "7412")
+        client().settings.get()
+        self.assertNotIn("X-Org-Id", last("/v1/lowco-api/settings")["headers"])
 
     def test_missing_key(self):
         saved = os.environ.pop("LOWCO_API_KEY", None)

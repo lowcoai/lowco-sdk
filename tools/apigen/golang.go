@@ -134,7 +134,7 @@ func emitGo(m *Model) []byte {
 
 	for _, svc := range m.services() {
 		cls := goField(svc) + "Service"
-		fmt.Fprintf(&b, "// %s calls the /v1/%s operations.\ntype %s struct{ c *core }\n\n", cls, svc, cls)
+		fmt.Fprintf(&b, "// %s calls the /v1/lowco-api/%s operations.\ntype %s struct{ c *core }\n\n", cls, svc, cls)
 		for _, o := range m.Ops {
 			if o.Service != svc {
 				continue
@@ -236,7 +236,7 @@ func emitGo(m *Model) []byte {
 
 	b.WriteString("// services holds every operation and resource group of the Lowco API.\ntype services struct {\n")
 	for _, svc := range m.services() {
-		fmt.Fprintf(&b, "\t// %s calls the /v1/%s operations.\n\t%s *%sService\n", goField(svc), svc, goField(svc), goField(svc))
+		fmt.Fprintf(&b, "\t// %s calls the /v1/lowco-api/%s operations.\n\t%s *%sService\n", goField(svc), svc, goField(svc), goField(svc))
 	}
 	for _, g := range m.groups() {
 		fmt.Fprintf(&b, "\t// %s: %s.\n\t%s *%sResource\n", goField(g), groupDoc(g), goField(g), goField(g))

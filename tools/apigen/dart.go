@@ -221,7 +221,7 @@ func emitDart(m *Model) []byte {
 
 	for _, svc := range m.services() {
 		cls := pascal(svc) + "Operations"
-		fmt.Fprintf(&b, "/// /v1/%s operations.\nclass %s {\n  %s(this._core);\n  final Core _core;\n\n", svc, cls, cls)
+		fmt.Fprintf(&b, "/// /v1/lowco-api/%s operations.\nclass %s {\n  %s(this._core);\n  final Core _core;\n\n", svc, cls, cls)
 		for _, o := range m.Ops {
 			if o.Service != svc {
 				continue
@@ -326,7 +326,7 @@ func emitDart(m *Model) []byte {
 	}
 	b.WriteString(strings.Join(inits, ",\n        ") + ";\n\n")
 	for _, svc := range m.services() {
-		fmt.Fprintf(&b, "  /// /v1/%s operations.\n  final %sOperations %s;\n\n", svc, pascal(svc), dartName(svc))
+		fmt.Fprintf(&b, "  /// /v1/lowco-api/%s operations.\n  final %sOperations %s;\n\n", svc, pascal(svc), dartName(svc))
 	}
 	for _, g := range m.groups() {
 		fmt.Fprintf(&b, "  /// %s.\n  final %sResource %s;\n\n", groupDoc(g), pascal(g), dartName(g))
