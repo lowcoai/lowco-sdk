@@ -1016,7 +1016,7 @@ class BarcodeDecodeRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -1923,7 +1923,7 @@ class DocaiBankStatementRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -2032,7 +2032,7 @@ class DocaiChequeRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -2148,7 +2148,7 @@ class DocaiClassifyRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -2275,7 +2275,7 @@ class DocaiExtractRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -2392,7 +2392,7 @@ class DocaiInvoiceRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -2535,7 +2535,7 @@ class DocaiKycRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -2654,7 +2654,7 @@ class DocaiReceiptRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -2763,7 +2763,7 @@ class DocaiTablesRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -2796,6 +2796,182 @@ class DocaiTablesRequest {
 }
 
 typedef DocaiTablesResult = TablesResult;
+
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class DocaiTextParams {
+  const DocaiTextParams({
+    required this.file,
+    this.callbackUrl,
+    this.maxCharacters,
+  });
+
+  /// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+  final FileInput file;
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Cut the text here; the result says truncated
+  final int? maxCharacters;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (maxCharacters != null) 'max_characters': maxCharacters!,
+      };
+
+  /// The named file inputs.
+  Map<String, FileInput?> get fileInputs => {'file': file};
+
+  /// The files, in order.
+  List<FileInput>? get manyFiles => null;
+}
+
+/// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+class DocaiTextRequest {
+  const DocaiTextRequest({
+    this.callbackUrl,
+    this.fileBase64,
+    this.fileId,
+    this.fileUrl,
+    this.filename,
+    this.maxCharacters,
+    this.password,
+  });
+
+  factory DocaiTextRequest.fromJson(Map<String, dynamic> json) => DocaiTextRequest(
+        callbackUrl: json['callback_url'] as String?,
+        fileBase64: json['file_base64'] as String?,
+        fileId: json['file_id'] as String?,
+        fileUrl: json['file_url'] as String?,
+        filename: json['filename'] as String?,
+        maxCharacters: (json['max_characters'] as num?)?.toInt(),
+        password: json['password'] as String?,
+      );
+
+  /// Public https URL that receives this job's webhook
+  final String? callbackUrl;
+
+  /// Base64, URL-safe base64 or a data: URL
+  final String? fileBase64;
+
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
+  final String? fileId;
+
+  /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+  final String? fileUrl;
+
+  /// Name for the stored input
+  final String? filename;
+
+  /// Cut the text here; the result says truncated
+  final int? maxCharacters;
+
+  /// Opens a protected PDF; never stored or logged
+  final String? password;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (callbackUrl != null) 'callback_url': callbackUrl!,
+        if (fileBase64 != null) 'file_base64': fileBase64!,
+        if (fileId != null) 'file_id': fileId!,
+        if (fileUrl != null) 'file_url': fileUrl!,
+        if (filename != null) 'filename': filename!,
+        if (maxCharacters != null) 'max_characters': maxCharacters!,
+        if (password != null) 'password': password!,
+      };
+}
+
+class DocaiTextResult {
+  const DocaiTextResult({
+    this.characters,
+    this.format,
+    this.paragraphs,
+    this.sheets,
+    this.tables,
+    this.text,
+    this.truncated,
+    this.warnings,
+  });
+
+  factory DocaiTextResult.fromJson(Map<String, dynamic> json) => DocaiTextResult(
+        characters: (json['characters'] as num?)?.toInt(),
+        format: json['format'] as String?,
+        paragraphs: (json['paragraphs'] as num?)?.toInt(),
+        sheets: (json['sheets'] as List?)?.map((e) => (e == null ? null : DocaiTextResultSheet.fromJson(e as Map<String, dynamic>))!).toList().cast<DocaiTextResultSheet>(),
+        tables: (json['tables'] as num?)?.toInt(),
+        text: json['text'] as String?,
+        truncated: json['truncated'] as bool?,
+        warnings: (json['warnings'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+      );
+
+  /// Characters in text
+  final int? characters;
+
+  final String? format;
+
+  /// DOCX paragraphs outside tables
+  final int? paragraphs;
+
+  final List<DocaiTextResultSheet>? sheets;
+
+  /// DOCX tables
+  final int? tables;
+
+  /// The document's text: one line per paragraph or row, cells joined by " | "; DOCX headings as # lines and list items as - lines; each XLSX sheet under a "## Sheet: <name>" line, dates as YYYY-MM-DD
+  final String? text;
+
+  /// true when the text was cut at max_characters
+  final bool? truncated;
+
+  final List<String>? warnings;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (characters != null) 'characters': characters!,
+        if (format != null) 'format': format!,
+        if (paragraphs != null) 'paragraphs': paragraphs!,
+        if (sheets != null) 'sheets': sheets!.map((e) => e.toJson()).toList(),
+        if (tables != null) 'tables': tables!,
+        if (text != null) 'text': text!,
+        if (truncated != null) 'truncated': truncated!,
+        if (warnings != null) 'warnings': warnings!,
+      };
+}
+
+/// An XLSX sheet, or the rows of a CSV or TSV
+class DocaiTextResultSheet {
+  const DocaiTextResultSheet({
+    this.columns,
+    this.hidden,
+    this.name,
+    this.rows,
+  });
+
+  factory DocaiTextResultSheet.fromJson(Map<String, dynamic> json) => DocaiTextResultSheet(
+        columns: (json['columns'] as num?)?.toInt(),
+        hidden: json['hidden'] as bool?,
+        name: json['name'] as String?,
+        rows: (json['rows'] as num?)?.toInt(),
+      );
+
+  final int? columns;
+
+  final bool? hidden;
+
+  final String? name;
+
+  /// Rows with content
+  final int? rows;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (columns != null) 'columns': columns!,
+        if (hidden != null) 'hidden': hidden!,
+        if (name != null) 'name': name!,
+        if (rows != null) 'rows': rows!,
+      };
+}
 
 class ErrorBody {
   const ErrorBody({
@@ -3052,7 +3228,7 @@ class FileRef {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -3071,6 +3247,59 @@ class FileRef {
         if (fileUrl != null) 'file_url': fileUrl!,
         if (filename != null) 'filename': filename!,
         if (password != null) 'password': password!,
+      };
+}
+
+/// A page; pass next_cursor as cursor for the next one (null at the end).
+class FilesListData {
+  const FilesListData({
+    this.items,
+    this.nextCursor,
+  });
+
+  factory FilesListData.fromJson(Map<String, dynamic> json) => FilesListData(
+        items: (json['items'] as List?)?.map((e) => (e == null ? null : StoredFile.fromJson(e as Map<String, dynamic>))!).toList().cast<StoredFile>(),
+        nextCursor: json['next_cursor'] as String?,
+      );
+
+  final List<StoredFile>? items;
+
+  final String? nextCursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (items != null) 'items': items!.map((e) => e.toJson()).toList(),
+        if (nextCursor != null) 'next_cursor': nextCursor!,
+      };
+}
+
+class FilesListQuery {
+  const FilesListQuery({
+    this.source,
+    this.limit,
+    this.cursor,
+  });
+
+  factory FilesListQuery.fromJson(Map<String, dynamic> json) => FilesListQuery(
+        source: json['source'] as String?,
+        limit: (json['limit'] as num?)?.toInt(),
+        cursor: json['cursor'] as String?,
+      );
+
+  /// Only files that arrived this way
+  final String? source;
+
+  /// Page size
+  final int? limit;
+
+  /// next_cursor of the previous page.
+  final String? cursor;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (source != null) 'source': source!,
+        if (limit != null) 'limit': limit!,
+        if (cursor != null) 'cursor': cursor!,
       };
 }
 
@@ -3442,7 +3671,7 @@ class Job {
   /// The request that created the job
   final String? requestId;
 
-  /// Set when succeeded: the operation's data, with output files as file objects and fresh signed links
+  /// Set when succeeded: the operation's data, with output files as file objects and fresh signed links. An OCR job keeps only a summary (OCRJobResult): its full result and text are files in the job's Lowco Docs folder.
   final Map<String, Object>? result;
 
   final String? service;
@@ -6125,6 +6354,72 @@ class MessagesListQuery {
       };
 }
 
+/// The result of an ocr/text or ocr/handwriting job. The full result (OCRResult, as the sync answer would be) and the plain text are files in the job's Lowco Docs folder, so a 1,000-page document never sits in the job.
+class OCRJobResult {
+  const OCRJobResult({
+    this.confidence,
+    this.engineUsed,
+    this.languagesDetected,
+    this.pageCount,
+    this.resultFile,
+    this.textCharacters,
+    this.textFile,
+    this.textPreview,
+    this.textTruncated,
+    this.warnings,
+  });
+
+  factory OCRJobResult.fromJson(Map<String, dynamic> json) => OCRJobResult(
+        confidence: json['confidence'] as num?,
+        engineUsed: json['engine_used'] as String?,
+        languagesDetected: (json['languages_detected'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+        pageCount: (json['page_count'] as num?)?.toInt(),
+        resultFile: json['result_file'] == null ? null : Output.fromJson(json['result_file'] as Map<String, dynamic>),
+        textCharacters: (json['text_characters'] as num?)?.toInt(),
+        textFile: json['text_file'] == null ? null : Output.fromJson(json['text_file'] as Map<String, dynamic>),
+        textPreview: json['text_preview'] as String?,
+        textTruncated: json['text_truncated'] as bool?,
+        warnings: (json['warnings'] as List?)?.map((e) => (e as String?)!).toList().cast<String>(),
+      );
+
+  final num? confidence;
+
+  final String? engineUsed;
+
+  final List<String>? languagesDetected;
+
+  final int? pageCount;
+
+  final Output? resultFile;
+
+  /// Characters in the whole text
+  final int? textCharacters;
+
+  final Output? textFile;
+
+  /// The first 2,000 characters of the text
+  final String? textPreview;
+
+  /// true when the text is longer than the preview
+  final bool? textTruncated;
+
+  final List<String>? warnings;
+
+  /// The wire form; null fields are left out (file inputs are sent separately).
+  Map<String, dynamic> toJson() => {
+        if (confidence != null) 'confidence': confidence!,
+        if (engineUsed != null) 'engine_used': engineUsed!,
+        if (languagesDetected != null) 'languages_detected': languagesDetected!,
+        if (pageCount != null) 'page_count': pageCount!,
+        if (resultFile != null) 'result_file': resultFile!.toJson(),
+        if (textCharacters != null) 'text_characters': textCharacters!,
+        if (textFile != null) 'text_file': textFile!.toJson(),
+        if (textPreview != null) 'text_preview': textPreview!,
+        if (textTruncated != null) 'text_truncated': textTruncated!,
+        if (warnings != null) 'warnings': warnings!,
+      };
+}
+
 class OCRPage {
   const OCRPage({
     this.blocks,
@@ -6611,7 +6906,7 @@ class OcrHandwritingRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -6747,7 +7042,7 @@ class OcrTextRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -6859,6 +7154,7 @@ class Output {
   /// When the file is deleted; null with zero retention
   final String? expiresAt;
 
+  /// The Lowco Docs document id
   final String? fileId;
 
   final String? mimeType;
@@ -7190,7 +7486,7 @@ class PdfArrangeRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -7309,7 +7605,7 @@ class PdfCompressRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -7445,7 +7741,7 @@ class PdfExtractTextRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -7728,7 +8024,7 @@ class PdfInfoRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -8192,7 +8488,7 @@ class PdfProtectRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -8329,7 +8625,7 @@ class PdfRotateRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -8464,7 +8760,7 @@ class PdfSplitRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -8589,7 +8885,7 @@ class PdfToDocxRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -8709,7 +9005,7 @@ class PdfToImagesRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -8835,7 +9131,7 @@ class PdfUnlockRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -8986,7 +9282,7 @@ class PdfWatermarkRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -9271,7 +9567,7 @@ class QrDecodeRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -9926,7 +10222,7 @@ class RenderDocxRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -10054,7 +10350,7 @@ class RenderDocxTemplateRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -13810,6 +14106,7 @@ class StoredFile {
 
   final String? expiresAt;
 
+  /// The Lowco Docs document id
   final String? fileId;
 
   final String? filename;
@@ -13824,7 +14121,7 @@ class StoredFile {
 
   final String? sha256;
 
-  /// How the file arrived
+  /// How the file arrived (document: a Lowco Docs document of another app, read by its id; never deleted by the API)
   final String? source;
 
   /// The wire form; null fields are left out (file inputs are sent separately).
@@ -15995,7 +16292,7 @@ class VerifyDocumentTamperRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -16474,7 +16771,7 @@ class VerifyDuplicateDocumentRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -18255,7 +18552,7 @@ class VerifyKycRequest {
   /// Base64, URL-safe base64 or a data: URL
   final String? fileBase64;
 
-  /// A stored file of this org and environment (POST /v1/lowco-api/files)
+  /// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
   final String? fileId;
 
   /// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
@@ -20896,6 +21193,9 @@ class DocaiOperations {
   /// Extract tables with CSV and XLSX files. Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.tables.execute.
   Future<Answer<DocaiTablesResult>> tables(DocaiTablesParams params, [CallOptions? options]) => _core.operation('/v1/lowco-api/docai/tables', params.toJson(), params.fileInputs, null, TablesResult.fromJson, options);
 
+  /// Text from DOCX, XLSX, CSV and plain-text files (no model, no OCR). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.text.execute.
+  Future<Answer<DocaiTextResult>> text(DocaiTextParams params, [CallOptions? options]) => _core.operation('/v1/lowco-api/docai/text', params.toJson(), params.fileInputs, null, DocaiTextResult.fromJson, options);
+
 }
 
 /// /v1/lowco-api/ocr operations.
@@ -21097,6 +21397,12 @@ class FilesResource {
 
   /// File metadata.
   Future<StoredFile> get(String id, [RequestOptions? options]) => _core.call('GET', '/v1/lowco-api/files/${Uri.encodeComponent(id)}', query: null, body: null, decode: (j) => StoredFile.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Stored files of this environment, newest first.
+  Future<FilesListData> list(FilesListQuery? query, [RequestOptions? options]) => _core.call('GET', '/v1/lowco-api/files', query: query?.toJson(), body: null, decode: (j) => FilesListData.fromJson(j as Map<String, dynamic>), options: options);
+
+  /// Every item of list, page after page (follows next_cursor).
+  Stream<StoredFile> listAll(FilesListQuery? query, [RequestOptions? options]) => _core.paginate('/v1/lowco-api/files', query?.toJson(), (j) => StoredFile.fromJson(j as Map<String, dynamic>), options);
 
   /// Upload a file (50 MB live, 5 MB test).
   Future<StoredFile> upload(FileInput file, [RequestOptions? options]) => _core.upload('/v1/lowco-api/files', file, (j) => StoredFile.fromJson(j as Map<String, dynamic>), options);

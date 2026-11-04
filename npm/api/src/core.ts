@@ -72,6 +72,8 @@ export interface ClientOptions {
   apiKey?: string;
   /** Defaults to the LOWCO_API_BASE_URL environment variable, else https://api.lowco.ai. */
   baseUrl?: string;
+  /** Your Lowco organization id, sent as X-Org-Id. Defaults to the LOWCO_ORG_ID environment variable. An org-scoped key carries its org already; a tenant-level key needs this. */
+  orgId?: string;
   /** Per-request timeout (default 60 s). */
   timeoutMs?: number;
   /** Retries of retryable failures (429, 503, network) for requests safe to repeat: GETs and calls with an Idempotency-Key. Default 2. */
@@ -214,6 +216,7 @@ function reference(f: FileRef): Json {
 export class Core {
   readonly baseUrl: string;
   private readonly apiKey: string;
+  readonly orgId: string;
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
   private readonly fetchImpl: typeof fetch;
@@ -226,6 +229,7 @@ export class Core {
     }
     this.apiKey = apiKey;
     this.baseUrl = (options.baseUrl ?? envVars.LOWCO_API_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    this.orgId = (options.orgId ?? envVars.LOWCO_ORG_ID ?? "").trim();
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.maxRetries = options.maxRetries ?? 2;
     const f = options.fetch ?? globalThis.fetch;
@@ -244,7 +248,10 @@ export class Core {
 
   private async send(method: string, url: string, init: { body?: BodyInit; headers?: Record<string, string>; auth?: boolean; redirect?: RequestRedirect }, options?: RequestOptions, retrySafe = method === "GET"): Promise<Raw> {
     const headers: Record<string, string> = { "X-Client-User-Agent": `lowcoai-api-node/${SDK_VERSION}`, ...init.headers };
-    if (init.auth !== false) headers.Authorization = `Bearer ${this.apiKey}`;
+    if (init.auth !== false) {
+      headers.Authorization = `Bearer ${this.apiKey}`;
+      if (this.orgId) headers["X-Org-Id"] = this.orgId;
+    }
     if (options?.requestId) headers["X-Request-Id"] = options.requestId;
     if (options?.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
     const safe = retrySafe || !!options?.idempotencyKey;

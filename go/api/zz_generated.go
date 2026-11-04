@@ -422,7 +422,7 @@ type BarcodeDecodeRequest struct {
 	CallbackURL *string `json:"callback_url,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -687,7 +687,7 @@ type DocaiBankStatementRequest struct {
 	Engine *string `json:"engine,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -726,7 +726,7 @@ type DocaiChequeRequest struct {
 	Engine *string `json:"engine,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -767,7 +767,7 @@ type DocaiClassifyRequest struct {
 	Engine *string `json:"engine,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -812,7 +812,7 @@ type DocaiExtractRequest struct {
 	Engine *string `json:"engine,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -855,7 +855,7 @@ type DocaiInvoiceRequest struct {
 	Engine *string `json:"engine,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -906,7 +906,7 @@ type DocaiKycRequest struct {
 	Engine *string `json:"engine,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -949,7 +949,7 @@ type DocaiReceiptRequest struct {
 	Engine *string `json:"engine,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -988,7 +988,7 @@ type DocaiTablesRequest struct {
 	Engine *string `json:"engine,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -1004,6 +1004,61 @@ type DocaiTablesRequest struct {
 
 // DocaiTablesResult is a Lowco API value.
 type DocaiTablesResult = TablesResult
+
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type DocaiTextParams struct {
+	// The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)
+	File FileInput `json:"-"`
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Cut the text here; the result says truncated
+	MaxCharacters *int `json:"max_characters,omitempty"`
+}
+
+// Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.
+type DocaiTextRequest struct {
+	// Public https URL that receives this job's webhook
+	CallbackURL *string `json:"callback_url,omitempty"`
+	// Base64, URL-safe base64 or a data: URL
+	FileBase64 *string `json:"file_base64,omitempty"`
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
+	FileID *string `json:"file_id,omitempty"`
+	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
+	FileURL *string `json:"file_url,omitempty"`
+	// Name for the stored input
+	Filename *string `json:"filename,omitempty"`
+	// Cut the text here; the result says truncated
+	MaxCharacters *int `json:"max_characters,omitempty"`
+	// Opens a protected PDF; never stored or logged
+	Password *string `json:"password,omitempty"`
+}
+
+// DocaiTextResult is a Lowco API object.
+type DocaiTextResult struct {
+	// Characters in text
+	Characters int `json:"characters"`
+	// One of: docx, xlsx, csv, tsv, text, json.
+	Format string `json:"format"`
+	// DOCX paragraphs outside tables
+	Paragraphs *int                   `json:"paragraphs,omitempty"`
+	Sheets     []DocaiTextResultSheet `json:"sheets,omitempty"`
+	// DOCX tables
+	Tables *int `json:"tables,omitempty"`
+	// The document's text: one line per paragraph or row, cells joined by " | "; DOCX headings as # lines and list items as - lines; each XLSX sheet under a "## Sheet: <name>" line, dates as YYYY-MM-DD
+	Text string `json:"text"`
+	// true when the text was cut at max_characters
+	Truncated bool     `json:"truncated"`
+	Warnings  []string `json:"warnings,omitempty"`
+}
+
+// An XLSX sheet, or the rows of a CSV or TSV
+type DocaiTextResultSheet struct {
+	Columns int     `json:"columns"`
+	Hidden  *bool   `json:"hidden,omitempty"`
+	Name    *string `json:"name,omitempty"`
+	// Rows with content
+	Rows int `json:"rows"`
+}
 
 // ErrorBody is a Lowco API object.
 type ErrorBody struct {
@@ -1078,7 +1133,7 @@ type Field struct {
 type FileRef struct {
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -1086,6 +1141,22 @@ type FileRef struct {
 	Filename *string `json:"filename,omitempty"`
 	// Opens a protected PDF; never stored or logged
 	Password *string `json:"password,omitempty"`
+}
+
+// A page; pass next_cursor as cursor for the next one (null at the end).
+type FilesListData struct {
+	Items      []StoredFile `json:"items"`
+	NextCursor *string      `json:"next_cursor"`
+}
+
+// FilesListQuery is a Lowco API object.
+type FilesListQuery struct {
+	// Only files that arrived this way One of: upload, url, base64, output, document.
+	Source *string `json:"source,omitempty"`
+	// Page size
+	Limit *int `json:"limit,omitempty"`
+	// next_cursor of the previous page.
+	Cursor *string `json:"cursor,omitempty"`
 }
 
 // InvoiceResult is a Lowco API object.
@@ -1174,7 +1245,7 @@ type Job struct {
 	Progress  *JobProgress `json:"progress"`
 	// The request that created the job
 	RequestID *string `json:"request_id,omitempty"`
-	// Set when succeeded: the operation's data, with output files as file objects and fresh signed links
+	// Set when succeeded: the operation's data, with output files as file objects and fresh signed links. An OCR job keeps only a summary (OCRJobResult): its full result and text are files in the job's Lowco Docs folder.
 	Result    map[string]any `json:"result"`
 	Service   string         `json:"service"`
 	StartedAt *string        `json:"started_at"`
@@ -1960,6 +2031,24 @@ type MessagesListQuery struct {
 	Cursor *string `json:"cursor,omitempty"`
 }
 
+// The result of an ocr/text or ocr/handwriting job. The full result (OCRResult, as the sync answer would be) and the plain text are files in the job's Lowco Docs folder, so a 1,000-page document never sits in the job.
+type OCRJobResult struct {
+	Confidence float64 `json:"confidence"`
+	// One of: fast, accurate, text_layer, mixed.
+	EngineUsed        string   `json:"engine_used"`
+	LanguagesDetected []string `json:"languages_detected"`
+	PageCount         int      `json:"page_count"`
+	ResultFile        Output   `json:"result_file"`
+	// Characters in the whole text
+	TextCharacters int    `json:"text_characters"`
+	TextFile       Output `json:"text_file"`
+	// The first 2,000 characters of the text
+	TextPreview string `json:"text_preview"`
+	// true when the text is longer than the preview
+	TextTruncated bool     `json:"text_truncated"`
+	Warnings      []string `json:"warnings,omitempty"`
+}
+
 // OCRPage is a Lowco API object.
 type OCRPage struct {
 	Blocks     []OCRRegion `json:"blocks,omitempty"`
@@ -2093,7 +2182,7 @@ type OcrHandwritingRequest struct {
 	Engine *string `json:"engine,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2140,7 +2229,7 @@ type OcrTextRequest struct {
 	Engine *string `json:"engine,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2180,8 +2269,9 @@ type Output struct {
 	Expired *bool `json:"expired,omitempty"`
 	// When the file is deleted; null with zero retention
 	ExpiresAt *string `json:"expires_at,omitempty"`
-	FileID    string  `json:"file_id"`
-	MimeType  *string `json:"mime_type,omitempty"`
+	// The Lowco Docs document id
+	FileID   string  `json:"file_id"`
+	MimeType *string `json:"mime_type,omitempty"`
 	// PDF outputs
 	Pages *int `json:"pages,omitempty"`
 	// Signed link valid 1 hour; null once the file expired
@@ -2276,7 +2366,7 @@ type PdfArrangeRequest struct {
 	CallbackURL *string `json:"callback_url,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2315,7 +2405,7 @@ type PdfCompressRequest struct {
 	CallbackURL *string `json:"callback_url,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2359,7 +2449,7 @@ type PdfExtractTextRequest struct {
 	CallbackURL *string `json:"callback_url,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2446,7 +2536,7 @@ type PdfInfoRequest struct {
 	CallbackURL *string `json:"callback_url,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2580,7 +2670,7 @@ type PdfProtectRequest struct {
 	CallbackURL *string `json:"callback_url,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2627,7 +2717,7 @@ type PdfRotateRequest struct {
 	CallbackURL *string `json:"callback_url,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2672,7 +2762,7 @@ type PdfSplitRequest struct {
 	Every *int `json:"every,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2711,7 +2801,7 @@ type PdfToDocxRequest struct {
 	CallbackURL *string `json:"callback_url,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2748,7 +2838,7 @@ type PdfToImagesRequest struct {
 	DPI         *int    `json:"dpi,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2788,7 +2878,7 @@ type PdfUnlockRequest struct {
 	CallbackURL *string `json:"callback_url,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2833,7 +2923,7 @@ type PdfWatermarkRequest struct {
 	Color       *string `json:"color,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -2920,7 +3010,7 @@ type QrDecodeRequest struct {
 	CallbackURL *string `json:"callback_url,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -3126,7 +3216,7 @@ type RenderDocxRequest struct {
 	CallbackURL *string `json:"callback_url,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -3168,7 +3258,7 @@ type RenderDocxTemplateRequest struct {
 	Data any `json:"data,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -4256,15 +4346,16 @@ type StoredFile struct {
 	Bytes     int     `json:"bytes"`
 	CreatedAt string  `json:"created_at"`
 	ExpiresAt *string `json:"expires_at"`
-	FileID    string  `json:"file_id"`
-	Filename  string  `json:"filename"`
+	// The Lowco Docs document id
+	FileID   string `json:"file_id"`
+	Filename string `json:"filename"`
 	// The job that produced it (source output)
 	JobID    *string `json:"job_id,omitempty"`
 	MimeType string  `json:"mime_type"`
 	// PDF pages
 	Pages  *int   `json:"pages,omitempty"`
 	SHA256 string `json:"sha256"`
-	// How the file arrived One of: upload, url, base64, output.
+	// How the file arrived (document: a Lowco Docs document of another app, read by its id; never deleted by the API) One of: upload, url, base64, output, document.
 	Source string `json:"source"`
 }
 
@@ -4908,7 +4999,7 @@ type VerifyDocumentTamperRequest struct {
 	Consent bool `json:"consent"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -5062,7 +5153,7 @@ type VerifyDuplicateDocumentRequest struct {
 	Consent bool `json:"consent"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -5623,7 +5714,7 @@ type VerifyKycRequest struct {
 	DocumentType *string `json:"document_type,omitempty"`
 	// Base64, URL-safe base64 or a data: URL
 	FileBase64 *string `json:"file_base64,omitempty"`
-	// A stored file of this org and environment (POST /v1/lowco-api/files)
+	// A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs
 	FileID *string `json:"file_id,omitempty"`
 	// Public https URL, fetched with SSRF protection (10 s, 3 redirects)
 	FileURL *string `json:"file_url,omitempty"`
@@ -6542,6 +6633,16 @@ func (s *DocAIService) Tables(ctx context.Context, p DocaiTablesParams, opts ...
 	return out.decode(s.c)
 }
 
+// Text: Text from DOCX, XLSX, CSV and plain-text files (no model, no OCR). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.text.execute.
+func (s *DocAIService) Text(ctx context.Context, p DocaiTextParams, opts ...CallOption) (*Answer[DocaiTextResult], error) {
+	var out Answer[DocaiTextResult]
+	err := s.c.operation(ctx, "/v1/lowco-api/docai/text", "file", p.File, nil, nil, p, &out.raw, opts)
+	if err != nil {
+		return nil, err
+	}
+	return out.decode(s.c)
+}
+
 // OCRService calls the /v1/lowco-api/ocr operations.
 type OCRService struct{ c *core }
 
@@ -7052,6 +7153,20 @@ func (r *FilesResource) Get(ctx context.Context, id string, opts ...RequestOptio
 		return nil, err
 	}
 	return &out, nil
+}
+
+// List: Stored files of this environment, newest first.
+func (r *FilesResource) List(ctx context.Context, query *FilesListQuery, opts ...RequestOption) (*FilesListData, error) {
+	var out FilesListData
+	if err := r.c.call(ctx, http.MethodGet, "/v1/lowco-api/files", toQuery(query), nil, &out, opts); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListAll pages through List, following next_cursor.
+func (r *FilesResource) ListAll(ctx context.Context, query *FilesListQuery, opts ...RequestOption) *Pager[StoredFile] {
+	return newPager[StoredFile](r.c, "/v1/lowco-api/files", toQuery(query), opts)
 }
 
 // Upload: Upload a file (50 MB live, 5 MB test).

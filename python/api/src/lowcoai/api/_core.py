@@ -87,12 +87,15 @@ def _multipart(fields: List[Tuple[str, str]], files: List[Tuple[str, str, str, b
 class Core:
     """Sends requests and decodes answers."""
 
-    def __init__(self, api_key: Optional[str] = None, *, base_url: Optional[str] = None, timeout: float = 60.0, max_retries: int = 2) -> None:
+    def __init__(self, api_key: Optional[str] = None, *, base_url: Optional[str] = None, timeout: float = 60.0, max_retries: int = 2,
+                 org_id: Optional[str] = None) -> None:
         key = api_key or os.environ.get("LOWCO_API_KEY")
         if not key:
             raise LowcoApiError("api_key is required (lc_live_… or lc_test_…): pass it or set LOWCO_API_KEY", status=0, reason="missing_key")
         self._key = key
         self.base_url = (base_url or os.environ.get("LOWCO_API_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
+        # Sent as X-Org-Id: an org-scoped key carries its org already; a tenant-level key needs it.
+        self.org_id = (org_id or os.environ.get("LOWCO_ORG_ID") or "").strip()
         self._timeout = timeout
         self._max_retries = max_retries
         self._opener = request.build_opener()
@@ -123,6 +126,8 @@ class Core:
         h.update(headers or {})
         if auth:
             h["Authorization"] = f"Bearer {self._key}"
+            if self.org_id:
+                h["X-Org-Id"] = self.org_id
         if request_id:
             h["X-Request-Id"] = request_id
         if idempotency_key:

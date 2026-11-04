@@ -314,7 +314,7 @@ class BarcodeDecodeRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -533,7 +533,7 @@ class DocaiBankStatementRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -567,7 +567,7 @@ class DocaiChequeRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -603,7 +603,7 @@ class DocaiClassifyRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -643,7 +643,7 @@ class DocaiExtractRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -681,7 +681,7 @@ class DocaiInvoiceRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -727,7 +727,7 @@ class DocaiKycRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -765,7 +765,7 @@ class DocaiReceiptRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -799,7 +799,7 @@ class DocaiTablesRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -810,6 +810,55 @@ class DocaiTablesRequest(TypedDict):
     """Pages to read, e.g. 1-3,7"""
     password: NotRequired[str]
     """Opens a protected PDF; never stored or logged"""
+
+class DocaiTextParams(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    file: FileInput
+    """The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers)"""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    max_characters: NotRequired[int]
+    """Cut the text here; the result says truncated"""
+
+class DocaiTextRequest(TypedDict):
+    """Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options."""
+    callback_url: NotRequired[str]
+    """Public https URL that receives this job's webhook"""
+    file_base64: NotRequired[str]
+    """Base64, URL-safe base64 or a data: URL"""
+    file_id: NotRequired[str]
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
+    file_url: NotRequired[str]
+    """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
+    filename: NotRequired[str]
+    """Name for the stored input"""
+    max_characters: NotRequired[int]
+    """Cut the text here; the result says truncated"""
+    password: NotRequired[str]
+    """Opens a protected PDF; never stored or logged"""
+
+class DocaiTextResult(TypedDict):
+    characters: int
+    """Characters in text"""
+    format: Literal["docx", "xlsx", "csv", "tsv", "text", "json"]
+    paragraphs: NotRequired[int]
+    """DOCX paragraphs outside tables"""
+    sheets: NotRequired[list[DocaiTextResultSheet]]
+    tables: NotRequired[int]
+    """DOCX tables"""
+    text: str
+    """The document's text: one line per paragraph or row, cells joined by " | "; DOCX headings as # lines and list items as - lines; each XLSX sheet under a "## Sheet: <name>" line, dates as YYYY-MM-DD"""
+    truncated: bool
+    """true when the text was cut at max_characters"""
+    warnings: NotRequired[list[str]]
+
+class DocaiTextResultSheet(TypedDict):
+    """An XLSX sheet, or the rows of a CSV or TSV"""
+    columns: int
+    hidden: NotRequired[bool]
+    name: NotRequired[str]
+    rows: int
+    """Rows with content"""
 
 class ErrorBody(TypedDict):
     code: int
@@ -874,13 +923,26 @@ class FileRef(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
     """Name for the stored input"""
     password: NotRequired[str]
     """Opens a protected PDF; never stored or logged"""
+
+class FilesListData(TypedDict):
+    """A page; pass next_cursor as cursor for the next one (null at the end)."""
+    items: list[StoredFile]
+    next_cursor: Optional[str]
+
+class FilesListQuery(TypedDict):
+    source: NotRequired[Literal["upload", "url", "base64", "output", "document"]]
+    """Only files that arrived this way"""
+    limit: NotRequired[int]
+    """Page size"""
+    cursor: NotRequired[str]
+    """next_cursor of the previous page."""
 
 class InvoiceResult(TypedDict):
     arithmetic_consistent: bool
@@ -959,7 +1021,7 @@ class Job(TypedDict):
     request_id: NotRequired[str]
     """The request that created the job"""
     result: Optional[dict[str, Any]]
-    """Set when succeeded: the operation's data, with output files as file objects and fresh signed links"""
+    """Set when succeeded: the operation's data, with output files as file objects and fresh signed links. An OCR job keeps only a summary (OCRJobResult): its full result and text are files in the job's Lowco Docs folder."""
     service: str
     started_at: Optional[str]
     status: Literal["queued", "processing", "succeeded", "failed", "cancelled"]
@@ -1645,6 +1707,22 @@ class MessagesListQuery(TypedDict):
     cursor: NotRequired[str]
     """next_cursor of the previous page."""
 
+class OCRJobResult(TypedDict):
+    """The result of an ocr/text or ocr/handwriting job. The full result (OCRResult, as the sync answer would be) and the plain text are files in the job's Lowco Docs folder, so a 1,000-page document never sits in the job."""
+    confidence: float
+    engine_used: Literal["fast", "accurate", "text_layer", "mixed"]
+    languages_detected: list[str]
+    page_count: int
+    result_file: Output
+    text_characters: int
+    """Characters in the whole text"""
+    text_file: Output
+    text_preview: str
+    """The first 2,000 characters of the text"""
+    text_truncated: bool
+    """true when the text is longer than the preview"""
+    warnings: NotRequired[list[str]]
+
 class OCRPage(TypedDict):
     blocks: NotRequired[list[OCRRegion]]
     confidence: float
@@ -1757,7 +1835,7 @@ class OcrHandwritingRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -1797,7 +1875,7 @@ class OcrTextRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -1831,6 +1909,7 @@ class Output(TypedDict):
     expires_at: NotRequired[Optional[str]]
     """When the file is deleted; null with zero retention"""
     file_id: str
+    """The Lowco Docs document id"""
     mime_type: NotRequired[str]
     pages: NotRequired[int]
     """PDF outputs"""
@@ -1904,7 +1983,7 @@ class PdfArrangeRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -1939,7 +2018,7 @@ class PdfCompressRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -1979,7 +2058,7 @@ class PdfExtractTextRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -2053,7 +2132,7 @@ class PdfInfoRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -2169,7 +2248,7 @@ class PdfProtectRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -2211,7 +2290,7 @@ class PdfRotateRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -2252,7 +2331,7 @@ class PdfSplitRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -2283,7 +2362,7 @@ class PdfToDocxRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -2316,7 +2395,7 @@ class PdfToImagesRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -2353,7 +2432,7 @@ class PdfUnlockRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -2394,7 +2473,7 @@ class PdfWatermarkRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -2473,7 +2552,7 @@ class QrDecodeRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -2663,7 +2742,7 @@ class RenderDocxRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -2694,7 +2773,7 @@ class RenderDocxTemplateRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -3632,6 +3711,7 @@ class StoredFile(TypedDict):
     created_at: str
     expires_at: Optional[str]
     file_id: str
+    """The Lowco Docs document id"""
     filename: str
     job_id: NotRequired[str]
     """The job that produced it (source output)"""
@@ -3639,8 +3719,8 @@ class StoredFile(TypedDict):
     pages: NotRequired[int]
     """PDF pages"""
     sha256: str
-    source: Literal["upload", "url", "base64", "output"]
-    """How the file arrived"""
+    source: Literal["upload", "url", "base64", "output", "document"]
+    """How the file arrived (document: a Lowco Docs document of another app, read by its id; never deleted by the API)"""
 
 class Suppression(TypedDict):
     """A suppressed recipient"""
@@ -4157,7 +4237,7 @@ class VerifyDocumentTamperRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -4300,7 +4380,7 @@ class VerifyDuplicateDocumentRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -4819,7 +4899,7 @@ class VerifyKycRequest(TypedDict):
     file_base64: NotRequired[str]
     """Base64, URL-safe base64 or a data: URL"""
     file_id: NotRequired[str]
-    """A stored file of this org and environment (POST /v1/lowco-api/files)"""
+    """A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs"""
     file_url: NotRequired[str]
     """Public https URL, fetched with SSRF protection (10 s, 3 redirects)"""
     filename: NotRequired[str]
@@ -5780,6 +5860,22 @@ class DocaiOperations:
         params = {"file": file, "callback_url": callback_url, "engine": engine, "languages": languages, "pages": pages}
         return self._core.operation("/v1/lowco-api/docai/tables", params, input_kind="file", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
 
+    def text(
+        self,
+        *,
+        file: FileInput,
+        callback_url: Optional[str] = None,
+        max_characters: Optional[int] = None,
+        mode: Optional[Literal["sync", "async"]] = None,
+        idempotency_key: Optional[str] = None,
+        accept: Optional[str] = None,
+        request_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Answer[DocaiTextResult]:
+        """Text from DOCX, XLSX, CSV and plain-text files (no model, no OCR). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.text.execute."""
+        params = {"file": file, "callback_url": callback_url, "max_characters": max_characters}
+        return self._core.operation("/v1/lowco-api/docai/text", params, input_kind="file", extra=[], mode=mode, idempotency_key=idempotency_key, accept=accept, request_id=request_id, timeout=timeout)
+
 
 class OcrOperations:
     """/v1/lowco-api/ocr operations."""
@@ -6715,6 +6811,14 @@ class FilesResource:
     def get(self, id: str, *, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> StoredFile:
         """File metadata."""
         return self._core.call("GET", f"/v1/lowco-api/files/{_seg(id)}", query=None, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list(self, *, cursor: Optional[str] = None, limit: Optional[int] = None, source: Optional[Literal["upload", "url", "base64", "output", "document"]] = None, idempotency_key: Optional[str] = None, request_id: Optional[str] = None) -> FilesListData:
+        """Stored files of this environment, newest first."""
+        return self._core.call("GET", f"/v1/lowco-api/files", query={"source": source, "limit": limit, "cursor": cursor}, json=None, idempotency_key=idempotency_key, request_id=request_id)
+
+    def list_all(self, *, source: Optional[Literal["upload", "url", "base64", "output", "document"]] = None, limit: Optional[int] = None, request_id: Optional[str] = None) -> Iterator[StoredFile]:
+        """Every item of list, page after page (follows next_cursor)."""
+        return self._core.paginate(f"/v1/lowco-api/files", {"source": source, "limit": limit}, request_id=request_id)
 
     def upload(self, file: FileInput, *, request_id: Optional[str] = None) -> StoredFile:
         """Upload a file (50 MB live, 5 MB test)."""

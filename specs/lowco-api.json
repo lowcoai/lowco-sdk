@@ -912,7 +912,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -1616,7 +1616,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -1709,7 +1709,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -1802,7 +1802,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -1904,7 +1904,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -2009,7 +2009,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -2120,7 +2120,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -2229,7 +2229,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -2322,7 +2322,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -2370,6 +2370,142 @@
       },
       "DocaiTablesResult": {
         "$ref": "#/components/schemas/TablesResult"
+      },
+      "DocaiTextRequest": {
+        "additionalProperties": false,
+        "description": "Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options.",
+        "oneOf": [
+          {
+            "required": [
+              "file_id"
+            ],
+            "title": "file_id"
+          },
+          {
+            "required": [
+              "file_url"
+            ],
+            "title": "file_url"
+          },
+          {
+            "required": [
+              "file_base64"
+            ],
+            "title": "file_base64"
+          }
+        ],
+        "properties": {
+          "callback_url": {
+            "description": "Public https URL that receives this job's webhook",
+            "format": "uri",
+            "type": "string"
+          },
+          "file_base64": {
+            "description": "Base64, URL-safe base64 or a data: URL",
+            "type": "string"
+          },
+          "file_id": {
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
+            "type": "string"
+          },
+          "file_url": {
+            "description": "Public https URL, fetched with SSRF protection (10 s, 3 redirects)",
+            "format": "uri",
+            "type": "string"
+          },
+          "filename": {
+            "description": "Name for the stored input",
+            "type": "string"
+          },
+          "max_characters": {
+            "default": 500000,
+            "description": "Cut the text here; the result says truncated",
+            "maximum": 2000000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "password": {
+            "description": "Opens a protected PDF; never stored or logged",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DocaiTextResult": {
+        "additionalProperties": false,
+        "properties": {
+          "characters": {
+            "description": "Characters in text",
+            "type": "integer"
+          },
+          "format": {
+            "enum": [
+              "docx",
+              "xlsx",
+              "csv",
+              "tsv",
+              "text",
+              "json"
+            ],
+            "type": "string"
+          },
+          "paragraphs": {
+            "description": "DOCX paragraphs outside tables",
+            "type": "integer"
+          },
+          "sheets": {
+            "items": {
+              "additionalProperties": false,
+              "description": "An XLSX sheet, or the rows of a CSV or TSV",
+              "properties": {
+                "columns": {
+                  "type": "integer"
+                },
+                "hidden": {
+                  "type": "boolean"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "rows": {
+                  "description": "Rows with content",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "columns",
+                "rows"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "tables": {
+            "description": "DOCX tables",
+            "type": "integer"
+          },
+          "text": {
+            "description": "The document's text: one line per paragraph or row, cells joined by \" | \"; DOCX headings as # lines and list items as - lines; each XLSX sheet under a \"## Sheet: \u003cname\u003e\" line, dates as YYYY-MM-DD",
+            "type": "string"
+          },
+          "truncated": {
+            "description": "true when the text was cut at max_characters",
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "characters",
+          "format",
+          "text",
+          "truncated"
+        ],
+        "type": "object"
       },
       "Error": {
         "additionalProperties": false,
@@ -2980,6 +3116,7 @@
             "type": "string"
           },
           "file_id": {
+            "description": "The Lowco Docs document id",
             "type": "string"
           },
           "filename": {
@@ -3000,12 +3137,13 @@
             "type": "string"
           },
           "source": {
-            "description": "How the file arrived",
+            "description": "How the file arrived (document: a Lowco Docs document of another app, read by its id; never deleted by the API)",
             "enum": [
               "upload",
               "url",
               "base64",
-              "output"
+              "output",
+              "document"
             ],
             "type": "string"
           }
@@ -3051,7 +3189,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -3416,7 +3554,7 @@
             "type": "string"
           },
           "result": {
-            "description": "Set when succeeded: the operation's data, with output files as file objects and fresh signed links",
+            "description": "Set when succeeded: the operation's data, with output files as file objects and fresh signed links. An OCR job keeps only a summary (OCRJobResult): its full result and text are files in the job's Lowco Docs folder.",
             "nullable": true,
             "type": "object"
           },
@@ -5472,6 +5610,69 @@
         },
         "type": "object"
       },
+      "OCRJobResult": {
+        "additionalProperties": false,
+        "description": "The result of an ocr/text or ocr/handwriting job. The full result (OCRResult, as the sync answer would be) and the plain text are files in the job's Lowco Docs folder, so a 1,000-page document never sits in the job.",
+        "properties": {
+          "confidence": {
+            "type": "number"
+          },
+          "engine_used": {
+            "enum": [
+              "fast",
+              "accurate",
+              "text_layer",
+              "mixed"
+            ],
+            "type": "string"
+          },
+          "languages_detected": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "page_count": {
+            "type": "integer"
+          },
+          "result_file": {
+            "$ref": "#/components/schemas/Output"
+          },
+          "text_characters": {
+            "description": "Characters in the whole text",
+            "type": "integer"
+          },
+          "text_file": {
+            "$ref": "#/components/schemas/Output"
+          },
+          "text_preview": {
+            "description": "The first 2,000 characters of the text",
+            "type": "string"
+          },
+          "text_truncated": {
+            "description": "true when the text is longer than the preview",
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "confidence",
+          "engine_used",
+          "languages_detected",
+          "page_count",
+          "result_file",
+          "text_characters",
+          "text_file",
+          "text_preview",
+          "text_truncated"
+        ],
+        "type": "object"
+      },
       "OCRPage": {
         "additionalProperties": false,
         "properties": {
@@ -5879,7 +6080,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -5988,7 +6189,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -6099,6 +6300,7 @@
             "type": "string"
           },
           "file_id": {
+            "description": "The Lowco Docs document id",
             "type": "string"
           },
           "mime_type": {
@@ -6363,7 +6565,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -6457,7 +6659,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -6554,7 +6756,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -6761,7 +6963,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -7106,7 +7308,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -7223,7 +7425,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -7315,7 +7517,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -7413,7 +7615,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -7485,7 +7687,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -7588,7 +7790,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -7663,7 +7865,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -7934,7 +8136,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -8324,7 +8526,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -8408,7 +8610,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -12641,7 +12843,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -12985,7 +13187,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -14179,7 +14381,7 @@
             "type": "string"
           },
           "file_id": {
-            "description": "A stored file of this org and environment (POST /v1/lowco-api/files)",
+            "description": "A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs",
             "type": "string"
           },
           "file_url": {
@@ -21721,6 +21923,347 @@
         }
       }
     },
+    "/v1/lowco-api/docai/text": {
+      "post": {
+        "description": "Text from DOCX, XLSX, CSV and plain-text files (no model, no OCR). A synchronous call still running at 25 s is promoted to a job and answered 202. Beta. A body field callback_url (public https) receives the job's webhook instead of the environment's default endpoints.",
+        "operationId": "docai_text",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Mode"
+          },
+          {
+            "$ref": "#/components/parameters/Prefer"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/Accept"
+          },
+          {
+            "$ref": "#/components/parameters/RequestID"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "examples": {
+                "bank-statement-csv": {
+                  "summary": "A bank statement exported as CSV",
+                  "value": {
+                    "file_id": "file_01JA9C2V6X9Z2B5D8F1H4K7N0Q"
+                  }
+                },
+                "notice-docx": {
+                  "summary": "A DOCX notice, text cut at 200,000 characters",
+                  "value": {
+                    "file_id": "file_01JA9C2T2V5X8Z1B4D7F0H3K6M",
+                    "max_characters": 200000
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/DocaiTextRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "properties": {
+                  "callback_url": {
+                    "format": "uri",
+                    "type": "string"
+                  },
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "options": {
+                    "description": "The operation's options as a JSON object; plain fields named like the options work too",
+                    "type": "string"
+                  },
+                  "password": {
+                    "description": "Opens a protected PDF",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "bank-statement-csv": {
+                    "summary": "A CSV statement, one row per line",
+                    "value": {
+                      "data": {
+                        "characters": 201,
+                        "format": "csv",
+                        "sheets": [
+                          {
+                            "columns": 5,
+                            "rows": 4
+                          }
+                        ],
+                        "text": "Date | Narration | Debit | Credit | Balance\n01-04-2026 | Opening balance |  |  | 10,000.00\n03-04-2026 | UPI/ACME TRADERS | 1,250.00 |  | 8,750.00\n05-04-2026 | NEFT/SALARY APR |  | 45,000.00 | 53,750.00",
+                        "truncated": false
+                      },
+                      "status": 1
+                    }
+                  },
+                  "ledger-xlsx": {
+                    "summary": "An XLSX workbook, each sheet under its name",
+                    "value": {
+                      "data": {
+                        "characters": 44,
+                        "format": "xlsx",
+                        "sheets": [
+                          {
+                            "columns": 2,
+                            "name": "Ledger",
+                            "rows": 2
+                          }
+                        ],
+                        "text": "## Sheet: Ledger\nParty | Balance\nAcme | 1500",
+                        "truncated": false
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DocaiTextResult"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Finished in the request.",
+            "headers": {
+              "X-Lowco-Credits-Used": {
+                "$ref": "#/components/headers/X-Lowco-Credits-Used"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "job": {
+                    "summary": "Accepted as a job",
+                    "value": {
+                      "data": {
+                        "attempts": 0,
+                        "created_at": "2026-10-09T09:30:00Z",
+                        "error": null,
+                        "expires_at": "2026-10-16T09:30:00Z",
+                        "finished_at": null,
+                        "input": {
+                          "file_id": "file_01JA9C2M7Q4V8X3K6T1R5N0W2E",
+                          "pages": 12
+                        },
+                        "job_id": "job_01JA9C3B5E8G1J4M7P0R3T6W9Y",
+                        "links": {
+                          "cancel": "/v1/lowco-api/jobs/job_01JA9C3B5E8G1J4M7P0R3T6W9Y/cancel",
+                          "self": "/v1/lowco-api/jobs/job_01JA9C3B5E8G1J4M7P0R3T6W9Y"
+                        },
+                        "operation": "text",
+                        "progress": null,
+                        "result": null,
+                        "service": "docai",
+                        "started_at": null,
+                        "status": "queued",
+                        "usage": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Job"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Accepted as a job; poll links.self or wait for the webhook.",
+            "headers": {
+              "Idempotent-Replayed": {
+                "$ref": "#/components/headers/Idempotent-Replayed"
+              },
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/Retry-After"
+              },
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "pdf": {
+                    "summary": "A PDF (use pdf/extract-text or ocr/text)",
+                    "value": {
+                      "error": {
+                        "code": 415,
+                        "doc_url": "https://docs.lowco.ai/api/errors#unsupported_media_type",
+                        "message": "docai/text reads DOCX, XLSX, CSV, TSV, plain text and JSON, not application/pdf. Use pdf/extract-text for PDFs and ocr/text for images.",
+                        "param": "file",
+                        "reason": "unsupported_media_type",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: unsupported_media_type.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayTimeout"
+          }
+        },
+        "summary": "Text from DOCX, XLSX, CSV and plain-text files (no model, no OCR)",
+        "tags": [
+          "docai"
+        ],
+        "x-lowco-default-mode": "sync",
+        "x-lowco-family": "docai",
+        "x-lowco-input": "file",
+        "x-lowco-limits": {
+          "max_mb": 50
+        },
+        "x-lowco-meter": {
+          "free": true,
+          "name": "api_docai_pages",
+          "unit": "call"
+        },
+        "x-lowco-output": "json",
+        "x-lowco-scope": "api.docai.text.execute",
+        "x-lowco-status": "beta",
+        "x-lowco-sync-limit": {},
+        "x-lowco-test-fixture": {
+          "behaviour": "fixture",
+          "providers": {
+            "llm.extract": "fixture-llm",
+            "ocr.accurate": "fixture (local Tesseract)"
+          },
+          "max_mb": 5,
+          "max_pages": 20,
+          "billed": false,
+          "notes": "Text comes from the text layer or the OCR fixture; fixture-llm fills the schema by fixed rules from the text (docs/providers.md), so the same file always gives the same answer. Validation and provenance run for real."
+        }
+      }
+    },
     "/v1/lowco-api/downloads/{token}": {
       "get": {
         "operationId": "files_download",
@@ -21792,8 +22335,190 @@
       }
     },
     "/v1/lowco-api/files": {
+      "get": {
+        "description": "Uploads, copies of file_url and file_base64 inputs, job and call outputs, and Lowco Docs documents of other apps an operation read, until each expires or is deleted.",
+        "operationId": "files_list",
+        "parameters": [
+          {
+            "description": "Only files that arrived this way",
+            "in": "query",
+            "name": "source",
+            "schema": {
+              "enum": [
+                "upload",
+                "url",
+                "base64",
+                "output",
+                "document"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "page": {
+                    "summary": "The environment's files, newest first",
+                    "value": {
+                      "data": {
+                        "items": [
+                          {
+                            "bytes": 918204,
+                            "created_at": "2026-10-09T09:41:00Z",
+                            "expires_at": "2026-10-16T09:41:00Z",
+                            "file_id": "7489521000000000057",
+                            "filename": "ocr.json",
+                            "job_id": "job_01JA9D7K2M5P8R1T4W7Y0B3D6F",
+                            "mime_type": "application/json",
+                            "sha256": "4b1e0c9d8a7f6e5d4c3b2a190817f6e5d4c3b2a1908f7e6d5c4b3a2918070f6e",
+                            "source": "output"
+                          },
+                          {
+                            "bytes": 482113,
+                            "created_at": "2026-10-09T09:30:00Z",
+                            "expires_at": "2026-10-10T09:30:00Z",
+                            "file_id": "7489521000000000042",
+                            "filename": "invoice-0042.pdf",
+                            "mime_type": "application/pdf",
+                            "pages": 10,
+                            "sha256": "9f2c1d0e8b7a6f5e4d3c2b1a09f8e7d6c5b4a3928170f6e5d4c3b2a1908f7e6d",
+                            "source": "upload"
+                          }
+                        ],
+                        "next_cursor": null
+                      },
+                      "status": 1
+                    }
+                  }
+                },
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "description": "A page; pass next_cursor as cursor for the next one (null at the end).",
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "$ref": "#/components/schemas/File"
+                          },
+                          "type": "array"
+                        },
+                        "next_cursor": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "next_cursor"
+                      ],
+                      "type": "object"
+                    },
+                    "status": {
+                      "description": "1 on success",
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "A page",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "$ref": "#/components/headers/X-RateLimit-Limit"
+              },
+              "X-RateLimit-Remaining": {
+                "$ref": "#/components/headers/X-RateLimit-Remaining"
+              },
+              "X-RateLimit-Reset": {
+                "$ref": "#/components/headers/X-RateLimit-Reset"
+              },
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "source": {
+                    "summary": "An unknown source",
+                    "value": {
+                      "error": {
+                        "code": 400,
+                        "doc_url": "https://docs.lowco.ai/api/errors#invalid_param",
+                        "message": "source must be upload, url, base64, output or document",
+                        "param": "source",
+                        "reason": "invalid_param",
+                        "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
+                      },
+                      "status": 0
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Error envelope. error.reason is one of: invalid_json, invalid_param, missing_param, unsupported_option.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/X-Request-Id"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        },
+        "summary": "Stored files of this environment, newest first",
+        "tags": [
+          "files"
+        ],
+        "x-lowco-scope": "api.platform.files.read"
+      },
       "post": {
-        "description": "Stores one file for this org and environment; pass its file_id to any operation. It is deleted after the environment's input retention.",
+        "description": "Stores one file in Lowco Docs (the org's lowco-api app folder) for this environment; its file_id is the Lowco Docs document id. Pass it to any operation. It is deleted after the environment's input retention.",
         "operationId": "files_upload",
         "requestBody": {
           "content": {
@@ -21831,7 +22556,7 @@
                         "bytes": 482113,
                         "created_at": "2026-10-09T09:30:00Z",
                         "expires_at": "2026-10-10T09:30:00Z",
-                        "file_id": "file_01JA9C2M7Q4V8X3K6T1R5N0W2E",
+                        "file_id": "7489521000000000042",
                         "filename": "invoice-0042.pdf",
                         "mime_type": "application/pdf",
                         "pages": 10,
@@ -21948,7 +22673,7 @@
         "operationId": "files_delete",
         "parameters": [
           {
-            "description": "file_…",
+            "description": "The Lowco Docs document id (a file_ id from before 2.1 still works)",
             "in": "path",
             "name": "id",
             "required": true,
@@ -22068,7 +22793,7 @@
         "operationId": "files_get",
         "parameters": [
           {
-            "description": "file_…",
+            "description": "The Lowco Docs document id (a file_ id from before 2.1 still works)",
             "in": "path",
             "name": "id",
             "required": true,
@@ -22089,7 +22814,7 @@
                         "bytes": 482113,
                         "created_at": "2026-10-09T09:30:00Z",
                         "expires_at": "2026-10-10T09:30:00Z",
-                        "file_id": "file_01JA9C2M7Q4V8X3K6T1R5N0W2E",
+                        "file_id": "7489521000000000042",
                         "filename": "invoice-0042.pdf",
                         "mime_type": "application/pdf",
                         "pages": 10,
@@ -22154,7 +22879,7 @@
                       "error": {
                         "code": 404,
                         "doc_url": "https://docs.lowco.ai/api/errors#file_not_found",
-                        "message": "File file_01JA9C2M7Q4V8X3K6T1R5N0W2E was not found in this environment.",
+                        "message": "File 7489521000000000042 was not found in this environment.",
                         "param": "id",
                         "reason": "file_not_found",
                         "request_id": "req_01JA9C4H8K1M4P7R0T3W6Y9A2C"
@@ -22197,7 +22922,7 @@
         "operationId": "files_content",
         "parameters": [
           {
-            "description": "file_…",
+            "description": "The Lowco Docs document id (a file_ id from before 2.1 still works)",
             "in": "path",
             "name": "id",
             "required": true,

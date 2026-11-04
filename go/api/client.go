@@ -26,6 +26,10 @@ type Config struct {
 	APIKey string
 	// BaseURL defaults to LOWCO_API_BASE_URL, else DefaultBaseURL.
 	BaseURL string
+	// OrgID is your Lowco organization id, sent as X-Org-Id. Defaults to
+	// LOWCO_ORG_ID. An org-scoped key carries its org already; a
+	// tenant-level key needs it.
+	OrgID string
 	// HTTPClient defaults to a client with Timeout.
 	HTTPClient *http.Client
 	// Timeout is the per-request timeout (default 60 s).
@@ -58,6 +62,9 @@ func NewClient(cfg Config) (*Client, error) {
 	if cfg.BaseURL == "" {
 		cfg.BaseURL = DefaultBaseURL
 	}
+	if cfg.OrgID == "" {
+		cfg.OrgID = os.Getenv("LOWCO_ORG_ID")
+	}
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 60 * time.Second
 	}
@@ -70,7 +77,7 @@ func NewClient(cfg Config) (*Client, error) {
 	if cfg.MaxRetries < 0 {
 		cfg.MaxRetries = 0
 	}
-	c := &core{key: cfg.APIKey, base: strings.TrimRight(cfg.BaseURL, "/"), http: cfg.HTTPClient, retries: cfg.MaxRetries}
+	c := &core{key: cfg.APIKey, org: strings.TrimSpace(cfg.OrgID), base: strings.TrimRight(cfg.BaseURL, "/"), http: cfg.HTTPClient, retries: cfg.MaxRetries}
 	return &Client{services: newServices(c), c: c}, nil
 }
 

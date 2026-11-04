@@ -334,7 +334,7 @@ export interface BarcodeDecodeRequest {
   callback_url?: string;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -580,7 +580,7 @@ export interface DocaiBankStatementRequest {
   engine?: "auto" | "fast" | "accurate";
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -618,7 +618,7 @@ export interface DocaiChequeRequest {
   engine?: "auto" | "fast" | "accurate";
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -658,7 +658,7 @@ export interface DocaiClassifyRequest {
   engine?: "auto" | "fast" | "accurate";
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -702,7 +702,7 @@ export interface DocaiExtractRequest {
   engine?: "auto" | "fast" | "accurate";
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -744,7 +744,7 @@ export interface DocaiInvoiceRequest {
   engine?: "auto" | "fast" | "accurate";
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -794,7 +794,7 @@ export interface DocaiKycRequest {
   engine?: "auto" | "fast" | "accurate";
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -836,7 +836,7 @@ export interface DocaiReceiptRequest {
   engine?: "auto" | "fast" | "accurate";
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -874,7 +874,7 @@ export interface DocaiTablesRequest {
   engine?: "auto" | "fast" | "accurate";
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -889,6 +889,59 @@ export interface DocaiTablesRequest {
 }
 
 export type DocaiTablesResult = TablesResult;
+
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface DocaiTextParams {
+  /** The file: a path, bytes, a stream, a URL or a stored file id (see the file helpers) */
+  file: FileInput;
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Cut the text here; the result says truncated */
+  max_characters?: number;
+}
+
+/** Exactly one of file_id, file_url, file_base64 (or a multipart file part); the other fields are options. */
+export interface DocaiTextRequest {
+  /** Public https URL that receives this job's webhook */
+  callback_url?: string;
+  /** Base64, URL-safe base64 or a data: URL */
+  file_base64?: string;
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
+  file_id?: string;
+  /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
+  file_url?: string;
+  /** Name for the stored input */
+  filename?: string;
+  /** Cut the text here; the result says truncated */
+  max_characters?: number;
+  /** Opens a protected PDF; never stored or logged */
+  password?: string;
+}
+
+export interface DocaiTextResult {
+  /** Characters in text */
+  characters: number;
+  format: "docx" | "xlsx" | "csv" | "tsv" | "text" | "json";
+  /** DOCX paragraphs outside tables */
+  paragraphs?: number;
+  sheets?: DocaiTextResultSheet[];
+  /** DOCX tables */
+  tables?: number;
+  /** The document's text: one line per paragraph or row, cells joined by " | "; DOCX headings as # lines and list items as - lines; each XLSX sheet under a "## Sheet: <name>" line, dates as YYYY-MM-DD */
+  text: string;
+  /** true when the text was cut at max_characters */
+  truncated: boolean;
+  warnings?: string[];
+}
+
+/** An XLSX sheet, or the rows of a CSV or TSV */
+export interface DocaiTextResultSheet {
+  columns: number;
+  hidden?: boolean;
+  name?: string;
+  /** Rows with content */
+  rows: number;
+}
 
 export interface ErrorBody {
   /** The HTTP status */
@@ -958,7 +1011,7 @@ export interface Field {
 export interface FileRef {
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -966,6 +1019,21 @@ export interface FileRef {
   filename?: string;
   /** Opens a protected PDF; never stored or logged */
   password?: string;
+}
+
+/** A page; pass next_cursor as cursor for the next one (null at the end). */
+export interface FilesListData {
+  items: StoredFile[];
+  next_cursor: string | null;
+}
+
+export interface FilesListQuery {
+  /** Only files that arrived this way */
+  source?: "upload" | "url" | "base64" | "output" | "document";
+  /** Page size */
+  limit?: number;
+  /** next_cursor of the previous page. */
+  cursor?: string;
 }
 
 export interface InvoiceResult {
@@ -1049,7 +1117,7 @@ export interface Job {
   progress: JobProgress | null;
   /** The request that created the job */
   request_id?: string;
-  /** Set when succeeded: the operation's data, with output files as file objects and fresh signed links */
+  /** Set when succeeded: the operation's data, with output files as file objects and fresh signed links. An OCR job keeps only a summary (OCRJobResult): its full result and text are files in the job's Lowco Docs folder. */
   result: Record<string, unknown> | null;
   service: string;
   started_at: string | null;
@@ -1791,6 +1859,23 @@ export interface MessagesListQuery {
   cursor?: string;
 }
 
+/** The result of an ocr/text or ocr/handwriting job. The full result (OCRResult, as the sync answer would be) and the plain text are files in the job's Lowco Docs folder, so a 1,000-page document never sits in the job. */
+export interface OCRJobResult {
+  confidence: number;
+  engine_used: "fast" | "accurate" | "text_layer" | "mixed";
+  languages_detected: string[];
+  page_count: number;
+  result_file: Output;
+  /** Characters in the whole text */
+  text_characters: number;
+  text_file: Output;
+  /** The first 2,000 characters of the text */
+  text_preview: string;
+  /** true when the text is longer than the preview */
+  text_truncated: boolean;
+  warnings?: string[];
+}
+
 export interface OCRPage {
   blocks?: OCRRegion[];
   confidence: number;
@@ -1911,7 +1996,7 @@ export interface OcrHandwritingRequest {
   engine?: "accurate";
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -1955,7 +2040,7 @@ export interface OcrTextRequest {
   engine?: "auto" | "fast" | "accurate";
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -1993,6 +2078,7 @@ export interface Output {
   expired?: boolean;
   /** When the file is deleted; null with zero retention */
   expires_at?: string | null;
+  /** The Lowco Docs document id */
   file_id: string;
   mime_type?: string;
   /** PDF outputs */
@@ -2084,7 +2170,7 @@ export interface PdfArrangeRequest {
   callback_url?: string;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2122,7 +2208,7 @@ export interface PdfCompressRequest {
   callback_url?: string;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2165,7 +2251,7 @@ export interface PdfExtractTextRequest {
   callback_url?: string;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2247,7 +2333,7 @@ export interface PdfInfoRequest {
   callback_url?: string;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2374,7 +2460,7 @@ export interface PdfProtectRequest {
   callback_url?: string;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2419,7 +2505,7 @@ export interface PdfRotateRequest {
   callback_url?: string;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2463,7 +2549,7 @@ export interface PdfSplitRequest {
   every?: number;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2500,7 +2586,7 @@ export interface PdfToDocxRequest {
   callback_url?: string;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2536,7 +2622,7 @@ export interface PdfToImagesRequest {
   dpi?: number;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2576,7 +2662,7 @@ export interface PdfUnlockRequest {
   callback_url?: string;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2620,7 +2706,7 @@ export interface PdfWatermarkRequest {
   color?: string;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2704,7 +2790,7 @@ export interface QrDecodeRequest {
   callback_url?: string;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2905,7 +2991,7 @@ export interface RenderDocxRequest {
   callback_url?: string;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -2945,7 +3031,7 @@ export interface RenderDocxTemplateRequest {
   data?: unknown;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -3975,6 +4061,7 @@ export interface StoredFile {
   bytes: number;
   created_at: string;
   expires_at: string | null;
+  /** The Lowco Docs document id */
   file_id: string;
   filename: string;
   /** The job that produced it (source output) */
@@ -3983,8 +4070,8 @@ export interface StoredFile {
   /** PDF pages */
   pages?: number;
   sha256: string;
-  /** How the file arrived */
-  source: "upload" | "url" | "base64" | "output";
+  /** How the file arrived (document: a Lowco Docs document of another app, read by its id; never deleted by the API) */
+  source: "upload" | "url" | "base64" | "output" | "document";
 }
 
 /** A suppressed recipient */
@@ -4598,7 +4685,7 @@ export interface VerifyDocumentTamperRequest {
   consent: boolean;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -4751,7 +4838,7 @@ export interface VerifyDuplicateDocumentRequest {
   consent: boolean;
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -5309,7 +5396,7 @@ export interface VerifyKycRequest {
   document_type?: "pan_card" | "aadhaar" | "driving_licence" | "passport" | "voter_id";
   /** Base64, URL-safe base64 or a data: URL */
   file_base64?: string;
-  /** A stored file of this org and environment (POST /v1/lowco-api/files) */
+  /** A Lowco Docs document id of this org: a file from POST /v1/lowco-api/files or an output, or any document the org's Lowco apps keep in Lowco Docs */
   file_id?: string;
   /** Public https URL, fetched with SSRF protection (10 s, 3 redirects) */
   file_url?: string;
@@ -6172,6 +6259,11 @@ export class DocaiOperations {
     return this.core.operation<DocaiTablesResult>("/v1/lowco-api/docai/tables", params as unknown as Record<string, unknown>, { input: "file", extra: [] }, options);
   }
 
+  /** Text from DOCX, XLSX, CSV and plain-text files (no model, no OCR). Answers 200 inline, or 202 with a job above its sync limit (or with mode async). Meter api_docai_pages; scope api.docai.text.execute. */
+  text(params: DocaiTextParams, options?: CallOptions): Promise<Answer<DocaiTextResult>> {
+    return this.core.operation<DocaiTextResult>("/v1/lowco-api/docai/text", params as unknown as Record<string, unknown>, { input: "file", extra: [] }, options);
+  }
+
 }
 
 /** /v1/lowco-api/ocr operations. */
@@ -6467,6 +6559,16 @@ export class FilesResource {
   /** File metadata. */
   get(id: string, options?: RequestOptions): Promise<StoredFile> {
     return this.core.call<StoredFile>("GET", `/v1/lowco-api/files/${encodeURIComponent(id)}`, { query: undefined, json: undefined }, options);
+  }
+
+  /** Stored files of this environment, newest first. */
+  list(query?: FilesListQuery, options?: RequestOptions): Promise<FilesListData> {
+    return this.core.call<FilesListData>("GET", `/v1/lowco-api/files`, { query: query as unknown as Record<string, unknown> | undefined, json: undefined }, options);
+  }
+
+  /** Every item of list, page after page (follows next_cursor). */
+  listAll(query?: Omit<FilesListQuery, "cursor">, options?: RequestOptions): AsyncIterable<StoredFile> {
+    return this.core.paginate<StoredFile>(`/v1/lowco-api/files`, query as unknown as Record<string, unknown> | undefined, options);
   }
 
   /** Upload a file (50 MB live, 5 MB test). */

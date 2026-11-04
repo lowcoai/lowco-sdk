@@ -27,7 +27,7 @@ func TestGeneratedFilesAreCurrent(t *testing.T) {
 			t.Errorf("%s is stale; run make api-gen", rel)
 		}
 	}
-	if len(m.Ops) != 54 || len(m.Reasons) != 56 {
+	if len(m.Ops) != 55 || len(m.Reasons) != 56 { // 55 since docai/text
 		t.Fatalf("%d operations, %d reasons", len(m.Ops), len(m.Reasons))
 	}
 }

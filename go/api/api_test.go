@@ -338,3 +338,29 @@ func TestWebhookVectorsFromLowcoAPI(t *testing.T) {
 		t.Fatalf("event %v %v", ev, err)
 	}
 }
+
+// OrgID (or LOWCO_ORG_ID) goes as X-Org-Id on authenticated calls only.
+func TestOrgIDHeader(t *testing.T) {
+	m := newMock(t)
+	ctx := context.Background()
+	c, err := api.NewClient(api.Config{APIKey: "lc_test_sdk", BaseURL: m.srv.URL, OrgID: "7412"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Settings.Get(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.last("/v1/lowco-api/settings").header.Get("X-Org-Id"); got != "7412" {
+		t.Fatalf("X-Org-Id %q", got)
+	}
+	if _, err := c.Files.Download(ctx, m.srv.URL+"/v1/lowco-api/downloads/tok_x"); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.last("/v1/lowco-api/downloads/tok_x").header.Get("X-Org-Id"); got != "" {
+		t.Fatalf("a signed link carried X-Org-Id %q", got)
+	}
+	t.Setenv("LOWCO_ORG_ID", "9001")
+	if _, err := client(t, m).Settings.Get(ctx); err != nil || m.last("/v1/lowco-api/settings").header.Get("X-Org-Id") != "9001" {
+		t.Fatalf("LOWCO_ORG_ID: %v", err)
+	}
+}

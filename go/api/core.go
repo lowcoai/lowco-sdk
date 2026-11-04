@@ -21,6 +21,7 @@ var sprintf = fmt.Sprintf
 
 type core struct {
 	key     string
+	org     string
 	base    string
 	http    *http.Client
 	retries int
@@ -111,6 +112,9 @@ func (c *core) send(ctx context.Context, in sendInput) (*rawAnswer, error) {
 		}
 		if in.auth {
 			req.Header.Set("Authorization", "Bearer "+c.key)
+			if c.org != "" {
+				req.Header.Set("X-Org-Id", c.org)
+			}
 		}
 		if id := in.callOptions.requestID; id != "" {
 			req.Header.Set("X-Request-Id", id)

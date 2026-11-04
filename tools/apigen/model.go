@@ -102,7 +102,7 @@ var fileKeys = map[string]bool{"file_id": true, "file_url": true, "file_base64":
 
 // resourceNames maps operationIds to SDK groups and methods.
 var resourceNames = map[string][2]string{
-	"files_upload": {"files", "upload"}, "files_get": {"files", "get"}, "files_delete": {"files", "delete"},
+	"files_upload": {"files", "upload"}, "files_get": {"files", "get"}, "files_delete": {"files", "delete"}, "files_list": {"files", "list"},
 	"files_content": {"files", "contentUrl"},
 	"jobs_list":     {"jobs", "list"}, "jobs_get": {"jobs", "get"}, "jobs_cancel": {"jobs", "cancel"}, "jobs_events": {"jobs", "events"},
 	"requests_get": {"requests", "get"}, "requests_list": {"requests", "list"},

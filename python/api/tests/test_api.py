@@ -208,6 +208,12 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(lowco.files.download(link), b"%PDF-1.7")
         self.assertNotIn("Authorization", last("/v1/lowco-api/downloads/tok_x")["headers"])
 
+    def test_org_id_header(self):
+        LowcoApi("lc_test_sdk", base_url=BASE, org_id="7412").settings.get()
+        self.assertEqual(last("/v1/lowco-api/settings")["headers"].get("X-Org-Id"), "7412")
+        client().settings.get()
+        self.assertNotIn("X-Org-Id", last("/v1/lowco-api/settings")["headers"])
+
     def test_missing_key(self):
         saved = os.environ.pop("LOWCO_API_KEY", None)
         try:

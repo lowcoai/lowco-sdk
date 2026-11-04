@@ -201,3 +201,10 @@ test("webhook signatures: the vectors made by lowco-api core/webhooksig", () => 
   assert.equal(constructEvent(ok.body, ok.header, ok.secret, { now: ok.now }).type, "job.succeeded");
   assert.throws(() => constructEvent(ok.body + " ", ok.header, ok.secret, { now: ok.now }), /does not match/);
 });
+
+test("orgId goes as X-Org-Id on authenticated calls", async () => {
+  await new LowcoApi({ apiKey: "lc_test_sdk", baseUrl: base, orgId: "7412" }).settings.get();
+  assert.equal(last("/v1/lowco-api/settings").headers["x-org-id"], "7412");
+  await client().settings.get();
+  assert.equal(last("/v1/lowco-api/settings").headers["x-org-id"], undefined);
+});
