@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lowcoai-engage"
-version = "0.1.0"
+version = "0.2.0"
 description = "Official server-side Python client for the lowco engage event-tracking service."
 readme = "README.md"
 license = "MIT"

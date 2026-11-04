@@ -4,7 +4,7 @@ Flutter analytics SDK for the **lowco engage** service — the app counterpart o
 
 ```yaml
 dependencies:
-  lowcoai_engage: ^0.1.0
+  lowcoai_engage: ^0.2.0
 ```
 
 ## Quick start

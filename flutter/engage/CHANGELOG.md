@@ -1,4 +1,4 @@
-## Unreleased
+## 0.2.0
 
 - `EngageConfig.appId` (optional) selects the engage app, sent as `X-Engage-App-Id`; without it events go to the org's default app.
 - An `lc_…` API key is sent as `X-Api-Key`; any other `apiKey` (an OAuth2 access token) still as `Authorization: Bearer`.

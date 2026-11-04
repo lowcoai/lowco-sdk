@@ -17,7 +17,7 @@ from ._client import AsyncEngageClient, EngageClient
 from ._errors import EngageError
 from .types import *  # noqa: F403
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "ATTRIBUTION_KEYS",
