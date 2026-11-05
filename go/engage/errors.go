@@ -16,8 +16,21 @@ var (
 	ErrMissingOrgID = errors.New("engage: orgId is required")
 	// ErrMissingEventName is returned by Track for an empty event name.
 	ErrMissingEventName = errors.New("engage: eventName is required")
-	// ErrMissingUserID is returned by IdentifyUser for an empty user id.
+	// ErrMissingUserID is returned by IdentifyUser, Alias, Merge,
+	// SetConsent and EnterJourney for an empty user id.
 	ErrMissingUserID = errors.New("engage: userID is required")
+	// ErrEmptyBatch is returned by TrackBatch for no events.
+	ErrEmptyBatch = errors.New("engage: events are required")
+	// ErrBatchTooLarge is returned by TrackBatch for more than MaxBatch
+	// events; split them into several calls.
+	ErrBatchTooLarge = errors.New("engage: at most 1000 events a batch")
+	// ErrMissingAlias is returned by Alias for an empty alias type or value.
+	ErrMissingAlias = errors.New("engage: aliasType and aliasValue are required")
+	// ErrMissingConsent is returned by SetConsent for an empty channel or
+	// status.
+	ErrMissingConsent = errors.New("engage: consent channel and status are required")
+	// ErrMissingJourneyID is returned by EnterJourney for an empty journey id.
+	ErrMissingJourneyID = errors.New("engage: journeyID is required")
 )
 
 // Error is returned for a non-2xx response and for a network or timeout

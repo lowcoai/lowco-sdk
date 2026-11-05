@@ -13,6 +13,12 @@ export interface Config {
    */
   appId?: string;
   autoTrack?: boolean;
+  /**
+   * Show the app's live Engage forms (popups, slide-ins, bars and inline
+   * `<div data-engage-form="<id>">` forms) by the display rules set in
+   * Engage. Fetched after init and on SPA route changes.
+   */
+  forms?: boolean;
 }
 
 export interface Metadata {
@@ -67,3 +73,48 @@ export interface LocationInfo {
   heading?: number | null;
   speed?: number | null;
 }
+
+/**
+ * An event for trackBatch(). Only `event_name` is required; the rest
+ * default to what track() would send (pass `user_id: null` for none).
+ */
+export interface BatchEventInput {
+  event_name: string;
+  event_data?: Metadata;
+  user_id?: string | null;
+  device_id?: string;
+  session_id?: string;
+  device_info?: DeviceInfo | null;
+  location?: LocationInfo | null;
+  event_time?: Date | string;
+}
+
+/** One event's outcome in a batch, by its place in the batch. */
+export interface BatchRow {
+  index: number;
+  eventName: string;
+  ok: boolean;
+  error?: string;
+  issues?: Metadata[];
+}
+
+/** POST /v1/engage/track/batch's answer. */
+export interface BatchResult {
+  accepted: number;
+  rejected: number;
+  results: BatchRow[];
+}
+
+export type {
+  EngageForm,
+  FormConsent,
+  FormContent,
+  FormDisplay,
+  FormField,
+  FormFieldError,
+  FormFieldType,
+  FormMode,
+  FormSubmitResult,
+  FormTrigger,
+  FormTriggerType,
+} from "./forms";

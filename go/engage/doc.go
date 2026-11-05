@@ -1,7 +1,10 @@
 // Package engage is the server-side Go client for the lowco engage
 // event-tracking service: the backend counterpart of the browser SDK
-// (@lowcoai/engage). Every call sends one event to
-// POST https://api.lowco.ai/v1/engage/track.
+// (@lowcoai/engage). Track, Page and IdentifyUser send one event to
+// POST https://api.lowco.ai/v1/engage/track; TrackBatch sends up to 1000
+// (built with NewEvent) to /v1/engage/track/batch and reports each one's
+// outcome. With a server (admin) credential, Alias, Merge, SetConsent and
+// EnterJourney manage profiles, consent and journeys.
 //
 // Construction requires a credential and an org id; the engage app is
 // optional:
@@ -22,6 +25,9 @@
 // reads API keys from; any other credential (an OAuth2 access token) is sent
 // as "Authorization: Bearer <token>". The org id travels as X-Org-Id and the
 // app id, when set, as X-Engage-App-Id.
+//
+// Config.BaseURL replaces the API host (a staging host, or an httptest
+// server in tests).
 //
 // The client is stateless and safe for concurrent use: it remembers no user,
 // keeps no session and captures no device or location information, so pass

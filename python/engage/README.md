@@ -2,6 +2,8 @@
 
 Server-side Python client for the **lowco engage** event-tracking service: the backend counterpart of the browser SDK [`@lowcoai/engage`](../../npm/engage). Sync and asyncio clients with the same surface, built on [httpx](https://www.python-httpx.org/). Python 3.10+.
 
+Besides one-event tracking it sends batches (`track_batch`, up to 1000 events) and, with a server credential, manages profiles, consent and journeys (`alias`, `merge`, `set_consent`, `enter_journey`).
+
 ```bash
 pip install lowcoai-engage
 ```
@@ -55,8 +57,9 @@ Each call sends exactly one event (one HTTP request) and returns once the servic
 | `device_id`   | Default `device_id` for events that don't pass one. Defaults to a uuid4 per client.       |
 | `timeout`     | Per-request timeout in seconds (default `30`). `None` disables it.                        |
 | `http_client` | Your own `httpx.Client` / `httpx.AsyncClient` (proxies, retries, test transports). It is not closed by the SDK. |
+| `base_url`    | Replaces `https://api.lowco.ai` (a staging host, say). A trailing slash is ignored. `client.base_url` returns it. |
 
-Events are always sent to `https://api.lowco.ai/v1/engage/track`.
+Events are sent to `https://api.lowco.ai/v1/engage/track` unless `base_url` says otherwise.
 
 ### Credentials and apps
 
@@ -78,9 +81,50 @@ engage = EngageClient("lc_…", "org_123", app_id="app_123")
 | `page(properties=None, *, ...)` | `page_view` | Page view; put `path`, `url`, `title`, `referrer`, `search` in `properties` like the browser SDK does. |
 | `identify_user(user_id, properties=None, *, ...)` | `_lowco_identify` | Links `user_id` to the device id. Not remembered. |
 
-Every method takes the keyword-only arguments `user_id` (except `identify_user`, where it is positional), `device_id`, `session_id`, `device_info`, `location` and `event_time`. `event_time` defaults to now; a naive `datetime` is treated as UTC. `datetime` / `date` values inside `properties` are serialised as ISO strings.
+| `build_event(event_name, properties=None, *, ...)` | `event_name` | The event `track` would send, without sending it (for `track_batch`). |
+| `track_batch(events)` | — | Up to 1000 events in one `POST /v1/engage/track/batch`; returns a `BatchResult`. |
+| `alias(user_id, alias_type, alias_value)` | — | Another name for a person; returns an `AliasResult`. |
+| `merge(keep_user_id, merge_user_id)` | — | Merges a duplicate profile into the one kept; returns the kept `Profile`. |
+| `set_consent(user_id, channel, status, *, source=None, evidence=None)` | — | Records a consent change; returns a `ConsentResult`. |
+| `enter_journey(journey_id, user_id)` | — | Puts a person in a journey; returns a `JourneyParticipant`. |
+
+`track`, `page`, `identify_user` and `build_event` take the keyword-only arguments `user_id` (except `identify_user`, where it is positional), `device_id`, `session_id`, `device_info`, `location` and `event_time`. `event_time` defaults to now; a naive `datetime` is treated as UTC. `datetime` / `date` values inside `properties` are serialised as ISO strings.
 
 `client.device_id` returns the default device id.
+
+## Batches and profiles
+
+`track_batch` is how a worker or queue ships many events: one bad event doesn't fail the rest, and the answer lists every event's outcome by its place.
+
+```python
+events = [
+    engage.build_event("order_completed", {"total": 1299}, user_id="user_123"),
+    engage.build_event("invoice_sent", user_id="user_456"),
+]
+result = engage.track_batch(events)  # ValueError for no events or more than MAX_BATCH (1000)
+for row in result["results"]:
+    if not row["ok"]:
+        # row["error"]: "event_name is required", "breaks its strict event definition"
+        # (see row["issues"]), or "couldn't be queued; send it again" (worth retrying)
+        ...
+```
+
+The profile and journey calls need a server credential (an admin `lc_…` API key), never a browser key:
+
+```python
+from lowcoai.engage import ALIAS_EXTERNAL, CONSENT_OPTED_IN, EngageError
+
+engage.alias("user_123", ALIAS_EXTERNAL, "crm:lead_58291")  # {"claimed": True} or {"claimed": False, "heldBy": ...}
+kept = engage.merge("user_123", "ana@example.in")  # 200, or 202 while the event store catches up
+engage.set_consent("user_123", "whatsapp", CONSENT_OPTED_IN, source="form", evidence={"formId": "frm_1"})
+try:
+    engage.enter_journey("jrn_welcome", "user_123")
+except EngageError as err:
+    if err.status_code == 409:
+        ...  # already in the journey, or may not re-enter yet
+```
+
+Alias types are `ALIAS_ANONYMOUS`, `ALIAS_EMAIL`, `ALIAS_PHONE` and `ALIAS_EXTERNAL`; consent statuses `CONSENT_OPTED_IN`, `CONSENT_OPTED_OUT` and `CONSENT_PENDING` on a channel in `CONSENT_CHANNELS` (`email`, `sms`, `whatsapp`, `push`, `webpush`, `inapp`, `all`). Answers are `TypedDict`s with the service's camelCase keys (`BatchResult`, `BatchRow`, `AliasResult`, `Profile`, `ConsentResult`, `JourneyParticipant`). Blank required arguments raise `ValueError` before any request.
 
 ## Data shapes
 
@@ -126,6 +170,6 @@ except EngageError as err:
     print(err.status_code, err.message, err.code)
 ```
 
-When the service answers with an opaque platform code (`"AAS-00105"`) as the message, `message` carries the human-readable `error.details` instead; the code is still in `body`. Network failures and timeouts surface as `httpx` exceptions. `ValueError` is raised for a blank `api_key`, `org_id`, `event_name` or `identify_user` `user_id`.
+When the service answers with an opaque platform code (`"AAS-00105"`) as the message, `message` carries the human-readable `error.details` instead; the code is still in `body`. Network failures and timeouts surface as `httpx` exceptions. `ValueError` is raised for a blank `api_key`, `org_id`, `event_name` or `identify_user` `user_id`, and for the blank arguments and batch limits above.
 
 Unlike the browser SDK (which fires and forgets), calls wait for the service's answer. To keep tracking off the request path, call it from a background task or worker.

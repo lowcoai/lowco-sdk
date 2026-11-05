@@ -6,6 +6,8 @@ export interface InlineSnippetOptions {
   /** Emitted only when given; without it events go to the org's default app. */
   appId?: string;
   autoTrack?: boolean;
+  /** Emitted only when true: show the app's live Engage forms. */
+  forms?: boolean;
   eventName?: string;
   eventData?: Metadata;
 }
@@ -31,6 +33,7 @@ export function createInlineSnippet({
   orgId = "YOUR_ORG_ID",
   appId,
   autoTrack = true,
+  forms,
   eventName = "signup_completed",
   eventData,
 }: InlineSnippetOptions = {}): string {
@@ -39,6 +42,7 @@ export function createInlineSnippet({
     orgId,
     appId: appId || undefined,
     autoTrack,
+    ...(forms ? { forms: true } : {}),
   });
 
   const eventCall = eventData

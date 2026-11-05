@@ -146,6 +146,22 @@ object LowcoAnalytics {
         current.captureAttribution(url)
     }
 
+    /**
+     * Builds the event [track] would send now, without sending it, to collect
+     * for [trackBatch]; null before [init]. See [EngageTracker.buildEvent].
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun buildEvent(eventName: String, properties: Map<String, Any?>? = null): EngageEvent? =
+        current()?.buildEvent(eventName, properties)
+
+    /** Sends up to 1000 events in one request; see [EngageTracker.trackBatch]. */
+    @JvmStatic
+    @JvmOverloads
+    fun trackBatch(events: List<EngageEvent>, onResult: EngageBatchCallback? = null) {
+        current()?.trackBatch(events, onResult)
+    }
+
     /** Sets (or clears) the location sent with later events. */
     @JvmStatic
     fun setLocation(location: LocationInfo?) {

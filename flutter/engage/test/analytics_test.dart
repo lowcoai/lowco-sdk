@@ -630,6 +630,105 @@ void main() {
     });
   });
 
+  group('batch', () {
+    final batchAnswer = jsonEncode({
+      'status': 1,
+      'data': {
+        'accepted': 1,
+        'rejected': 1,
+        'results': [
+          {'index': 0, 'eventName': 'a', 'ok': true},
+          {
+            'index': 1,
+            'eventName': 'order',
+            'ok': false,
+            'error': 'breaks its strict event definition',
+            'issues': [
+              {'property': 'total', 'kind': 'type', 'expected': 'number', 'got': 'string'}
+            ],
+          },
+        ],
+      },
+    });
+
+    test('posts {"events": [...]} to /track/batch and returns each row', () async {
+      rec = Recorder((_) => http.Response(batchAnswer, 200));
+      await init(cfg: const EngageConfig(apiKey: 'lc_k', orgId: 'org_1', appId: 'app_9'));
+      await analytics().identifyUser('u1');
+      final a = analytics().buildEvent('a', {'x': 1})!;
+      final b = analytics().buildEvent('order', {'total': '12'})!;
+      final result = await analytics().trackBatch([a, b]);
+
+      final req = rec.requests.last;
+      expect(req.method, 'POST');
+      expect(req.url.toString(), 'https://api.lowco.ai/v1/engage/track/batch');
+      expect(req.headers['X-Api-Key'], 'lc_k');
+      expect(req.headers.containsKey('Authorization'), isFalse);
+      expect(req.headers['X-Org-Id'], 'org_1');
+      expect(req.headers['X-Engage-App-Id'], 'app_9');
+      final events = (jsonDecode(req.body) as Map<String, dynamic>)['events'] as List;
+      expect(events, hasLength(2));
+      expect(events[0], jsonDecode(jsonEncode(a.toJson())));
+      expect((events[1] as Map)['event_name'], 'order');
+      expect((events[1] as Map)['user_id'], 'u1');
+      expect((events[1] as Map)['device_id'], analytics().deviceId);
+      expect((events[1] as Map)['session_id'], analytics().sessionId);
+
+      expect(result, isNotNull);
+      expect(result!.accepted, 1);
+      expect(result.rejected, 1);
+      expect([for (final r in result.results) r.ok], [true, false]);
+      expect(result.rejectedRows.single.index, 1);
+      expect(result.rejectedRows.single.error, 'breaks its strict event definition');
+      expect(result.rejectedRows.single.issues.single['property'], 'total');
+    });
+
+    test('empty, too large and refused batches go to onError', () async {
+      final errors = <Object>[];
+      rec = Recorder((_) => http.Response(
+          jsonEncode({
+            'error': {'message': 'too many'}
+          }),
+          413));
+      await init(cfg: EngageConfig(apiKey: 'k', orgId: 'o', onError: errors.add));
+      final one = analytics().buildEvent('x')!;
+
+      expect(await analytics().trackBatch([]), isNull);
+      expect(await analytics().trackBatch(List.filled(maxBatchSize + 1, one)), isNull);
+      expect(rec.requests, isEmpty);
+      expect(errors, hasLength(2));
+      expect(errors, everyElement(isA<ArgumentError>()));
+
+      expect(await analytics().trackBatch([one]), isNull);
+      expect(rec.requests, hasLength(1));
+      expect((errors.last as EngageException).statusCode, 413);
+      expect((errors.last as EngageException).message, 'too many');
+    });
+
+    test('before init: buildEvent is null and trackBatch drops the batch', () async {
+      expect(analytics().buildEvent('x'), isNull);
+      final event = EngageEvent(eventName: 'x', deviceId: 'd', eventTime: DateTime.utc(2026));
+      expect(await analytics().trackBatch([event]), isNull);
+      expect(rec.requests, isEmpty);
+    });
+
+    test('EngageBatchResult reads lenient JSON', () {
+      final result = EngageBatchResult.fromJson({
+        'accepted': '2',
+        'results': [
+          {'index': 0, 'ok': true},
+          {'index': 1.0, 'ok': 'false', 'error': 'event_name is required'},
+          'junk',
+        ],
+      });
+      expect(result.accepted, 2);
+      expect(result.rejected, 0);
+      expect(result.results, hasLength(2));
+      expect(result.rejectedRows.single.index, 1);
+      expect(result.rejectedRows.single.eventName, '');
+    });
+  });
+
   test('uuidV4 produces RFC 4122 v4 ids', () {
     final ids = {for (var i = 0; i < 100; i++) uuidV4()};
     expect(ids, hasLength(100));

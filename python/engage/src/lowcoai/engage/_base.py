@@ -4,16 +4,22 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime, timezone
 from typing import Any, cast
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, quote
 
 from ._errors import build_http_error
 from .types import DeviceInfo, Event, LocationInfo
 
 BASE_URL = "https://api.lowco.ai"
 TRACK_PATH = "/v1/engage/track"
+TRACK_BATCH_PATH = "/v1/engage/track/batch"
+"""Batch ingestion: up to :data:`MAX_BATCH` events, each taken or refused on its own."""
+ALIAS_PATH = "/v1/engage/users/alias"
+MERGE_PATH = "/v1/engage/users/merge"
+MAX_BATCH = 1000
+"""The most events one ``track_batch`` call takes."""
 HEADER_ORG_ID = "X-Org-Id"
 HEADER_API_KEY = "X-Api-Key"
 """Carries an ``lc_`` API key; any other token travels as ``Authorization: Bearer``."""
@@ -22,6 +28,18 @@ HEADER_ENGAGE_APP_ID = "X-Engage-App-Id"
 PAGE_VIEW_EVENT = "page_view"
 IDENTIFY_EVENT = "_lowco_identify"
 DEFAULT_TIMEOUT = 30.0
+
+ALIAS_ANONYMOUS = "anonymous"
+"""An SDK device / anonymous id: the person's earlier anonymous events become theirs."""
+ALIAS_EMAIL = "email"
+ALIAS_PHONE = "phone"
+ALIAS_EXTERNAL = "external"
+"""An id in another system (a CRM lead id, say)."""
+
+CONSENT_OPTED_IN = "opted_in"
+CONSENT_OPTED_OUT = "opted_out"
+CONSENT_PENDING = "pending"
+CONSENT_CHANNELS: tuple[str, ...] = ("email", "sms", "whatsapp", "push", "webpush", "inapp", "all")
 
 ATTRIBUTION_KEYS: tuple[str, ...] = (
     "utm_source",
@@ -52,6 +70,7 @@ class BaseClient:
         *,
         app_id: str | None,
         device_id: str | None,
+        base_url: str | None = None,
     ) -> None:
         if not api_key or not api_key.strip():
             raise ValueError("EngageClient: api_key is required")
@@ -59,7 +78,8 @@ class BaseClient:
             raise ValueError("EngageClient: org_id is required")
         self._device_id = device_id or str(uuid.uuid4())
         self._app_id = app_id.strip() if app_id and app_id.strip() else None
-        self._track_url = BASE_URL + TRACK_PATH
+        self._base_url = (base_url or "").strip().rstrip("/") or BASE_URL
+        self._track_url = self._base_url + TRACK_PATH
         api_key = api_key.strip()
         self._headers = {"Content-Type": "application/json"}
         if is_api_key(api_key):
@@ -79,6 +99,91 @@ class BaseClient:
     def app_id(self) -> str | None:
         """The engage app events go to, or ``None`` for the org's default app."""
         return self._app_id
+
+    @property
+    def base_url(self) -> str:
+        """The API host calls go to (``https://api.lowco.ai`` unless configured)."""
+        return self._base_url
+
+    def build_event(
+        self,
+        event_name: str,
+        properties: Mapping[str, Any] | None = None,
+        *,
+        user_id: str | None = None,
+        device_id: str | None = None,
+        session_id: str | None = None,
+        device_info: DeviceInfo | None = None,
+        location: LocationInfo | None = None,
+        event_time: datetime | None = None,
+    ) -> Event:
+        """The event ``track`` would send, without sending it (to collect for ``track_batch``).
+
+        ``properties`` are copied into ``event_data``; ``device_id`` defaults to
+        :attr:`device_id` and ``event_time`` to now. Raises ``ValueError`` for a
+        blank ``event_name``.
+        """
+        return self._build_event(
+            event_name,
+            properties,
+            user_id=user_id,
+            device_id=device_id,
+            session_id=session_id,
+            device_info=device_info,
+            location=location,
+            event_time=event_time,
+        )
+
+    # --- request builders shared by the sync and async clients -------------
+
+    def _batch_request(self, events: Sequence[Event]) -> tuple[str, str, bytes]:
+        if not events:
+            raise ValueError("track_batch: events are required")
+        if len(events) > MAX_BATCH:
+            raise ValueError(f"track_batch: at most {MAX_BATCH} events a batch")
+        return "POST", self._base_url + TRACK_BATCH_PATH, encode_json({"events": list(events)})
+
+    def _alias_request(
+        self, user_id: str, alias_type: str, alias_value: str
+    ) -> tuple[str, str, bytes]:
+        _require(user_id, "user_id")
+        _require(alias_type, "alias_type")
+        _require(alias_value, "alias_value")
+        body = {"userId": user_id, "aliasType": alias_type, "aliasValue": alias_value}
+        return "POST", self._base_url + ALIAS_PATH, encode_json(body)
+
+    def _merge_request(self, keep_user_id: str, merge_user_id: str) -> tuple[str, str, bytes]:
+        _require(keep_user_id, "keep_user_id")
+        _require(merge_user_id, "merge_user_id")
+        body = {"keepUserId": keep_user_id, "mergeUserId": merge_user_id}
+        return "POST", self._base_url + MERGE_PATH, encode_json(body)
+
+    def _consent_request(
+        self,
+        user_id: str,
+        channel: str,
+        status: str,
+        source: str | None,
+        evidence: Mapping[str, Any] | None,
+    ) -> tuple[str, str, bytes]:
+        _require(user_id, "user_id")
+        _require(channel, "channel")
+        _require(status, "status")
+        body: dict[str, Any] = {"channel": channel, "status": status}
+        if source:
+            body["source"] = source
+        if evidence:
+            body["evidence"] = dict(evidence)
+        user = quote(user_id, safe="")
+        url = f"{self._base_url}/v1/engage/users/userId/{user}/consents"
+        return "PUT", url, encode_json(body)
+
+    def _journey_request(self, journey_id: str, user_id: str) -> tuple[str, str, bytes]:
+        _require(journey_id, "journey_id")
+        _require(user_id, "user_id")
+        journey = quote(journey_id, safe="")
+        url = f"{self._base_url}/v1/engage/configurations/journeys/{journey}/enter"
+        return "POST", url, encode_json({"userId": user_id})
 
     def _build_event(
         self,
@@ -110,8 +215,13 @@ class BaseClient:
 
 def encode_event(event: Event) -> bytes:
     """Compact UTF-8 JSON like ``JSON.stringify``; NaN / infinity raise ``ValueError``."""
+    return encode_json(event)
+
+
+def encode_json(value: Any) -> bytes:
+    """Compact UTF-8 JSON like ``JSON.stringify``; NaN / infinity raise ``ValueError``."""
     return json.dumps(
-        event,
+        value,
         default=_json_default,
         separators=(",", ":"),
         ensure_ascii=False,
@@ -122,6 +232,27 @@ def encode_event(event: Event) -> bytes:
 def check_status(status: int, text: str) -> None:
     if status < 200 or status >= 300:
         raise build_http_error(status, text)
+
+
+def decode_data(status: int, text: str) -> Any:
+    """The ``data`` of a 2xx ``{"status", "data"}`` answer (``None`` when absent).
+
+    Raises :class:`EngageError` for a non-2xx status and ``ValueError`` when a
+    2xx body isn't JSON.
+    """
+    check_status(status, text)
+    if not text.strip():
+        return None
+    try:
+        parsed = json.loads(text)
+    except ValueError as exc:
+        raise ValueError(f"engage: response is not JSON: {text[:200]!r}") from exc
+    return parsed.get("data") if isinstance(parsed, dict) else None
+
+
+def _require(value: str, name: str) -> None:
+    if not value or not value.strip():
+        raise ValueError(f"{name} is required")
 
 
 def iso(value: datetime) -> str:

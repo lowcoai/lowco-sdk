@@ -4,11 +4,25 @@ import {
   HEADER_ENGAGE_APP_ID,
   HEADER_ORG_ID,
   isApiKey,
+  resetId,
 } from "./utils";
-import { Config, DeviceInfo, Event, LocationInfo, Metadata } from "./types";
+import {
+  BatchEventInput,
+  BatchResult,
+  BatchRow,
+  Config,
+  DeviceInfo,
+  Event,
+  LocationInfo,
+  Metadata,
+} from "./types";
+import { EngageForm, EngageForms } from "./forms";
 import UAParser from "ua-parser-js";
 
 const BASE_URL = "https://api.lowco.ai";
+
+/** The most events one POST /v1/engage/track/batch takes. */
+export const MAX_BATCH = 1000;
 
 class LowcoAnalytics {
   private static instance: LowcoAnalytics;
@@ -19,6 +33,8 @@ class LowcoAnalytics {
   private locationInfo: LocationInfo | null = null;
   private sessionId: string | null = null;
   private lastEventTime: number | null = null;
+  private forms: EngageForms | null = null;
+  private routeHooksInstalled = false;
   private readonly SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
   private readonly SESSION_ID_STORAGE_KEY = "lowco_session_id";
   private readonly LAST_EVENT_STORAGE_KEY = "lowco_session_last_event";
@@ -53,16 +69,25 @@ class LowcoAnalytics {
       orgId: config.orgId,
       appId: config.appId,
       autoTrack: config.autoTrack,
+      forms: config.forms,
     });
     this.initializeSession();
     if (config.autoTrack && this.canUseBrowserApis()) {
       this.trackPageView();
-      window.addEventListener("popstate", this.trackPageView);
-      this.overrideHistoryMethods();
       this.setLocationInfo();
+    }
+    if ((config.autoTrack || config.forms) && this.canUseBrowserApis()) {
+      this.installRouteHooks();
     }
     if (this.canUseBrowserApis()) {
       this.setDeviceInfo();
+    }
+    if (config.forms && this.canUseBrowserApis()) {
+      const forms = this.ensureForms();
+      forms.setAutoShow(true);
+      void forms.start();
+    } else {
+      this.forms?.setAutoShow(false);
     }
   }
 
@@ -225,6 +250,25 @@ class LowcoAnalytics {
     );
   }
 
+  /**
+   * SPA navigation: `popstate` and the patched `pushState`/`replaceState`
+   * track a page view (autoTrack) and let forms re-apply their page rules.
+   * Installed once, however often init() runs.
+   */
+  private installRouteHooks(): void {
+    if (this.routeHooksInstalled) return;
+    this.routeHooksInstalled = true;
+    window.addEventListener("popstate", this.handleRouteChange);
+    this.overrideHistoryMethods();
+  }
+
+  private handleRouteChange = (): void => {
+    if (this.config?.autoTrack) {
+      this.trackPageView();
+    }
+    this.forms?.onRouteChange();
+  };
+
   private overrideHistoryMethods(): void {
     const originalPushState = history.pushState;
     const originalReplaceState = history.replaceState;
@@ -232,12 +276,12 @@ class LowcoAnalytics {
 
     history.pushState = function (state, title, url) {
       originalPushState.apply(this, [state, title, url]);
-      instance.trackPageView();
+      instance.handleRouteChange();
     };
 
     history.replaceState = function (state, title, url) {
       originalReplaceState.apply(this, [state, title, url]);
-      instance.trackPageView();
+      instance.handleRouteChange();
     };
   }
 
@@ -372,6 +416,7 @@ class LowcoAnalytics {
     } as Event;
 
     this.sendEvent(event);
+    this.forms?.onEvent(eventName);
   }
 
   public identifyUser(userId: string, properties: Metadata = {}) {
@@ -400,7 +445,113 @@ class LowcoAnalytics {
       location: this.locationInfo,
       event_time: eventTime,
     } as Event);
-    // Here you would typically send the user properties to your analytics backend
+    this.forms?.onIdentityChange();
+  }
+
+  /**
+   * Logout: forgets the identified user and starts a new anonymous id
+   * (`lowco_uuid`) and session, so the next person on this browser isn't
+   * tied to the last one. First-touch attribution is kept.
+   */
+  public reset(): void {
+    this.userId = null;
+    this.anonymousId = resetId();
+    this.startNewSession();
+    this.forms?.onIdentityChange();
+  }
+
+  /**
+   * Shows a live form now, whatever its trigger, pages, audience or
+   * frequency (an inline form fills its `[data-engage-form]` elements, or
+   * opens as a popup when the page has none). Works without
+   * `init({ forms: true })`. Resolves false when the form isn't live.
+   */
+  public showForm(id: string): Promise<boolean> {
+    if (!this.config) {
+      console.error("Analytics not initialized. Call init() first.");
+      return Promise.resolve(false);
+    }
+    if (!this.canUseBrowserApis()) return Promise.resolve(false);
+    return this.ensureForms().show(id);
+  }
+
+  /**
+   * Closes every form popup, slide-in and bar the SDK shows and holds back
+   * pending triggers until the next page (or refreshForms). Inline forms stay.
+   */
+  public hideForms(): void {
+    this.forms?.hideAll();
+  }
+
+  /** Re-fetches the live forms (skipping the 60 s cache) and re-applies their rules. */
+  public refreshForms(): Promise<EngageForm[]> {
+    if (!this.config) {
+      console.error("Analytics not initialized. Call init() first.");
+      return Promise.resolve([]);
+    }
+    if (!this.canUseBrowserApis()) return Promise.resolve([]);
+    return this.ensureForms().refresh();
+  }
+
+  private ensureForms(): EngageForms {
+    if (!this.forms) {
+      this.forms = new EngageForms(
+        {
+          baseUrl: () => BASE_URL,
+          headers: () => (this.config ? this.buildHeaders(this.config) : {}),
+          userId: () => this.userId,
+          anonymousId: () => this.anonymousId,
+          sessionId: () => this.sessionId,
+        },
+        false,
+      );
+    }
+    return this.forms;
+  }
+
+  /**
+   * Sends events through POST /v1/engage/track/batch, 1000 a request, and
+   * answers each event's outcome by its place in `events` (one bad event
+   * doesn't stop the rest). Missing fields are filled like track() fills
+   * them: the identified user, this browser's device id, session, device
+   * info and location, and now. Rejects when a request fails; batches sent
+   * before it were taken.
+   */
+  public async trackBatch(events: BatchEventInput[]): Promise<BatchResult> {
+    const config = this.config;
+    if (!config) {
+      throw new Error("Analytics not initialized. Call init() first.");
+    }
+    const out: BatchResult = { accepted: 0, rejected: 0, results: [] };
+    const wire = events.map((e) => ({
+      id: "",
+      event_name: e.event_name,
+      event_data: e.event_data ?? {},
+      user_id: e.user_id === undefined ? this.userId : e.user_id,
+      device_id: e.device_id ?? this.anonymousId,
+      session_id: e.session_id ?? this.sessionId ?? undefined,
+      device_info: e.device_info === undefined ? this.deviceInfo : e.device_info,
+      location: e.location === undefined ? this.locationInfo : e.location,
+      event_time: e.event_time ?? new Date(),
+    }));
+    for (let start = 0; start < wire.length; start += MAX_BATCH) {
+      const res = await fetch(`${BASE_URL}/v1/engage/track/batch`, {
+        method: "POST",
+        headers: this.buildHeaders(config),
+        body: JSON.stringify({ events: wire.slice(start, start + MAX_BATCH) }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        const message = body?.error?.details || body?.error?.message || body?.message || `status ${res.status}`;
+        throw Object.assign(new Error(`track/batch failed: ${message}`), { status: res.status, body });
+      }
+      const data = body?.data ?? {};
+      out.accepted += Number(data.accepted) || 0;
+      out.rejected += Number(data.rejected) || 0;
+      const rows: BatchRow[] = Array.isArray(data.results) ? data.results : [];
+      for (const row of rows) out.results.push({ ...row, index: row.index + start });
+    }
+    return out;
   }
   private sendEvent(event: Event): void {
     if (!this.config) {

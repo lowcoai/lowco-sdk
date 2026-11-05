@@ -10,16 +10,23 @@ from typing import Any
 from typing_extensions import Required, TypedDict
 
 __all__ = [
+    "AliasResult",
+    "BatchIssue",
+    "BatchResult",
+    "BatchRow",
     "BrowserInfo",
     "CPUInfo",
+    "ConsentResult",
     "DeviceHardwareInfo",
     "DeviceInfo",
     "EngineInfo",
     "Event",
     "Identify",
+    "JourneyParticipant",
     "LocationInfo",
     "Metadata",
     "OSInfo",
+    "Profile",
 ]
 
 Metadata = dict[str, Any]
@@ -103,3 +110,89 @@ class Event(TypedDict, total=False):
 class Identify(TypedDict, total=False):
     user_id: Required[str]
     user_data: Required[Metadata]
+
+
+# --- answers of the batch, identity, consent and journey APIs ---------------
+# Keys are the service's camelCase JSON keys.
+
+
+class BatchIssue(TypedDict, total=False):
+    """One way an event breaks its strict event definition."""
+
+    property: str
+    kind: str
+    expected: str
+    got: str
+
+
+class BatchRow(TypedDict, total=False):
+    """How one event of a batch was taken (``index`` is its place in the batch).
+
+    ``error`` says why it was refused: no event name, breaking a strict event
+    definition (see ``issues``), or ``"couldn't be queued; send it again"`` (a
+    transient failure worth retrying).
+    """
+
+    index: Required[int]
+    eventName: str
+    ok: Required[bool]
+    error: str
+    issues: list[BatchIssue]
+
+
+class BatchResult(TypedDict):
+    """Answer of ``track_batch``: counts and each event's outcome by its place."""
+
+    accepted: int
+    rejected: int
+    results: list[BatchRow]
+
+
+class AliasResult(TypedDict, total=False):
+    """Whether an alias is now the person's; ``heldBy`` names who has it otherwise."""
+
+    claimed: Required[bool]
+    heldBy: str
+
+
+class Profile(TypedDict, total=False):
+    """A person's profile (the kept one, as ``merge`` returns it)."""
+
+    id: str
+    orgId: str
+    appId: str
+    userId: str
+    userMetadata: Metadata
+    scores: Metadata
+    createdAt: str
+    updatedAt: str
+
+
+class ConsentResult(TypedDict, total=False):
+    """A recorded consent change.
+
+    ``confirmation`` is ``"sent"`` when a double opt-in confirmation was
+    queued, ``"not_configured"`` when the channel needs one but none is set up.
+    """
+
+    channel: Required[str]
+    status: Required[str]
+    previous: str
+    confirmation: str
+
+
+class JourneyParticipant(TypedDict, total=False):
+    """A person's place in a journey (``enter_journey``)."""
+
+    id: str
+    appId: str
+    journeyId: str
+    version: int
+    userId: str
+    executionId: str
+    status: str
+    currentNodeId: str
+    enteredAt: str
+    finishedAt: str
+    context: Metadata
+    exitReason: str

@@ -24,6 +24,9 @@ type Config struct {
 	TimeoutMS int
 	// HTTPClient replaces the default HTTP client.
 	HTTPClient *http.Client
+	// BaseURL replaces DefaultBaseURL (a staging host, or an httptest
+	// server in tests). A trailing slash is ignored.
+	BaseURL string
 }
 
 // Metadata holds free-form event properties (event_data). Values must be

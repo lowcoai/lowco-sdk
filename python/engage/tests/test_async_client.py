@@ -114,10 +114,22 @@ def test_sync_and_async_clients_expose_the_same_api() -> None:
     async_ = _public_methods(AsyncEngageClient)
     sync.pop("close")
     async_.pop("aclose")
-    assert sync.keys() == async_.keys() == {"track", "page", "identify_user"}
+    assert sync.keys() == async_.keys() == {
+        "track",
+        "page",
+        "identify_user",
+        "build_event",
+        "track_batch",
+        "alias",
+        "merge",
+        "set_consent",
+        "enter_journey",
+    }
     for name, sig in sync.items():
         assert str(sig) == str(async_[name]), name
-        assert inspect.iscoroutinefunction(getattr(AsyncEngageClient, name)), name
+        # build_event only builds; everything else talks to the service.
+        is_coroutine = inspect.iscoroutinefunction(getattr(AsyncEngageClient, name))
+        assert is_coroutine == (name != "build_event"), name
     assert inspect.signature(EngageClient.__init__).parameters.keys() == (
         inspect.signature(AsyncEngageClient.__init__).parameters.keys()
     )
@@ -125,3 +137,4 @@ def test_sync_and_async_clients_expose_the_same_api() -> None:
     assert isinstance(AsyncEngageClient.device_id, property)
     assert isinstance(EngageClient.app_id, property)
     assert isinstance(AsyncEngageClient.app_id, property)
+    assert isinstance(EngageClient.base_url, property)

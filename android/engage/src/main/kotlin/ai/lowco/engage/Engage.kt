@@ -8,6 +8,12 @@ const val LOWCO_BASE_URL = "https://api.lowco.ai"
 /** Path of the event ingestion endpoint. */
 const val ENGAGE_TRACK_PATH = "/v1/engage/track"
 
+/** Path of the batch ingestion endpoint (see `trackBatch`). */
+const val ENGAGE_TRACK_BATCH_PATH = "/v1/engage/track/batch"
+
+/** The most events one `trackBatch` call takes. */
+const val MAX_BATCH_SIZE = 1000
+
 /** Header carrying an `lc_` API key; other credentials travel as `Authorization: Bearer`. */
 const val HEADER_API_KEY = "X-Api-Key"
 

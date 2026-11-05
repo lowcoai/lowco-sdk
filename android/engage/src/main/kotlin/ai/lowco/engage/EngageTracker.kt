@@ -165,6 +165,44 @@ class EngageTracker internal constructor(
         write(FIRST_TOUCH_STORAGE_KEY, encoded)
     }
 
+    /**
+     * Builds the event [track] would send now (properties merged over the
+     * attribution context, with the current user, device id, session, device
+     * info and location) without sending it, to collect events for
+     * [trackBatch]. Like [track] it counts as session activity.
+     */
+    @JvmOverloads
+    fun buildEvent(eventName: String, properties: Map<String, Any?>? = null): EngageEvent =
+        synchronized(lock) { newEvent(eventName, properties) }
+
+    /**
+     * Sends up to [MAX_BATCH_SIZE] events in one POST to
+     * `https://api.lowco.ai/v1/engage/track/batch` from the background
+     * executor (build them with [buildEvent]). Unlike [track], one bad event
+     * doesn't fail the rest: [onResult], called on the executor thread, gets
+     * each event's outcome by its place. Fire-and-forget like [track]: an
+     * empty or too-large batch, an unencodable value, a non-2xx answer or a
+     * network failure goes to [EngageConfig.onError] instead.
+     */
+    @JvmOverloads
+    fun trackBatch(events: List<EngageEvent>, onResult: EngageBatchCallback? = null) {
+        if (events.isEmpty() || events.size > MAX_BATCH_SIZE) {
+            report(IllegalArgumentException("engage: a batch takes 1 to $MAX_BATCH_SIZE events, got ${events.size}"))
+            return
+        }
+        val body = try {
+            jsonEncode(mapOf("events" to events.map { it.toJson() })).toByteArray(Charsets.UTF_8)
+        } catch (e: IllegalArgumentException) {
+            report(e)
+            return
+        }
+        try {
+            executor.execute { deliverBatch(body, onResult) }
+        } catch (e: RejectedExecutionException) {
+            report(e)
+        }
+    }
+
     /** Logout: forgets the user id and starts a new session. The device id and attribution are kept. */
     fun reset() {
         synchronized(lock) {
@@ -212,21 +250,7 @@ class EngageTracker internal constructor(
     private fun emit(eventName: String, properties: Map<String, Any?>?, identifiedUser: String? = null) {
         val body = synchronized(lock) {
             if (identifiedUser != null) userId = identifiedUser
-            val now = clock.nowMillis()
-            ensureActiveSession(now)
-            val data = LinkedHashMap<String, Any?>(attribution)
-            firstTouch?.let { data["first_touch"] = it }
-            properties?.let { data.putAll(it) }
-            val event = EngageEvent(
-                eventName = eventName,
-                eventData = data,
-                userId = userId,
-                deviceId = deviceId,
-                sessionId = sessionId,
-                deviceInfo = deviceInfo,
-                location = location,
-                eventTime = now,
-            )
+            val event = newEvent(eventName, properties)
             try {
                 jsonEncode(event.toJson()).toByteArray(Charsets.UTF_8)
             } catch (e: IllegalArgumentException) {
@@ -241,10 +265,40 @@ class EngageTracker internal constructor(
         }
     }
 
+    /** The event with the current user, ids and context. Call with [lock] held. */
+    private fun newEvent(eventName: String, properties: Map<String, Any?>?): EngageEvent {
+        val now = clock.nowMillis()
+        ensureActiveSession(now)
+        val data = LinkedHashMap<String, Any?>(attribution)
+        firstTouch?.let { data["first_touch"] = it }
+        properties?.let { data.putAll(it) }
+        return EngageEvent(
+            eventName = eventName,
+            eventData = data,
+            userId = userId,
+            deviceId = deviceId,
+            sessionId = sessionId,
+            deviceInfo = deviceInfo,
+            location = location,
+            eventTime = now,
+        )
+    }
+
     private fun deliver(body: ByteArray) {
         try {
             val response = transport.post(TRACK_URL, headers, body)
             if (response.statusCode !in 200..299) throw httpError(response)
+        } catch (e: Exception) {
+            report(e)
+        }
+    }
+
+    private fun deliverBatch(body: ByteArray, onResult: EngageBatchCallback?) {
+        try {
+            val response = transport.post(TRACK_BATCH_URL, headers, body)
+            if (response.statusCode !in 200..299) throw httpError(response)
+            val data = jsonDecodeObject(response.body)?.get("data") as? Map<*, *>
+            onResult?.onResult(parseBatchResult(data))
         } catch (e: Exception) {
             report(e)
         }
@@ -286,6 +340,7 @@ class EngageTracker internal constructor(
 
     private companion object {
         const val TRACK_URL = LOWCO_BASE_URL + ENGAGE_TRACK_PATH
+        const val TRACK_BATCH_URL = LOWCO_BASE_URL + ENGAGE_TRACK_BATCH_PATH
 
         fun httpError(response: EngageResponse): EngageException {
             val text = response.body

@@ -16,6 +16,12 @@ const String lowcoBaseUrl = 'https://api.lowco.ai';
 /// Path of the event ingestion endpoint.
 const String engageTrackPath = '/v1/engage/track';
 
+/// Path of the batch ingestion endpoint (see [LowcoAnalytics.trackBatch]).
+const String engageTrackBatchPath = '/v1/engage/track/batch';
+
+/// The most events one [LowcoAnalytics.trackBatch] call takes.
+const int maxBatchSize = 1000;
+
 /// Header carrying the organization id.
 const String headerOrgId = 'X-Org-Id';
 
@@ -59,6 +65,7 @@ const List<String> attributionKeys = [
 
 const Duration _requestTimeout = Duration(seconds: 30);
 final Uri _trackUri = Uri.parse('$lowcoBaseUrl$engageTrackPath');
+final Uri _trackBatchUri = Uri.parse('$lowcoBaseUrl$engageTrackBatchPath');
 
 /// Analytics client for the lowco engage service. Use the process-wide
 /// [instance] (the TS SDK's default export).
@@ -209,6 +216,56 @@ class LowcoAnalytics {
     return _emit(config, '_lowco_identify', properties);
   }
 
+  /// Builds the event [track] would send now — [metadata] merged over the
+  /// attribution context, with the current user, device id, session,
+  /// device info and location — without sending it, to collect events for
+  /// [trackBatch]. Like [track] it counts as session activity. Returns null
+  /// before [init] completes.
+  EngageEvent? buildEvent(String eventName, [Metadata? metadata]) {
+    final config = _config;
+    if (config == null) return null;
+    return _buildEvent(config, eventName, metadata);
+  }
+
+  /// Sends up to [maxBatchSize] events in one request to
+  /// `POST /v1/engage/track/batch` (build them with [buildEvent]). Unlike
+  /// [track], one bad event doesn't fail the rest: the result lists each
+  /// event's outcome by its place ([EngageBatchResult.rejectedRows]).
+  ///
+  /// Never throws: an empty or too-large batch, a refused batch (non-2xx) or
+  /// a network failure goes to [EngageConfig.onError] and the future
+  /// completes with null. Calls before [init] completes are dropped (null).
+  Future<EngageBatchResult?> trackBatch(List<EngageEvent> events) async {
+    final config = _config;
+    if (config == null) {
+      await _notInitialized();
+      return null;
+    }
+    if (events.isEmpty || events.length > maxBatchSize) {
+      _report(
+        config,
+        ArgumentError('engage: a batch takes 1 to $maxBatchSize events, got ${events.length}'),
+      );
+      return null;
+    }
+    try {
+      final body = utf8.encode(jsonEncode({
+        'events': [for (final event in events) event.toJson()],
+      }, toEncodable: _toEncodable));
+      final response = await _post(config, _trackBatchUri, engageTrackBatchPath, body);
+      if (response == null) return null;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw _httpError(response);
+      }
+      final decoded = response.body.trim().isEmpty ? null : jsonDecode(response.body);
+      final data = decoded is Map ? readMap(decoded['data']) : null;
+      return data == null ? const EngageBatchResult() : EngageBatchResult.fromJson(data);
+    } catch (error) {
+      _report(config, error);
+      return null;
+    }
+  }
+
   /// Sets (or clears) the location sent with later events. The SDK does not
   /// read the location itself; pass coordinates from your location plugin.
   void setLocation(LocationInfo? location) => _location = location;
@@ -316,10 +373,13 @@ class LowcoAnalytics {
 
   // --- Delivery ------------------------------------------------------------
 
-  Future<void> _emit(EngageConfig config, String eventName, Metadata? data) {
+  Future<void> _emit(EngageConfig config, String eventName, Metadata? data) =>
+      _send(config, _buildEvent(config, eventName, data));
+
+  EngageEvent _buildEvent(EngageConfig config, String eventName, Metadata? data) {
     final eventTime = now();
     _ensureActiveSession(config, eventTime.millisecondsSinceEpoch);
-    final event = EngageEvent(
+    return EngageEvent(
       eventName: eventName,
       eventData: {..._attributionContext(), ...?data},
       userId: _userId,
@@ -329,30 +389,38 @@ class LowcoAnalytics {
       location: _location,
       eventTime: eventTime,
     );
-    return _send(config, event);
   }
 
   Future<void> _send(EngageConfig config, EngageEvent event) async {
-    final client = _http;
-    if (client == null) return;
+    if (_http == null) return;
     try {
-      final abort = Completer<void>();
-      final request = http.AbortableRequest('POST', _trackUri, abortTrigger: abort.future)
-        ..headers.addAll(trackHeaders(config))
-        ..bodyBytes = utf8.encode(jsonEncode(event.toJson(), toEncodable: _toEncodable));
-      final response = await client.send(request).then(http.Response.fromStream).timeout(
-        _requestTimeout,
-        onTimeout: () {
-          if (!abort.isCompleted) abort.complete();
-          throw TimeoutException('engage: POST $engageTrackPath timed out', _requestTimeout);
-        },
-      );
+      final body = utf8.encode(jsonEncode(event.toJson(), toEncodable: _toEncodable));
+      final response = await _post(config, _trackUri, engageTrackPath, body);
+      if (response == null) return;
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw _httpError(response);
       }
     } catch (error) {
       _report(config, error);
     }
+  }
+
+  /// POSTs [body] to [uri] with the track headers and the request timeout;
+  /// null when there is no HTTP client.
+  Future<http.Response?> _post(EngageConfig config, Uri uri, String path, List<int> body) async {
+    final client = _http;
+    if (client == null) return null;
+    final abort = Completer<void>();
+    final request = http.AbortableRequest('POST', uri, abortTrigger: abort.future)
+      ..headers.addAll(trackHeaders(config))
+      ..bodyBytes = body;
+    return client.send(request).then(http.Response.fromStream).timeout(
+      _requestTimeout,
+      onTimeout: () {
+        if (!abort.isCompleted) abort.complete();
+        throw TimeoutException('engage: POST $path timed out', _requestTimeout);
+      },
+    );
   }
 
   // --- Helpers -------------------------------------------------------------

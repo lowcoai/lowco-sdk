@@ -1,6 +1,6 @@
 # engage (Go)
 
-Server-side Go client for the **lowco engage** event-tracking service, the backend counterpart of the browser SDK [`@lowcoai/engage`](../../npm/engage). Every call sends one event to `POST https://api.lowco.ai/v1/engage/track`. No dependencies outside the standard library.
+Server-side Go client for the **lowco engage** event-tracking service, the backend counterpart of the browser SDK [`@lowcoai/engage`](../../npm/engage). `Track`, `Page` and `IdentifyUser` send one event to `POST https://api.lowco.ai/v1/engage/track`; `TrackBatch` sends up to 1000 at once, and `Alias`, `Merge`, `SetConsent` and `EnterJourney` manage profiles and journeys from your server. No dependencies outside the standard library.
 
 ```bash
 go get github.com/lowcoai/lowco-sdk/go/engage
@@ -54,6 +54,7 @@ Create the client once and share it: it is safe for concurrent use.
 | `DeviceID`   | `device_id` of events that do not set one. Defaults to a random UUID per client. |
 | `TimeoutMS`  | Timeout of the default HTTP client in milliseconds (30s when zero). Not applied to `HTTPClient`. |
 | `HTTPClient` | Your own `*http.Client` (proxies, retries, test transports). |
+| `BaseURL`    | Replaces `https://api.lowco.ai` (a staging host, or an `httptest` server in tests). A trailing slash is ignored. |
 
 `NewClient` returns `ErrMissingAPIKey` / `ErrMissingOrgID` when either required field is blank.
 
@@ -73,7 +74,53 @@ Create the client once and share it: it is safe for concurrent use.
 | `Page(ctx, properties, opts)` | `page_view` | Put `path`, `url`, `title`, `referrer`, `search` in `properties` like the browser SDK does. |
 | `IdentifyUser(ctx, userID, properties, opts)` | `_lowco_identify` | Links `userID` to the device id. Not remembered. Returns `ErrMissingUserID` for a blank id. |
 
+| `NewEvent(eventName, properties, opts)` | `eventName` | Builds the event `Track` would send, without sending it (for `TrackBatch`). |
+| `TrackBatch(ctx, events)` | — | Up to 1000 events in one `POST /v1/engage/track/batch`; returns each event's outcome. |
+| `Alias(ctx, userID, aliasType, aliasValue)` | — | Another name for a person (`AliasAnonymous`, `AliasEmail`, `AliasPhone`, `AliasExternal`). |
+| `Merge(ctx, keepUserID, mergeUserID)` | — | Merges a duplicate profile into the one kept; returns the kept `*Profile`. |
+| `SetConsent(ctx, userID, ConsentRequest)` | — | Records a consent change (`ConsentOptedIn`, `ConsentOptedOut`, `ConsentPending`). |
+| `EnterJourney(ctx, journeyID, userID)` | — | Puts a person in a journey; returns the `*JourneyParticipant`. |
+
 `opts` (`*EventOptions`, may be `nil`) carries `UserID`, `DeviceID`, `SessionID`, `DeviceInfo`, `Location` and `EventTime` (defaults to now). `client.DeviceID()` returns the default device id.
+
+## Batches and profiles
+
+`TrackBatch` is how a worker or queue ships many events: one bad event doesn't fail the rest, and the result lists every event's outcome by its place.
+
+```go
+events := []engage.Event{
+	client.NewEvent("order_completed", engage.Metadata{"total": 1299}, &engage.EventOptions{UserID: "user_123"}),
+	client.NewEvent("invoice_sent", nil, &engage.EventOptions{UserID: "user_456"}),
+}
+res, err := client.TrackBatch(ctx, events) // ErrEmptyBatch / ErrBatchTooLarge (> engage.MaxBatch) before sending
+if err != nil {
+	log.Fatal(err) // the whole batch was refused (*engage.Error)
+}
+for _, row := range res.RejectedRows() {
+	// row.Index, row.Error ("event_name is required", "breaks its strict event definition"
+	// with row.Issues, or "couldn't be queued; send it again" — worth retrying)
+}
+```
+
+The profile and journey calls need a server credential (an admin `lc_…` API key), never a browser key:
+
+```go
+_, _ = client.Alias(ctx, "user_123", engage.AliasExternal, "crm:lead_58291")
+kept, _ := client.Merge(ctx, "user_123", "ana@example.in") // 200, or 202 while the event store catches up: both succeed
+_, _ = client.SetConsent(ctx, "user_123", engage.ConsentRequest{
+	Channel: engage.ConsentWhatsApp, Status: engage.ConsentOptedIn, Source: "form",
+	Evidence: engage.Metadata{"formId": "frm_1"},
+})
+p, err := client.EnterJourney(ctx, "jrn_welcome", "user_123")
+var e *engage.Error
+if errors.As(err, &e) && e.Status == http.StatusConflict {
+	// already in the journey, or may not re-enter yet
+}
+_ = kept
+_ = p
+```
+
+`Alias` returns `Claimed: false` and `HeldBy` when another person already holds the alias (it stays theirs). Blank required arguments return `ErrMissingUserID`, `ErrMissingAlias`, `ErrMissingConsent` or `ErrMissingJourneyID` before any request.
 
 ## Stateless by design
 
@@ -84,7 +131,7 @@ A server handles many users at once, so the client remembers nothing between cal
 - No device / location capture: set `DeviceInfo` / `Location` when you know them. `LocationInfo` coordinates are pointers so `0` is sent; use `engage.Float64(v)`. `IPAddress` is the field a server usually knows.
 - To tie server events to a browser visitor, forward the browser's `lowco_uuid` as `EventOptions.DeviceID`.
 
-Each call sends exactly one event and returns once the service has answered. To keep tracking off the request path, call it from a goroutine or a worker.
+`Track`, `Page` and `IdentifyUser` each send exactly one event and return once the service has answered. To keep tracking off the request path, call them from a goroutine, or collect events in a worker and send them with `TrackBatch`.
 
 ## Data shape
 

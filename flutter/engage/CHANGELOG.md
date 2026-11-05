@@ -1,3 +1,7 @@
+## Unreleased
+
+- `trackBatch(List<EngageEvent>)` sends up to 1000 events to `POST /v1/engage/track/batch` and resolves to an `EngageBatchResult` (per-event `EngageBatchRow`s, `rejectedRows`); `buildEvent(name, [metadata])` builds the event `track` would send. New exports: `engageTrackBatchPath`, `maxBatchSize`.
+
 ## 0.2.0
 
 - `EngageConfig.appId` (optional) selects the engage app, sent as `X-Engage-App-Id`; without it events go to the org's default app.

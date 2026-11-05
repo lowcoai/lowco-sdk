@@ -268,6 +268,61 @@ class EngageEvent {
 
 /// Delivery failure passed to [EngageConfig.onError] for a non-2xx answer
 /// from the track endpoint.
+/// How one event of a [LowcoAnalytics.trackBatch] batch was taken.
+class EngageBatchRow {
+  const EngageBatchRow({
+    required this.index,
+    this.eventName = '',
+    required this.ok,
+    this.error,
+    this.issues = const [],
+  });
+
+  factory EngageBatchRow.fromJson(Map<String, dynamic> json) => EngageBatchRow(
+        index: readInt(json['index']) ?? 0,
+        eventName: readString(json['eventName']) ?? '',
+        ok: readBool(json['ok']) ?? false,
+        error: readString(json['error']),
+        issues: readMapList(json['issues']) ?? const [],
+      );
+
+  /// The event's place in the batch.
+  final int index;
+  final String eventName;
+  final bool ok;
+
+  /// Why the event was refused: no event name, breaking a strict event
+  /// definition (see [issues]), or "couldn't be queued; send it again" (a
+  /// transient failure worth retrying).
+  final String? error;
+
+  /// How the event breaks its strict event definition
+  /// (`{property, kind, expected, got}`).
+  final List<Map<String, dynamic>> issues;
+}
+
+/// The answer to [LowcoAnalytics.trackBatch]: how many events were taken and
+/// each one's outcome by its place.
+class EngageBatchResult {
+  const EngageBatchResult({this.accepted = 0, this.rejected = 0, this.results = const []});
+
+  factory EngageBatchResult.fromJson(Map<String, dynamic> json) => EngageBatchResult(
+        accepted: readInt(json['accepted']) ?? 0,
+        rejected: readInt(json['rejected']) ?? 0,
+        results: readObjectList(json['results'], EngageBatchRow.fromJson) ?? const [],
+      );
+
+  final int accepted;
+  final int rejected;
+  final List<EngageBatchRow> results;
+
+  /// The rows that were not taken.
+  List<EngageBatchRow> get rejectedRows => [
+        for (final row in results)
+          if (!row.ok) row
+      ];
+}
+
 class EngageException implements Exception {
   EngageException({required this.statusCode, required String message, this.body = ''})
       : message = message.isEmpty ? 'engage: status=$statusCode' : message;

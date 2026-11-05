@@ -30,3 +30,19 @@ export const generateId = () => {
   }
   return uuidFromLocalStorage;
 };
+
+/** A new anonymous id, saved as `lowco_uuid` (reset() after a logout). */
+export const resetId = (): string => {
+  const id =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  try {
+    if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
+      localStorage.setItem("lowco_uuid", id);
+    }
+  } catch {
+    // Storage blocked: the id lives for this page only.
+  }
+  return id;
+};

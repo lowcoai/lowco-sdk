@@ -300,4 +300,86 @@ class EngageTrackerTest {
         assertEquals(1, rec.requests.size)
         assertTrue(errors.isNotEmpty())
     }
+
+    @Test
+    fun trackBatchPostsEventsAndReturnsEachRow() {
+        rec.respond = {
+            EngageResponse(
+                200,
+                """{"status":1,"data":{"accepted":1,"rejected":1,"results":[""" +
+                    """{"index":0,"eventName":"a","ok":true},""" +
+                    """{"index":1,"eventName":"order","ok":false,"error":"breaks its strict event definition",""" +
+                    """"issues":[{"property":"total","kind":"type","expected":"number","got":"string"}]}]}}""",
+            )
+        }
+        val t = tracker(EngageConfig(apiKey = "lc_k", orgId = "org_1", appId = "app_9"))
+        t.identifyUser("u1")
+        rec.requests.clear()
+        val events = listOf(t.buildEvent("a", mapOf("x" to 1)), t.buildEvent("order", mapOf("total" to "12")))
+        val results = mutableListOf<EngageBatchResult>()
+        t.trackBatch(events) { results += it }
+
+        val sent = rec.last
+        assertEquals(1, rec.requests.size)
+        assertEquals("https://api.lowco.ai/v1/engage/track/batch", sent.url)
+        assertEquals("lc_k", sent.headers["X-Api-Key"])
+        assertEquals("org_1", sent.headers["X-Org-Id"])
+        assertEquals("app_9", sent.headers["X-Engage-App-Id"])
+        val wire = sent.body.getJSONArray("events")
+        assertEquals(2, wire.length())
+        assertEquals("a", wire.getJSONObject(0).getString("event_name"))
+        assertEquals(1, wire.getJSONObject(0).getJSONObject("event_data").getInt("x"))
+        assertEquals("u1", wire.getJSONObject(1).getString("user_id"))
+        assertEquals(t.deviceId, wire.getJSONObject(1).getString("device_id"))
+        assertEquals(t.sessionId, wire.getJSONObject(1).getString("session_id"))
+        assertEquals("2026-09-21T14:13:20.123Z", wire.getJSONObject(1).getString("event_time"))
+
+        val result = results.single()
+        assertEquals(1, result.accepted)
+        assertEquals(1, result.rejected)
+        assertEquals(listOf(true, false), result.results.map { it.ok })
+        val rejected = result.rejectedRows.single()
+        assertEquals(1, rejected.index)
+        assertEquals("order", rejected.eventName)
+        assertEquals("breaks its strict event definition", rejected.error)
+        assertEquals("total", rejected.issues.single()["property"])
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
+    fun badBatchesGoToOnErrorAndAreNotSent() {
+        val t = tracker()
+        val one = t.buildEvent("x")
+        t.trackBatch(emptyList())
+        t.trackBatch(List(MAX_BATCH_SIZE + 1) { one })
+        t.trackBatch(listOf(t.buildEvent("x", mapOf("bad" to Double.NaN))))
+        assertTrue(rec.requests.isEmpty())
+        assertEquals(3, errors.size)
+        assertTrue(errors.all { it is IllegalArgumentException })
+
+        errors.clear()
+        rec.respond = { EngageResponse(413, """{"error":{"message":"too many"}}""") }
+        var answered = false
+        t.trackBatch(listOf(one)) { answered = true }
+        assertEquals(1, rec.requests.size)
+        assertFalse(answered)
+        assertEquals(413, (errors.single() as EngageException).statusCode)
+        assertEquals("too many", errors.single().message)
+    }
+
+    @Test
+    fun parseBatchResultIsLenient() {
+        val result = parseBatchResult(
+            mapOf(
+                "accepted" to 2,
+                "results" to listOf(mapOf("index" to 0, "ok" to true), mapOf("index" to 1L, "error" to "x"), "junk"),
+            ),
+        )
+        assertEquals(2, result.accepted)
+        assertEquals(0, result.rejected)
+        assertEquals(2, result.results.size)
+        assertEquals(1, result.rejectedRows.single().index)
+        assertEquals("", result.rejectedRows.single().eventName)
+        assertEquals(EngageBatchResult(0, 0, emptyList()), parseBatchResult(null))
+    }
 }

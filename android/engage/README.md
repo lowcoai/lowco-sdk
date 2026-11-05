@@ -71,6 +71,8 @@ From Java every method is static: `LowcoAnalytics.track("signup_completed", Map.
 | `setLocation(location?)` | `location` for later events; the SDK never reads the location itself. |
 | `setDeviceInfo(deviceInfo)` | Replace the detected `device_info`. |
 | `reset()` | Logout: forget the user id and start a new session. |
+| `buildEvent(eventName, properties?)` | The event `track` would send now, without sending it (null before `init`). |
+| `trackBatch(events, onResult?)` | Up to 1000 events in one `POST /v1/engage/track/batch`; `onResult` (background thread) gets an `EngageBatchResult` with each event's outcome (`rejectedRows`). |
 | `userId`, `deviceId`, `sessionId`, `isInitialized` | Current state. |
 
 Calls made before `init` are dropped with a warning, except `captureAttribution`, which is applied when `init` runs.
@@ -94,7 +96,7 @@ Same rules and storage keys as the browser SDK:
 
 ## Delivery and errors
 
-Each event is built on the calling thread and POSTed on its own from one background thread (so events leave in order) with `HttpURLConnection` and a 30-second timeout. Methods never throw: invalid events (blank names, non-finite numbers), non-2xx answers (`EngageException` with `statusCode`, `message` and the raw `body`), network failures and storage failures go to `onError`. Events are not queued on disk or retried.
+Each event is built on the calling thread and POSTed on its own from one background thread (so events leave in order) with `HttpURLConnection` and a 30-second timeout. Methods never throw: invalid events (blank names, non-finite numbers), non-2xx answers (`EngageException` with `statusCode`, `message` and the raw `body`), network failures and storage failures go to `onError`. Events are not queued on disk or retried. `trackBatch` sends a list you collected in one request: each event is taken or refused on its own (`EngageBatchRow.error`, and `issues` for a strict event definition); an empty or over-1000 batch, a refused batch or a network failure goes to `onError`.
 
 `EngageTracker`, the client behind `LowcoAnalytics`, has no Android dependency: construct it directly with your own `EngageStorage`, `EngageTransport` and `Executor` for tests or non-Android JVM code.
 

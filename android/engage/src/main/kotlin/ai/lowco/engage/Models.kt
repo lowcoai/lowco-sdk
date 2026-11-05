@@ -116,6 +116,59 @@ data class EngageEvent(
     }
 }
 
+/** How one event of a `trackBatch` batch was taken. */
+data class EngageBatchRow @JvmOverloads constructor(
+    /** The event's place in the batch. */
+    val index: Int,
+    val eventName: String,
+    val ok: Boolean,
+    /**
+     * Why the event was refused: no event name, breaking a strict event
+     * definition (see [issues]), or "couldn't be queued; send it again" (a
+     * transient failure worth retrying).
+     */
+    val error: String? = null,
+    /** How the event breaks its strict event definition (`property`, `kind`, `expected`, `got`). */
+    val issues: List<Map<String, Any?>> = emptyList(),
+)
+
+/** The answer to `trackBatch`: how many events were taken and each one's outcome by its place. */
+data class EngageBatchResult(
+    val accepted: Int,
+    val rejected: Int,
+    val results: List<EngageBatchRow>,
+) {
+    /** The rows that were not taken. */
+    val rejectedRows: List<EngageBatchRow>
+        get() = results.filter { !it.ok }
+}
+
+/** Receives a `trackBatch` answer, on the SDK's background thread. */
+fun interface EngageBatchCallback {
+    fun onResult(result: EngageBatchResult)
+}
+
+/** Reads the `data` of a `/track/batch` answer leniently. */
+internal fun parseBatchResult(data: Map<*, *>?): EngageBatchResult {
+    val rows = (data?.get("results") as? List<*>).orEmpty().mapNotNull { row ->
+        val r = row as? Map<*, *> ?: return@mapNotNull null
+        EngageBatchRow(
+            index = (r["index"] as? Number)?.toInt() ?: 0,
+            eventName = r["eventName"] as? String ?: "",
+            ok = r["ok"] == true,
+            error = r["error"] as? String,
+            issues = (r["issues"] as? List<*>).orEmpty().mapNotNull { issue ->
+                (issue as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v }
+            },
+        )
+    }
+    return EngageBatchResult(
+        accepted = (data?.get("accepted") as? Number)?.toInt() ?: 0,
+        rejected = (data?.get("rejected") as? Number)?.toInt() ?: 0,
+        results = rows,
+    )
+}
+
 /** Delivery failure passed to [EngageConfig.onError] for a non-2xx answer. */
 class EngageException(
     val statusCode: Int,

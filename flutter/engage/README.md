@@ -60,8 +60,12 @@ An org can have several engage apps, each with its own events and users. Set `ap
 | `captureAttribution(uri)`               | Reads `utm_*` / click ids from a deep link or URL (see below).                  |
 | `setLocation(LocationInfo?)`            | Location sent with later events.                                                |
 | `setDeviceInfo(DeviceInfo)`             | Override the auto-detected `device_info` (e.g. with `device_info_plus` data).   |
+| `buildEvent(name, [metadata])`          | The event `track` would send now, without sending it (null before `init`).      |
+| `trackBatch(List<EngageEvent>)`         | Up to 1000 events in one `POST /v1/engage/track/batch`; resolves to an `EngageBatchResult` (null on failure). |
 
-Tracking is fire-and-forget: one `POST` per event, and the returned futures never throw (you may `await` them to know the request finished). Errors — non-2xx answers as `EngageException(statusCode, message, body)`, network failures, timeouts (30 s), storage failures — go to `onError`.
+`trackBatch` takes or refuses each event on its own: `result.rejectedRows` lists the refused ones with their `error` (and `issues` for a strict event definition); an empty or over-1000 batch, a refused batch or a network failure goes to `onError` and resolves to null.
+
+Tracking is fire-and-forget: one `POST` per event (or per `trackBatch` call), and the returned futures never throw (you may `await` them to know the request finished). Errors — non-2xx answers as `EngageException(statusCode, message, body)`, network failures, timeouts (30 s), storage failures — go to `onError`.
 
 ## Route tracking
 
