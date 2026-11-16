@@ -8,6 +8,8 @@ export interface InlineSnippetOptions {
   autoTrack?: boolean;
   /** Emitted only when true: show the app's live Engage forms. */
   forms?: boolean;
+  /** Emitted only when true: mirror each event's event_id onto fbq/gtag. */
+  mirrorEventIds?: boolean;
   eventName?: string;
   eventData?: Metadata;
 }
@@ -34,6 +36,7 @@ export function createInlineSnippet({
   appId,
   autoTrack = true,
   forms,
+  mirrorEventIds,
   eventName = "signup_completed",
   eventData,
 }: InlineSnippetOptions = {}): string {
@@ -43,6 +46,7 @@ export function createInlineSnippet({
     appId: appId || undefined,
     autoTrack,
     ...(forms ? { forms: true } : {}),
+    ...(mirrorEventIds ? { mirrorEventIds: true } : {}),
   });
 
   const eventCall = eventData

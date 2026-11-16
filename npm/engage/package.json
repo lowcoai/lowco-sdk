@@ -50,6 +50,7 @@
     "build:browser": "tsup --entry.lowco-analytics src/browser.ts --format iife --global-name LowcoAnalytics --out-dir dist --target es2020 --minify --no-clean",
     "build": "npm run build:lib && npm run build:browser",
     "typecheck": "tsc --noEmit",
+    "test": "npm run build:lib && node --test test/*.test.mjs",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

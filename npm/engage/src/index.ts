@@ -33,3 +33,17 @@ export type {
   FormTriggerType,
 } from "./types";
 export type { EmbedSnippetOptions, InlineSnippetOptions } from "./snippet";
+export {
+  CLICK_ID_KEYS,
+  collectAdIds,
+  createEventId,
+  fbcFromFbclid,
+  gaClientIdFromCookie,
+  gaSessionId,
+  mergeSessionClickIds,
+  mirrorEventId,
+  parseCookies,
+  primaryClickId,
+  readClickIds,
+} from "./adids";
+export type { AdIdsInput, ClickIdKey } from "./adids";

@@ -17,6 +17,18 @@ import {
   Metadata,
 } from "./types";
 import { EngageForm, EngageForms } from "./forms";
+import {
+  ClickIdKey,
+  collectAdIds,
+  createEventId,
+  fbcFromFbclid,
+  gaClientIdFromCookie,
+  gaSessionId,
+  mergeSessionClickIds,
+  mirrorEventId,
+  parseCookies,
+  readClickIds,
+} from "./adids";
 import UAParser from "ua-parser-js";
 
 const BASE_URL = "https://api.lowco.ai";
@@ -33,11 +45,15 @@ class LowcoAnalytics {
   private locationInfo: LocationInfo | null = null;
   private sessionId: string | null = null;
   private lastEventTime: number | null = null;
+  private sessionStart: number | null = null;
+  private sessionAds: SessionAds | null = null;
   private forms: EngageForms | null = null;
   private routeHooksInstalled = false;
   private readonly SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
   private readonly SESSION_ID_STORAGE_KEY = "lowco_session_id";
   private readonly LAST_EVENT_STORAGE_KEY = "lowco_session_last_event";
+  private readonly SESSION_START_STORAGE_KEY = "lowco_session_start";
+  private readonly SESSION_ADS_STORAGE_KEY = "lowco_session_ads";
   private readonly FIRST_TOUCH_STORAGE_KEY = "lowco_first_touch";
   private readonly ATTRIBUTION_KEYS = [
     "utm_source",
@@ -47,7 +63,11 @@ class LowcoAnalytics {
     "utm_content",
     "utm_id",
     "gclid",
+    "gbraid",
+    "wbraid",
     "fbclid",
+    "li_fat_id",
+    "ttclid",
     "msclkid",
   ];
 
@@ -70,6 +90,7 @@ class LowcoAnalytics {
       appId: config.appId,
       autoTrack: config.autoTrack,
       forms: config.forms,
+      mirrorEventIds: config.mirrorEventIds,
     });
     this.initializeSession();
     if (config.autoTrack && this.canUseBrowserApis()) {
@@ -177,6 +198,7 @@ class LowcoAnalytics {
 
     const storedSessionId = localStorage.getItem(this.SESSION_ID_STORAGE_KEY);
     const storedLastEvent = localStorage.getItem(this.LAST_EVENT_STORAGE_KEY);
+    const storedStart = Number(localStorage.getItem(this.SESSION_START_STORAGE_KEY));
     const now = Date.now();
 
     if (storedSessionId && storedLastEvent) {
@@ -186,6 +208,7 @@ class LowcoAnalytics {
         if (!isExpired) {
           this.sessionId = storedSessionId;
           this.lastEventTime = lastEventTimestamp;
+          this.sessionStart = Number.isFinite(storedStart) && storedStart > 0 ? storedStart : lastEventTimestamp;
           return;
         }
       }
@@ -194,10 +217,30 @@ class LowcoAnalytics {
     this.startNewSession(now);
   }
 
+  /**
+   * A new session id, GA4-compatible: `<client id>.<start epoch seconds>`,
+   * the client id being GA4's (`_ga` cookie) when the page runs gtag, else
+   * this browser's anonymous id.
+   */
   private startNewSession(timestamp: number = Date.now()): void {
-    this.sessionId = this.createSessionId();
+    this.sessionStart = timestamp;
+    this.sessionId = gaSessionId(this.clientId(), timestamp);
     this.lastEventTime = timestamp;
+    this.sessionAds = null;
     this.persistSession();
+  }
+
+  private clientId(): string {
+    const ga = gaClientIdFromCookie(parseCookies(this.readCookie())._ga);
+    return ga ?? this.anonymousId ?? this.createSessionId();
+  }
+
+  private readCookie(): string {
+    try {
+      return typeof document !== "undefined" ? (document.cookie ?? "") : "";
+    } catch {
+      return "";
+    }
   }
 
   private ensureActiveSession(eventTime: Date): void {
@@ -229,6 +272,9 @@ class LowcoAnalytics {
         this.LAST_EVENT_STORAGE_KEY,
         this.lastEventTime.toString(),
       );
+      if (this.sessionStart) {
+        localStorage.setItem(this.SESSION_START_STORAGE_KEY, this.sessionStart.toString());
+      }
     } catch (error) {
       console.error("Failed to persist session data:", error);
     }
@@ -307,6 +353,66 @@ class LowcoAnalytics {
     };
   }
 
+  /**
+   * The ad identifiers for this event: the session's click ids (the first
+   * value of each seen this session is kept), `click_id`/`click_id_kind`,
+   * Meta's `_fbp`/`_fbc` cookies (`fbc` derived from fbclid when the cookie
+   * is absent), GA4's client id, the referrer and the page URL.
+   */
+  private buildAdContext(nowMs: number = Date.now()): Metadata {
+    const search =
+      typeof window !== "undefined" ? (window.location?.search ?? "") : "";
+    const ads = this.loadSessionAds();
+    ads.click_ids = mergeSessionClickIds(ads.click_ids, readClickIds(search));
+    const cookie = this.readCookie();
+    if (ads.click_ids.fbclid && !ads.fbc && !parseCookies(cookie)._fbc) {
+      ads.fbc = fbcFromFbclid(ads.click_ids.fbclid, nowMs);
+    }
+    this.saveSessionAds(ads);
+    return collectAdIds({
+      clickIds: ads.click_ids,
+      cookie,
+      derivedFbc: ads.fbc,
+      referrer: typeof document !== "undefined" ? document.referrer || undefined : undefined,
+      url: typeof window !== "undefined" ? window.location?.href || undefined : undefined,
+    });
+  }
+
+  private loadSessionAds(): SessionAds {
+    const sid = this.sessionId ?? "";
+    if (this.sessionAds && this.sessionAds.session_id === sid) {
+      return this.sessionAds;
+    }
+    let ads: SessionAds = { session_id: sid, click_ids: {} };
+    if (this.canUseStorage()) {
+      try {
+        const raw = localStorage.getItem(this.SESSION_ADS_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed && typeof parsed === "object" && parsed.session_id === sid) {
+          ads = {
+            session_id: sid,
+            click_ids: parsed.click_ids && typeof parsed.click_ids === "object" ? parsed.click_ids : {},
+            ...(typeof parsed.fbc === "string" ? { fbc: parsed.fbc } : {}),
+          };
+        }
+      } catch {
+        // unreadable: start the session's ad ids afresh
+      }
+    }
+    this.sessionAds = ads;
+    return ads;
+  }
+
+  private saveSessionAds(ads: SessionAds): void {
+    this.sessionAds = ads;
+    if (!this.canUseStorage()) return;
+    try {
+      localStorage.setItem(this.SESSION_ADS_STORAGE_KEY, JSON.stringify(ads));
+    } catch {
+      // storage blocked: the ids live for this page only
+    }
+  }
+
   private getAttributionParams(search: string): Metadata {
     if (!search) {
       return {};
@@ -383,14 +489,20 @@ class LowcoAnalytics {
     }
   }
 
-  public page(properties: Metadata = {}) {
-    this.track("page_view", properties);
+  /** Tracks a `page_view`; returns its `event_id` (undefined before init). */
+  public page(properties: Metadata = {}): string | undefined {
+    return this.track("page_view", properties);
   }
 
-  public track(eventName: string, eventMetadata: Metadata = {}) {
+  /**
+   * Tracks an event and returns its `event_id` (a UUID; pass your own as
+   * `event_id` in the metadata to keep it), so the same id can be given to
+   * other tags. Undefined before init().
+   */
+  public track(eventName: string, eventMetadata: Metadata = {}): string | undefined {
     if (!this.config) {
       console.error("Analytics not initialized. Call init() first.");
-      return;
+      return undefined;
     }
 
     if (!this.sessionId) {
@@ -400,13 +512,17 @@ class LowcoAnalytics {
     const eventTime = new Date();
     this.ensureActiveSession(eventTime);
 
+    const eventData: Metadata = {
+      ...this.buildAttributionContext(),
+      ...this.buildAdContext(eventTime.getTime()),
+      event_id: createEventId(),
+      ...eventMetadata,
+    };
+    const eventId = String(eventData.event_id);
     const event = {
-      id: "",
+      id: eventId,
       event_name: eventName,
-      event_data: {
-        ...this.buildAttributionContext(),
-        ...eventMetadata,
-      },
+      event_data: eventData,
       user_id: this.userId,
       device_id: this.anonymousId,
       session_id: this.sessionId ?? undefined,
@@ -416,7 +532,11 @@ class LowcoAnalytics {
     } as Event;
 
     this.sendEvent(event);
+    if (this.config.mirrorEventIds && typeof window !== "undefined") {
+      mirrorEventId(window as unknown as { fbq?: unknown; gtag?: unknown }, eventName, eventId, eventMetadata);
+    }
     this.forms?.onEvent(eventName);
+    return eventId;
   }
 
   public identifyUser(userId: string, properties: Metadata = {}) {
@@ -431,13 +551,18 @@ class LowcoAnalytics {
     }
     this.ensureActiveSession(eventTime);
 
+    // The click ids, fbp/fbc and GA client id ride on the identify too, so
+    // they land on the profile.
+    const eventData: Metadata = {
+      ...this.buildAttributionContext(),
+      ...this.buildAdContext(eventTime.getTime()),
+      event_id: createEventId(),
+      ...properties,
+    };
     this.sendEvent({
-      id: "",
+      id: String(eventData.event_id),
       event_name: "_lowco_identify",
-      event_data: {
-        ...this.buildAttributionContext(),
-        ...properties,
-      },
+      event_data: eventData,
       user_id: userId,
       device_id: this.anonymousId,
       session_id: this.sessionId ?? undefined,
@@ -523,17 +648,20 @@ class LowcoAnalytics {
       throw new Error("Analytics not initialized. Call init() first.");
     }
     const out: BatchResult = { accepted: 0, rejected: 0, results: [] };
-    const wire = events.map((e) => ({
-      id: "",
+    const wire = events.map((e) => {
+      const eventData: Metadata = { event_id: createEventId(), ...(e.event_data ?? {}) };
+      return {
+      id: String(eventData.event_id),
       event_name: e.event_name,
-      event_data: e.event_data ?? {},
+      event_data: eventData,
       user_id: e.user_id === undefined ? this.userId : e.user_id,
       device_id: e.device_id ?? this.anonymousId,
       session_id: e.session_id ?? this.sessionId ?? undefined,
       device_info: e.device_info === undefined ? this.deviceInfo : e.device_info,
       location: e.location === undefined ? this.locationInfo : e.location,
       event_time: e.event_time ?? new Date(),
-    }));
+      };
+    });
     for (let start = 0; start < wire.length; start += MAX_BATCH) {
       const res = await fetch(`${BASE_URL}/v1/engage/track/batch`, {
         method: "POST",
@@ -565,6 +693,14 @@ class LowcoAnalytics {
       headers: this.buildHeaders(this.config),
     });
   }
+}
+
+/** The session's ad click ids, kept in `lowco_session_ads`. */
+interface SessionAds {
+  session_id: string;
+  click_ids: Partial<Record<ClickIdKey, string>>;
+  /** `fbc` derived from fbclid when Meta's `_fbc` cookie is absent. */
+  fbc?: string;
 }
 
 export default LowcoAnalytics.getInstance();

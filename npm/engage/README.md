@@ -45,6 +45,7 @@ Events are always sent to `https://api.lowco.ai`.
 | `appId`      | Optional. The engage app to track into, sent as `X-Engage-App-Id`. Omitted: the org's default app.           |
 | `autoTrack`  | Auto-track page views and `history.pushState` / `replaceState`.                                              |
 | `forms`      | Show the app's live Engage forms by their display rules (see [Forms](#forms)).                               |
+| `mirrorEventIds` | Opt-in. Also send each tracked event to the Meta pixel (`fbq`) and gtag when they are on the page, with the same `event_id` (see [Ad ids and event ids](#ad-ids-and-event-ids)). |
 
 ### Credentials and apps
 
@@ -57,9 +58,9 @@ Events are always sent to `https://api.lowco.ai`.
 ## API
 
 - `init(config)` — configure and start session tracking.
-- `track(eventName, metadata?)` — fire a custom event.
-- `page(properties?)` — fire a `page_view` event.
-- `identifyUser(userId, properties?)` — bind a user id to the device id and emit `_lowco_identify`.
+- `track(eventName, metadata?)` — fire a custom event; returns its `event_id`.
+- `page(properties?)` — fire a `page_view` event; returns its `event_id`.
+- `identifyUser(userId, properties?)` — bind a user id to the device id and emit `_lowco_identify` (carrying the ad ids below, so they land on the profile).
 - `reset()` — logout: forget the identified user and start a new anonymous id (`lowco_uuid`) and session.
 - `showForm(id)` — show a live form now, whatever its rules; resolves `false` when it isn't live.
 - `hideForms()` — close the SDK's form popups, slide-ins and bars and hold back pending triggers until the next page.
@@ -87,9 +88,42 @@ LowcoAnalytics.init({ apiKey: "lc_…", orgId: "org_123", appId: "app_123", form
 
 ## Sessions & attribution
 
-- Session id is stored under `lowco_session_id` (30-minute inactivity timeout).
-- Device id is stored under `lowco_uuid`; `reset()` replaces it.
-- First-touch attribution (UTM, gclid, fbclid, msclkid) is captured under `lowco_first_touch` and merged into every event.
+- Session id is GA4-compatible — `<client id>.<session start epoch seconds>`, the client id being GA4's (from the `_ga` cookie) when the page runs gtag, else the SDK's device id — and is stored under `lowco_session_id` / `lowco_session_start` (renewed after 30 minutes without an event).
+- Device id is stored under `lowco_uuid`; `reset()` replaces it (and starts a new session).
+- The current page's UTM parameters and click ids are merged into every event; first-touch attribution (UTM and click ids, landing URL, referrer) is captured once under `lowco_first_touch` and sent as `first_touch`.
+
+## Ad ids and event ids
+
+Every event (`track`, `page`, `identifyUser`) carries, when present, these properties — the names Engage reads to attribute visits and leads to ads and to forward conversions to Meta, Google and LinkedIn:
+
+| Property | Source |
+| --- | --- |
+| `gclid`, `gbraid`, `wbraid`, `fbclid`, `li_fat_id`, `ttclid`, `msclkid` | Click ids on the landing URL, kept for the session (`lowco_session_ads`); the first value of each seen in a session is kept. |
+| `click_id`, `click_id_kind` | The highest-ranked of those (gclid › gbraid › wbraid › fbclid › msclkid › ttclid › li_fat_id) and its parameter name. |
+| `fbp` | Meta's `_fbp` cookie. |
+| `fbc` | Meta's `_fbc` cookie; without it, derived from `fbclid` as `fb.1.<epoch ms>.<fbclid>` (stable for the session). |
+| `ga_client_id` | GA4's client id from the `_ga` cookie (`GA1.1.<client id>` → `<client id>`). |
+| `referrer` | `document.referrer`. |
+| `url` | The page URL. |
+| `event_id` | A UUID per event (also sent as the event's `id`). Pass your own `event_id` in the metadata to keep it, e.g. an order id. |
+
+Properties you pass to `track()` win over these.
+
+With `mirrorEventIds: true`, each tracked event (except `page_view`, which the pixel and `gtag('config')` send themselves) is also sent to `fbq` — as the matching standard event (`Lead`, `Purchase`, `CompleteRegistration`, `AddToCart`, `InitiateCheckout`, `ViewContent`, `Contact`, `Subscribe`, `Search`) or `trackCustom`, with `{ eventID }` — and to `gtag('event', name, { …, event_id })`, using only the event's scalar properties. Meta and Google then dedupe it against the same conversion Engage forwards server-side. Leave it off if your page already fires those events itself; instead pass the id `track()` returns to your own calls:
+
+```ts
+const eventId = LowcoAnalytics.track("lead_submitted", { form: "demo" });
+fbq("track", "Lead", {}, { eventID: eventId });
+```
+
+The helpers (`readClickIds`, `collectAdIds`, `gaClientIdFromCookie`, `fbcFromFbclid`, `gaSessionId`, `createEventId`, `mirrorEventId`, `CLICK_ID_KEYS`) are exported.
+
+## Development
+
+```bash
+npm run typecheck
+npm test   # builds the library, then node --test test/*.test.mjs
+```
 
 ## Snippet helpers
 

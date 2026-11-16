@@ -19,6 +19,14 @@ export interface Config {
    * Engage. Fetched after init and on SPA route changes.
    */
   forms?: boolean;
+  /**
+   * Also send each tracked event to the Meta pixel (`fbq`, with
+   * `{ eventID }`) and gtag (`event_id` parameter) when those globals are
+   * on the page, with the same `event_id` Engage stores, so Meta and
+   * Google dedupe them against the conversions Engage forwards server-side.
+   * `page_view` is never mirrored. Off by default.
+   */
+  mirrorEventIds?: boolean;
 }
 
 export interface Metadata {
