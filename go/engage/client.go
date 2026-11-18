@@ -12,11 +12,15 @@ import (
 	"time"
 )
 
-// DefaultBaseURL is the fixed API host every event is sent to.
+// DefaultBaseURL is the API host every call goes to unless Config.BaseURL
+// says otherwise.
 const DefaultBaseURL = "https://api.lowco.ai"
 
 // TrackPath is the event ingestion endpoint.
 const TrackPath = "/v1/engage/track"
+
+// TrackBatchPath is the batch ingestion endpoint (see TrackBatch).
+const TrackBatchPath = "/v1/engage/track/batch"
 
 // Request headers.
 const (
@@ -48,6 +52,7 @@ func IsAPIKey(apiKey string) bool {
 // Client sends events to the engage track API. Create one and share it: it
 // holds no per-user state and is safe for concurrent use.
 type Client struct {
+	baseURL  string
 	trackURL string
 	headers  http.Header
 	appID    string
@@ -56,9 +61,10 @@ type Client struct {
 	now      func() time.Time
 }
 
-// NewClient constructs a Client targeting DefaultBaseURL. Config.APIKey and
-// Config.OrgID are required: it returns ErrMissingAPIKey or ErrMissingOrgID
-// when either is empty. Config.AppID is optional.
+// NewClient constructs a Client targeting Config.BaseURL (DefaultBaseURL when
+// empty). Config.APIKey and Config.OrgID are required: it returns
+// ErrMissingAPIKey or ErrMissingOrgID when either is empty. Config.AppID is
+// optional.
 func NewClient(config Config) (*Client, error) {
 	apiKey := strings.TrimSpace(config.APIKey)
 	if apiKey == "" {
@@ -98,8 +104,14 @@ func NewClient(config Config) (*Client, error) {
 		client = &http.Client{Timeout: timeout}
 	}
 
+	baseURL := strings.TrimRight(strings.TrimSpace(config.BaseURL), "/")
+	if baseURL == "" {
+		baseURL = DefaultBaseURL
+	}
+
 	return &Client{
-		trackURL: DefaultBaseURL + TrackPath,
+		baseURL:  baseURL,
+		trackURL: baseURL + TrackPath,
 		headers:  headers,
 		appID:    appID,
 		deviceID: deviceID,
@@ -140,6 +152,13 @@ func (c *Client) IdentifyUser(ctx context.Context, userID string, properties Met
 		return ErrMissingUserID
 	}
 	return c.send(ctx, c.buildEvent(IdentifyEvent, properties, opts, userID))
+}
+
+// NewEvent builds the event Track would send — properties copied into
+// event_data, the client's device id and the current time unless opts set
+// them — without sending it, to collect events for TrackBatch.
+func (c *Client) NewEvent(eventName string, properties Metadata, opts *EventOptions) Event {
+	return c.buildEvent(eventName, properties, opts, "")
 }
 
 // buildEvent assembles the wire event; userID, when set, wins over opts.
@@ -204,11 +223,21 @@ func (c *Client) send(ctx context.Context, event Event) error {
 // encodeEvent marshals compact UTF-8 JSON like JSON.stringify (no HTML
 // escaping). Unsupported values such as NaN fail here, before any request.
 func encodeEvent(event Event) ([]byte, error) {
+	body, err := encodeJSON(event)
+	if err != nil {
+		return nil, fmt.Errorf("engage: encode event: %w", err)
+	}
+	return body, nil
+}
+
+// encodeJSON is compact UTF-8 JSON without HTML escaping or a trailing
+// newline.
+func encodeJSON(v any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
-	if err := enc.Encode(event); err != nil {
-		return nil, fmt.Errorf("engage: encode event: %w", err)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
 	}
 	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
 }
