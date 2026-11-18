@@ -442,6 +442,27 @@ Each package is self-contained; run its checks from its own folder.
 
 ---
 
+## Releasing SDKs
+
+Run the release script from the repository root with Python 3.11 or newer.
+
+```sh
+./scripts/publish-packages.py --dry-run
+./scripts/publish-packages.py --check
+./scripts/publish-packages.py --publish
+```
+
+`--dry-run` checks which versions are already available and reports what is ready or blocked. `--check` also builds and validates pending releases. `--publish` requires a clean, committed checkout and uploads the pending versions after the checks pass. Repeat `--only` to select ecosystems or package paths, for example `--only npm --only python/engage`.
+
+- Set the intended versions in the npm, Python, Dart/Flutter, and Android package manifests before releasing. Update `ios/engage/CHANGELOG.md` for Swift. Published versions are skipped, and npm prereleases use the `next` tag.
+- Supply an explicit stable version for each changed Go module with `--go-version go/engage VERSION`. Go and Swift tags point to `public/main`, so sync the corresponding source and the root Swift manifest to the public mirror before tagging. If your clone needs the remote, run `git remote add public https://github.com/lowcoai/lowco-sdk.git`. The script pushes only the release tags.
+- Configure npm registry access, install `build` and `twine` in the Python environment and configure PyPI credentials, and authenticate the Dart or Flutter CLI with pub.dev. For Android, use the [Maven Central setup](android/engage/README.md#releasing).
+- Pending releases of the four generated API packages run the compatibility and generated-source checks. The script uses the sibling `lowco-api` checkout by default. Use `--lowco-api PATH` to point at a different checkout.
+
+If an upload fails, correct the error and rerun the same command. Maven Central can take time to index a successful deployment. Check the Central Portal status before retrying an interrupted Android upload.
+
+---
+
 ## Repository conventions
 
 - Every SDK targets the fixed API host `https://api.lowco.ai` (`wss://api.lowco.ai/v1/ws` for flux) — base URLs are not configurable.

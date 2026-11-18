@@ -16,5 +16,8 @@ build/
 .dart_tool/
 pubspec.lock
 
+# Swift Package Manager
+/.build/
+
 # Go tool binaries (go build output)
 tools/apigen/apigen

@@ -106,3 +106,9 @@ Each event is built on the calling thread and POSTed on its own from one backgro
 ./gradlew testDebugUnitTest    # needs an Android SDK (ANDROID_HOME or local.properties)
 ./gradlew assembleRelease publishToMavenLocal
 ```
+
+## Releasing
+
+Register the `ai.lowco` namespace in the [Central Portal](https://central.sonatype.com) and create a user token. Set `mavenCentralUsername` and `mavenCentralPassword` in your user Gradle properties. Configure a published GPG key using `signingInMemoryKey` and, for a protected key, `signingInMemoryKeyPassword`. In CI, supply the same properties through `ORG_GRADLE_PROJECT_` environment variables. See the [Maven Central plugin guide](https://vanniktech.github.io/gradle-maven-publish-plugin/central/).
+
+Set the release version in `build.gradle.kts` and run `./scripts/publish-packages.py --only android --publish` from the repository root. For a standalone release, run `./gradlew testDebugUnitTest publishAndReleaseToMavenCentral` from this directory.

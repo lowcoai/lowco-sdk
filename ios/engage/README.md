@@ -8,7 +8,9 @@ Swift client for the **Lowco Engage** event-tracking service: the native counter
 
 ## Install
 
-The package lives in a subfolder of the `lowco-sdk` repository (`ios/engage`). Swift Package Manager only resolves a remote URL whose repository has a `Package.swift` at its root, so until a root manifest (or a split `lowco-engage-ios` repository) is published, add it as a **local package**:
+After a Swift release tag is published, add `https://github.com/lowcoai/lowco-sdk.git` in Xcode under *File → Add Package Dependencies* and select the `LowcoEngage` product.
+
+To work from a checkout, add the SDK as a **local package**.
 
 - **Xcode**: clone `lowco-sdk` (or add it as a git submodule), then *File → Add Package Dependencies… → Add Local…* and pick `lowco-sdk/ios/engage`. Add the `LowcoEngage` library to your app target.
 - **Package.swift**:
